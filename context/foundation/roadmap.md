@@ -1,0 +1,310 @@
+---
+project: "GymLog"
+version: 1
+status: draft
+created: 2026-08-09
+updated: 2026-08-09
+prd_version: 1
+main_goal: speed
+top_blocker: time
+---
+
+# Roadmap: GymLog
+
+> Derived from `context/foundation/prd.md` (v1) + auto-researched codebase baseline.
+> Edit-in-place; archive when superseded.
+> Slices below are listed in dependency order. The "At a glance" table is the index.
+>
+> **Sequencing framing — answered by the owner, not inferred.** The goal is `speed`: the product
+> has three weeks of after-hours time and twenty-two must-have requirements, so only work that a
+> must-have requirement forces is sequenced at all — everything else is parked rather than
+> scheduled late.
+> The main constraint is `time`, and the consequence is deliberate: **every slice below is
+> independently deliverable**, so stopping part-way still leaves something whole. The one layer
+> that gets deep investment is **data** — the product's hardest guardrail is that no account can
+> reach another's training, the codebase has no data layer at all today, and ownership has to be
+> enforced in the database rather than in request code. Interface, request handling and hosting
+> stay deliberately plain.
+
+## Vision recap
+
+Someone who lifts three or four evenings a week already writes every set down. The data is
+there; the arithmetic is not. Comparing sets at different rep counts and different loads by hand,
+across weeks, is work nobody does — so people train by feel, guess the next load at the rack, and
+notice a stalled block weeks after it stalled.
+
+Repetitions and weight are enough to derive a comparable strength score for each set, sum a
+week's work into one figure, and know the moment a set beats everything before it. This is not a
+data-capture problem needing more input — it is arithmetic the product can do silently at save
+time. The same notebook, with the maths already done.
+
+## North star
+
+**S-03: user can log a workout, add an exercise, enter a set of repetitions and weight, and
+immediately see an estimated one-rep max** — this is the flow that proves the product's whole
+premise, because the value on offer is the arithmetic, not the recording. It maps directly onto
+the primary success criterion, and it is placed as early as its prerequisites allow.
+
+> "North star" here means: the smallest end-to-end slice whose successful delivery would prove
+> the core product idea works — everything else in this roadmap only matters if this one does,
+> which is why it is sequenced as early as its prerequisites permit rather than saved for later.
+
+## At a glance
+
+| ID   | Change ID                         | Outcome (user can …)                                                                    | Prerequisites                                                                                                                   | PRD refs                                                                            | Status   |
+| ---- | --------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------- |
+| F-01 | verification-harness              | (foundation) wrong derived numbers fail the pipeline instead of reaching a screen       | —                                                                                                                               | Business Logic §boundaries, NFR §determinism, US-04 AC §assert-against-stored-state | ready    |
+| F-02 | smoke-deploy                      | (foundation) the product is reachable at a stable public address from a green pipeline  | —                                                                                                                               | NFR §browser support, NFR §2s p95 on mobile                                         | ready    |
+| F-03 | owned-persistence-baseline        | (foundation) rows belong to accounts and the database enforces it                       | F-02, a provisioned hosted database project (URL + key set as pipeline secrets and as runtime secrets on the deployed instance) | US-04, Access Control §ownership enforced, NFR §no cross-account reach              | proposed |
+| S-01 | account-access                    | create an account, sign in, sign out, and be sent to sign-in when signed out            | F-03                                                                                                                            | FR-001, FR-002, FR-003, US-04, Access Control                                       | proposed |
+| S-02 | exercise-catalogue                | browse and search exercises, and add their own with a muscle group and bodyweight flag  | S-01, F-03                                                                                                                      | FR-011, FR-012, FR-013, FR-014, Access Control §catalogue visibility                | proposed |
+| S-03 | log-workout-with-estimate         | log a workout and see the estimated one-rep max for the set they just entered           | S-02, F-01, F-03                                                                                                                | US-01, FR-004, FR-005, FR-008, FR-009, FR-015                                       | proposed |
+| S-04 | personal-records                  | be told at save time when a set beats their best, and see current records per exercise  | S-03, F-01                                                                                                                      | US-02, FR-020, FR-021                                                               | proposed |
+| S-05 | edit-and-delete-log               | correct or remove a workout or a set, warned first about any record that will fall      | S-04, F-01                                                                                                                      | FR-006, FR-007, FR-010, US-02                                                       | proposed |
+| S-06 | unit-formula-timezone-preferences | choose kilograms or pounds, the estimation formula, and the timezone their week runs in | S-03, F-03                                                                                                                      | FR-016, FR-022, US-03, NFR §unit round-trip                                         | proposed |
+| S-07 | weekly-tonnage                    | see this training week's total tonnage next to last week's                              | S-05, S-06, F-01                                                                                                                | US-03, FR-017                                                                       | proposed |
+| S-08 | tonnage-breakdown                 | see where the week's work went, per exercise and per muscle group                       | S-07, F-01                                                                                                                      | US-03, FR-018, FR-019                                                               | proposed |
+| S-09 | account-boundary                  | be certain no other account can reach their training, and delete their own account      | S-02, S-03, S-06, F-01, F-03                                                                                                    | US-04, NFR §no cross-account reach, NFR §own-data deletion                          | proposed |
+
+## Streams
+
+Navigation aid — groups items that share a Prerequisites chain. Canonical ordering still lives in the dependency graph below; this table is the proposed reading order across parallel tracks.
+
+| Stream | Theme                   | Chain                             | Note                                                                                                                                                |
+| ------ | ----------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A      | Correctness gate        | `F-01`                            | Needs nothing at all — the only work available while the database project is still being provisioned.                                               |
+| B      | Environment & ownership | `F-02` → `F-03` → `S-01`          | The critical path; nothing that stores data can start until this stream's data foundation lands.                                                    |
+| C      | Log, derive, correct    | `S-02` → `S-03` → `S-04` → `S-05` | The north-star chain. Joins Stream B at its account slice, and consumes Stream A's gate throughout.                                                 |
+| D      | The week in numbers     | `S-06` → `S-07` → `S-08`          | Joins Stream C at the north star; its totals also wait on Stream C's edit slice, so corrections are already reflected when the weekly figures ship. |
+| E      | Account boundary        | `S-09`                            | Joins C and D once every level of the record exists; runs alongside the whole of Stream D.                                                          |
+
+## Baseline
+
+What's already in place in the codebase as of `2026-08-09` (auto-researched + owner-confirmed).
+Foundations below assume these are present and do NOT re-scaffold them.
+
+- **Frontend:** present — server-rendered pages with interactive islands, a utility CSS system and a component library are all wired; `src/pages/`, `src/components/`, `src/components/ui/`.
+- **Backend / API:** present, scaffold only — server rendering is on by default and three authentication endpoints exist under `src/pages/api/auth/`. No endpoint touches training data, because none exists yet.
+- **Data:** **absent** — `supabase/config.toml` is present but there is no `supabase/migrations/` directory, no table, and no provisioned project. This is the roadmap's largest gap and the reason `data` is the deep-investment layer.
+- **Auth:** present, scaffold only — a cookie-session client (`src/lib/supabase.ts`), request middleware resolving the current user with a protected-route redirect (`src/middleware.ts`), and sign-in / sign-up / confirm-email pages. It has never run against a real identity provider, and there is no row-ownership enforcement anywhere, because there are no tables to enforce it on.
+- **Deploy / infra:** partial — the hosting configuration is correct and named, the pipeline (`.github/workflows/ci.yml`) runs lint and build on `main` and is green, and the hosting account is authenticated. The product has never been deployed; `context/deployment/deploy-plan.md` is written and awaiting the owner's approval.
+- **Observability:** partial — platform-level observability is switched on in the hosting configuration. No error tracking, no metrics, no dashboards.
+- **Verification tooling (correction to the six probed layers):** **absent** — there is no unit-test runner, no browser-test runner, and no test script in the package manifest. The pipeline runs lint and build only; type checking and tests are not wired. This is what `F-01` exists to close.
+
+## Foundations
+
+### F-01: Domain-rule verification harness
+
+- **Outcome:** (foundation) a unit-test runner is wired into the repository and the pipeline gate runs type checking and unit tests alongside the existing lint and build, so a wrong derived number fails the pipeline instead of reaching a screen.
+- **Change ID:** verification-harness
+- **PRD refs:** Business Logic §boundaries, NFR §determinism, US-04 AC §assert-against-stored-state
+  — the boundary rules under Business Logic §"The rule is only as good as its boundaries"; the
+  requirement that derived values are deterministic and reproducible; and US-04's criterion that
+  a failure is "verified against the recorded data, not only against the response the caller sees".
+- **Unlocks:** S-03, S-04, S-05, S-07, S-08 — every slice whose acceptance turns on a numeric boundary (one repetition, the twelve-repetition edge, zero and negative loads, unit round-trip, week boundaries across timezones). Also creates the assert-against-stored-state verification path that S-09 and US-04 require.
+- **Prerequisites:** —
+- **Parallel with:** F-02
+- **Blockers:** —
+- **Unknowns:** —
+- **Risk:** sequenced first because the boundary arithmetic needs no database and no deployed environment — it is the only work available while the data environment is still being provisioned, which is exactly what the time constraint asks for. Scope is the runner and the pipeline gate only; the tests themselves belong to the slices that own the rules. Over-scoping this into a full test strategy would spend the scarcest resource on work no user ever sees.
+- **Status:** ready
+
+### F-02: Public deployment path
+
+- **Outcome:** (foundation) the product is deployed and reachable at a stable public address from a green pipeline, with the deployment configuration validated while the surface area is still small enough that a failure is easy to read.
+- **Change ID:** smoke-deploy
+- **PRD refs:** NFR §browser support, NFR §2s p95 on mobile
+  — "remains usable on the latest two major versions of the four mainstream desktop browsers and
+  on current mobile Safari and Chrome", and "usable content in under 2 seconds at the 95th
+  percentile on a mid-range phone over a mobile connection".
+- **Unlocks:** F-03 — a deployed instance is where the runtime credentials have to be set, and that step fails silently rather than loudly if skipped. Also opens the only honest verification path for the mobile-performance and browser-support requirements, which no pipeline can check.
+- **Prerequisites:** —
+- **Parallel with:** F-01
+- **Blockers:** the first production deployment is the owner's call, not the implementer's — `context/deployment/deploy-plan.md` is `status: awaiting-approval`. Planning may proceed; execution waits.
+- **Unknowns:** —
+- **Risk:** nothing stands in front of it — the hosting account is already authenticated and the build is green (`context/deployment/deploy-plan.md` §Preconditions) — so it is deliberately thin and deliberately early. What it produces is a page that renders and cannot sign anybody in — the expected outcome at this stage, not a defect, and it must not be reported as "the product is deployed". Validating the deployment path now costs one throwaway run; discovering a misconfiguration after application code exists costs a debugging session in the middle of the build.
+- **Status:** ready
+
+### F-03: Account-owned persistence with database-enforced isolation
+
+- **Outcome:** (foundation) a hosted database is connected to development, the pipeline and the deployed instance, and the row-ownership policy shape that every later table must follow is established and demonstrated on the account's own profile row — including a check that asserts against stored rows rather than the status code a caller sees.
+- **Change ID:** owned-persistence-baseline
+- **PRD refs:** US-04, Access Control §ownership enforced, NFR §no cross-account reach
+  — Access Control's "ownership is enforced by the product, not merely hidden in the interface",
+  and the requirement that "no account's training data is obtainable by another account through
+  any interface".
+- **Unlocks:** S-01, S-02, S-03, S-06, S-09 — every slice that stores anything at all. It also closes the roadmap's single largest unknown (there is no data layer today) and creates the persisted-state verification path US-04 demands.
+- **Prerequisites:** F-02, a provisioned hosted database project (URL + key set as pipeline secrets and as runtime secrets on the deployed instance)
+- **Parallel with:** F-01
+- **Blockers:** no database project exists yet — Owner: user. Nothing downstream of this can be built until it does, which makes provisioning it the highest-value thing the owner can do today.
+- **Unknowns:**
+  - There is no local database stack on the development machine and none is wanted, so development, migrations and integration checks all run against the hosted project. How migrations are applied, and how a check run avoids disturbing the data the owner is actually training with, needs deciding. — Owner: user. Block: no.
+- **Risk:** this is the deep-investment item and the only foundation that is not thin, because the product's hardest guardrail lives here: ownership is enforced in the database, not only in request code. From this point on the ownership policy is written in the same migration that creates each table — a table that lands without one is a defect, not a follow-up. Sequenced before every data-bearing slice because retrofitting ownership onto tables that already exist is precisely where isolation defects are born.
+- **Status:** proposed
+
+## Slices
+
+### S-01: Account access
+
+- **Outcome:** user can create an account with an email address and a password, sign in, sign out, and is sent to sign-in when they request a training screen while signed out — landing afterwards on the screen they originally asked for.
+- **Change ID:** account-access
+- **PRD refs:** FR-001, FR-002, FR-003, US-04, Access Control
+  — US-04 here specifically for its criterion that "signing out and returning requires
+  authenticating again before any training data is shown"; the adversarial half of US-04 is S-09.
+- **Prerequisites:** F-03
+- **Parallel with:** F-01
+- **Blockers:** —
+- **Unknowns:** —
+- **Risk:** the sign-in surface already exists in the repository but has never run against a real identity provider, and the known failure mode is silent: absent runtime credentials produce a deployment that serves pages, returns success, and treats every visitor as anonymous. This slice is where that is caught, and it is caught by signing in against the deployed address — a green pipeline cannot see it.
+- **Status:** proposed
+
+### S-02: Exercise catalogue
+
+- **Outcome:** user can browse and search a catalogue of exercises, add their own to a private catalogue, and give each one exactly one primary muscle group and a bodyweight flag.
+- **Change ID:** exercise-catalogue
+- **PRD refs:** FR-011, FR-012, FR-013, FR-014, Access Control §catalogue visibility
+  — "the seeded exercise catalogue is readable by every signed-in account. Custom exercises added
+  by a user are private to that account."
+- **Prerequisites:** S-01, F-03
+- **Parallel with:** F-01
+- **Blockers:** —
+- **Unknowns:**
+  - What is the muscle-group taxonomy, and which exercises ship in the seeded catalogue? Working starting point: legs, back, chest, shoulders, arms, core; roughly 30–40 exercises covering the main lifts. — Owner: user. Block: no.
+- **Risk:** the group list is load-bearing rather than cosmetic — because every exercise carries exactly one group, the per-group figures later have to reconcile with the week's total, so a taxonomy chosen carelessly here is re-tagged across every custom exercise the owner has already created. Sequenced before the north star because logging a workout requires an exercise to log it against, and free-text names would make per-exercise records impossible to compute at all. The bodyweight flag lands here rather than later so the zero and negative load rules are explicit at the moment sets first become storable.
+- **Status:** proposed
+
+### S-03: Log a workout and see what it was worth
+
+- **Outcome:** user can create a workout dated today with an optional note, add an exercise from the catalogue, log a set of repetitions and weight, save, and immediately see an estimated one-rep max for that set — with the workout present in their list, most recent first, after a reload.
+- **Change ID:** log-workout-with-estimate
+- **PRD refs:** US-01, FR-004, FR-005, FR-008, FR-009, FR-015
+- **Prerequisites:** S-02, F-01, F-03
+- **Parallel with:** —
+- **Blockers:** —
+- **Unknowns:** —
+- **Risk:** the estimate is the product, so its boundaries are the risk: at exactly one repetition the estimate must equal the weight lifted, and above twelve repetitions no estimate may be shown rather than a fabricated one. Two storage decisions are also made here and are expensive to reverse — weights are held in one canonical unit, and estimates are derived on read rather than written down — because S-06 later lets the user change both the unit and the formula, and neither change may rewrite a logged value or a past estimate.
+- **Status:** proposed
+
+### S-04: A record is announced when it happens, and listed afterwards
+
+- **Outcome:** user is told at the moment of saving when a set beats their previous best for that exercise, and can open a list of their current records per exercise — the best estimate and the heaviest absolute weight side by side.
+- **Change ID:** personal-records
+- **PRD refs:** US-02, FR-020, FR-021
+- **Prerequisites:** S-03, F-01
+- **Parallel with:** S-06
+- **Blockers:** —
+- **Unknowns:** —
+- **Risk:** three exclusions decide whether this number is true — the first-ever set for an exercise establishes a baseline and is not announced, sets outside the estimate's valid range and assisted sets with a negative load take no part at all, and a set equal to the previous best once both are expressed in the same unit is not a record. Records are read from the surviving sets rather than written down as trophies, which is what keeps them honest under S-05 and is far cheaper to establish now than to unwind later.
+- **Status:** proposed
+
+### S-05: Correct or remove what was logged
+
+- **Outcome:** user can edit a workout's date and note, edit or delete an individual set, and delete a workout together with everything under it — being told first which record it holds and what that record will fall to, and having to confirm.
+- **Change ID:** edit-and-delete-log
+- **PRD refs:** FR-006, FR-007, FR-010, US-02
+  — US-02 here for its criteria that "the record recomputes from the sets that remain, and may go
+  down", and that the user "is told which record it holds and what value that record will fall to,
+  and must confirm".
+- **Prerequisites:** S-04, F-01
+- **Parallel with:** S-06
+- **Blockers:** —
+- **Unknowns:** —
+- **Risk:** this is where a derived number goes stale without anybody noticing — deleting the set behind a record has to lower that record rather than leave it pointing at nothing, and a fat-fingered weight is the single most common correction a real log receives. Sequenced immediately after records exist so the warn-then-fall behaviour has something to act on. The weekly figures this also disturbs are covered when S-07 lands, which is why S-07 lists this slice as a prerequisite rather than the other way round.
+- **Status:** proposed
+
+### S-06: Units, formula, and the week's timezone
+
+- **Outcome:** user can choose kilograms or pounds, choose whether estimates use Epley or Brzycki, and set the timezone their training week is evaluated in — and every weight, estimate and total on screen follows the choice consistently.
+- **Change ID:** unit-formula-timezone-preferences
+- **PRD refs:** FR-016, FR-022, US-03, NFR §unit round-trip
+  — US-03 here only for its criterion that "a training week runs Monday to Sunday evaluated in the
+  user's own timezone"; the weekly figures themselves are S-07. The round-trip requirement is "a
+  weight entered in pounds and read back in pounds is the number the user typed".
+- **Prerequisites:** S-03, F-03
+- **Parallel with:** S-04, S-05
+- **Blockers:** —
+- **Unknowns:** —
+- **Risk:** the round-trip is the whole risk — a value typed in pounds, displayed in kilograms and read back in pounds must be the number typed, and neither conversion nor rounding may turn a non-record into a record or erase one. Sequenced after the north star on purpose: shipping sensible defaults first keeps the first end-to-end flow small, and that only works because S-03 stores weights in one canonical unit and derives estimates on read, so changing either preference re-derives rather than migrates.
+- **Status:** proposed
+
+### S-07: The week's work, against last week's
+
+- **Outcome:** user opens the home screen and sees total tonnage for the current training week next to the previous one, with a week that has no logged sets reading as zero and an explanation rather than a blank.
+- **Change ID:** weekly-tonnage
+- **PRD refs:** US-03, FR-017
+- **Prerequisites:** S-05, S-06, F-01
+- **Parallel with:** S-09
+- **Blockers:** —
+- **Unknowns:** —
+- **Risk:** one failure — a weekly figure that is wrong and looks right — reaches this screen by two routes. The week has to run Monday to Sunday in the user's own timezone, so a Sunday-evening session belongs to that week rather than the next; and the totals have to be summed in the database rather than by walking every set inside the request, because the hosting runtime enforces a hard per-request processing cap that kills the request outright instead of slowing it — a shape that passes in the first week and fails once the log grows. Zero-weight sets contribute repetitions but nothing to the total, and assisted sets contribute nothing rather than a negative amount.
+- **Status:** proposed
+
+### S-08: Where the week's work went
+
+- **Outcome:** user can see the current week's tonnage broken down per exercise and per muscle group, with the group figures summing exactly to the week's total.
+- **Change ID:** tonnage-breakdown
+- **PRD refs:** US-03, FR-018, FR-019
+- **Prerequisites:** S-07, F-01
+- **Parallel with:** S-09
+- **Blockers:** —
+- **Unknowns:**
+  - How is an exercise's muscle group corrected after the fact? Changing it retroactively rewrites every historical per-group figure that exercise contributed to — numbers the user has already seen — and the alternative is applying the change only going forward. — Owner: user. Block: no.
+- **Risk:** the breakdown is only worth showing if it reconciles: every exercise contributes to exactly one group precisely so the group rows sum to the week's total, with no set counted twice and none left out. Sequenced immediately after the total so both figures come from the same aggregation and cannot drift apart. It is also the natural stopping point if the schedule tightens — the total answers the primary question on its own, and this slice answers the secondary one.
+- **Status:** proposed
+
+### S-09: The account boundary, proven and reversible
+
+- **Outcome:** user's training is unreachable from any other account — reads, edits and deletes alike, including a request that names a workout, exercise entry or set identifier directly, verified against the stored rows — and the user can delete their own account together with all of its training data, after which none of it is retrievable.
+- **Change ID:** account-boundary
+- **PRD refs:** US-04, NFR §no cross-account reach, NFR §own-data deletion
+  — "no account's training data is obtainable by another account through any interface … for
+  reads, modifications, and deletions alike", and "a user can delete their account together with
+  all associated training data, after which none of it is retrievable through the product".
+- **Prerequisites:** S-02, S-03, S-06, F-01, F-03
+- **Parallel with:** S-07, S-08
+- **Blockers:** —
+- **Unknowns:** —
+- **Risk:** the enforcement itself is not deferred to this slice — the ownership policy is written in the same migration as every table from F-03 onwards, and a table that lands without one is a defect rather than a follow-up. What is sequenced here is the adversarial proof, which can only run once all three levels of the record exist, and which has to assert against stored rows rather than the status code the caller sees: a check that only reads the response passes happily against a broken boundary. Account deletion joins it because it is the same boundary read from the other side.
+- **Status:** proposed
+
+## Backlog Handoff
+
+| Roadmap ID | Change ID                         | Suggested issue title                                                     | Ready for `/10x-plan` | Notes                                                                  |
+| ---------- | --------------------------------- | ------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------- |
+| F-01       | verification-harness              | Wire a unit-test runner and add typecheck + tests to the pipeline gate    | yes                   | Run `/10x-plan verification-harness`. Needs no database, no deploy.    |
+| F-02       | smoke-deploy                      | Deploy the current build to a stable public address and verify the config | yes                   | Run `/10x-plan smoke-deploy`. Execution waits on the owner's go-ahead. |
+| F-03       | owned-persistence-baseline        | Connect a hosted database and establish the row-ownership policy shape    | no                    | Needs F-02 and a provisioned database project (owner action).          |
+| S-01       | account-access                    | Sign up, sign in, sign out, and gate the training screens                 | no                    | Needs F-03.                                                            |
+| S-02       | exercise-catalogue                | Browse, search, and add exercises with a muscle group and bodyweight flag | no                    | Needs S-01, F-03. Taxonomy decision open (non-blocking).               |
+| S-03       | log-workout-with-estimate         | Log a workout and show the estimated one-rep max                          | no                    | Needs S-02, F-01, F-03. North star.                                    |
+| S-04       | personal-records                  | Announce a personal record at save time and list current records          | no                    | Needs S-03, F-01.                                                      |
+| S-05       | edit-and-delete-log               | Edit and delete workouts and sets, warning before a record falls          | no                    | Needs S-04, F-01.                                                      |
+| S-06       | unit-formula-timezone-preferences | Preferred unit, estimation formula, and training-week timezone            | no                    | Needs S-03, F-03.                                                      |
+| S-07       | weekly-tonnage                    | Weekly tonnage for the current and previous training week                 | no                    | Needs S-05, S-06, F-01. Aggregate in the database, not in-request.     |
+| S-08       | tonnage-breakdown                 | Weekly tonnage broken down per exercise and per muscle group              | no                    | Needs S-07, F-01. Retroactive-group decision open (non-blocking).      |
+| S-09       | account-boundary                  | Prove cross-account isolation against stored data; account deletion       | no                    | Needs S-02, S-03, S-06, F-01, F-03.                                    |
+
+## Open Roadmap Questions
+
+1. **What is the muscle-group taxonomy, and which exercises ship in the seeded catalogue?** — FR-013 requires every exercise to carry exactly one primary muscle group, so the list of groups is now load-bearing: too coarse (push / pull / legs) and the breakdown says nothing, too fine (fifteen groups) and every week looks sparse. A working starting point is legs, back, chest, shoulders, arms, core. Roughly 30–40 seeded exercises covering the main lifts is the target; an exhaustive collection is explicitly not. Owner: user. By: before the catalogue is seeded. Block: gates **S-02** (which seeds it) and shapes **S-08** (which reports on it) — neither is blocked from being planned, but S-02 cannot be implemented without the list.
+2. **How is an exercise's muscle group corrected after the fact?** — If a user assigns the wrong group to a custom exercise, changing it retroactively rewrites every historical per-group tonnage figure that exercise contributed to. Whether that is acceptable (numbers the user already saw will change) or whether the change should apply only going forward needs deciding. Owner: user. By: implementation planning. Block: gates the correction behaviour in **S-02** and the historical figures in **S-08**; neither is blocked from being planned.
+3. **How are migrations applied and integration checks run without a local database stack?** — The development machine has no container runtime and none is wanted, so there is no local database. Development, migrations and any check that touches stored data all run against the hosted project, which is also the project the owner is training against. Owner: user. Block: gates the working method inside **F-03** and every slice downstream of it; not blocking for planning.
+
+## Parked
+
+- **Per-exercise history of the estimated one-rep max over time (FR-023)** — Why parked: the only `nice-to-have` in the PRD, and named there as the first thing to cut if three weeks tighten. The record list and the weekly comparison already answer the core question.
+- **Records bucketed by repetition range** — Why parked: PRD §Open Questions, resolved during shaping. Because records are derived from surviving sets rather than awarded, buckets can be added later from existing data alone; deferring costs nothing.
+- **Calendar view of workouts** — Why parked: PRD §FR-005 resolution. The list is the confirmation step in the logging flow and works on a narrow screen; a calendar is a presentation change that can follow.
+- **Training programme generation, coaching cues, load recommendations** — Why parked: PRD §Non-Goals. The boundary that keeps the domain rule small enough to be correct.
+- **Generative or predictive intelligence of any kind** — Why parked: PRD §Non-Goals. The value here is arithmetic that is verifiable and reproducible.
+- **Any social surface — sharing, following, leaderboards, comparison** — Why parked: PRD §Non-Goals. Single-tenant by design, which also keeps the access-control model flat.
+- **Nutrition, bodyweight, sleep, cardio tracking** — Why parked: PRD §Non-Goals. Each brings its own domain rules and none improves the strength question.
+- **Import from other trackers or wearables** — Why parked: PRD §Non-Goals. Manual entry only; an import path would need a mapping onto the exercise catalogue before the first working flow even exists.
+- **Native mobile application and offline-first behaviour** — Why parked: PRD §Non-Goals. Connectivity is assumed; offline synchronisation is a product of its own.
+- **Coach / athlete roles and shared workouts** — Why parked: PRD §Non-Goals, now and in what the MVP's shape implies.
+- **Multi-region availability and compliance work beyond baseline data-protection duties** — Why parked: PRD §Non-Goals. Own-data deletion is in scope (S-09); nothing beyond it is.
+- **Error tracking, metrics and dashboards beyond what the platform provides** — Why parked: the goal is speed and the observability layer is not a launch gate for a single-account product. Platform-level observability is already on.
+
+## Done
+
+(Empty on first generation.)
