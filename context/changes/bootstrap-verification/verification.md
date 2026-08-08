@@ -150,8 +150,53 @@ remaining 20 are transitive. **Every finding has a fix available** — none is a
 - **esbuild** (transitive) — arbitrary file read when running the development server on Windows.
   Fix available.
 
-No auto-fix was applied. Per the bootstrap contract, this step informs; the remediation decision
-is the project owner's.
+No auto-fix was applied during the bootstrap step itself. Per the bootstrap contract, that step
+informs; the remediation decision is the project owner's. What follows records the remediation
+that was then decided and carried out.
+
+### Remediation performed
+
+**`npm audit fix` (non-breaking only): 23 advisories → 4.** This cleared the CRITICAL `tar`
+finding and eleven of the thirteen HIGH ones. Remaining after the fix: 2 HIGH, 1 MODERATE, 1 LOW.
+
+**Astro 7 upgrade: attempted, reverted.** All four remaining advisories resolve only via
+`astro@7.x`, which is a major bump. Bootstrap time is the cheapest possible moment for such an
+upgrade — no application code depends on Astro 6 behaviour yet — and the ecosystem had already
+moved: `@astrojs/cloudflare@14.2.0` peers on `astro ^7.0.0` and on `wrangler ^4.83.0` (this
+project ships 4.90), and `@astrojs/react@6` supports React 19. The upgrade installed cleanly and
+reported **0 vulnerabilities**, and both `astro sync` and `npm run lint` passed.
+
+`npm run build` did not. It fails during "Building server entrypoints" with:
+
+```
+Could not find the prerender entry point in the build output. This is likely a bug in Astro.
+  at getPrerenderEntryFileName (astro/dist/core/build/static-build.js:210:9)
+```
+
+Reproduced on both `astro@7.2.0` + `@astrojs/cloudflare@14.2.0` and `astro@7.1.6` +
+`@astrojs/cloudflare@14.1.7`, with the starter's `astro.config.mjs` unmodified
+(`output: "server"`, Cloudflare adapter, React and sitemap integrations). Two versions failing
+identically points at a systematic incompatibility between Astro 7's static-build path and the
+Cloudflare adapter rather than a single-release regression, so the attempt was time-boxed and
+abandoned there.
+
+**Decision: stay on Astro 6 with the four remaining advisories.** Their real exposure for this
+project:
+
+| Advisory                                | Severity | Exposure here                                                                                             |
+| --------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------- |
+| `astro` — reflected XSS via unescaped slot name; Host-header SSRF in prerendered error page | HIGH | Genuine and the one to watch. Mitigation until the upgrade lands: avoid dynamic slot names, and treat the error page as untrusted-input surface. |
+| `sharp` — inherited libvips CVEs        | HIGH     | Reached only through Astro's image optimization. This product handles no user-supplied images (images are an explicit non-goal of the PRD), so the code path is not exercised. |
+| `@astrojs/cloudflare` — depends on vulnerable `astro` | MODERATE | Same root cause as the `astro` entry; resolves with it.                                                    |
+| `esbuild` — arbitrary file read in the dev server on Windows | LOW | Development-only, and this project is developed on Windows, so it is not purely theoretical — but it requires a local attacker able to reach the dev server. |
+
+Revisit the Astro 7 upgrade once the adapter incompatibility is fixed upstream. The rollback
+point is the `bootstrap:` commit; the upgrade command that installed cleanly was
+`npm install astro@^7.2.0 @astrojs/cloudflare@^14.2.0 @astrojs/react@^6.0.2 @astrojs/check@latest @astrojs/sitemap@latest`.
+
+### Post-remediation verification
+
+`npx astro sync`, `npm run lint`, and `npm run build` all exit 0 on the reverted Astro 6 tree.
 
 ## Hints recorded but not acted on
 
