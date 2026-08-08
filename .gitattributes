@@ -1,0 +1,16 @@
+# Normalize line endings to LF in the repository and in every working copy.
+# Without this, git's autocrlf on Windows checks files out as CRLF, and
+# prettier/eslint fail every line with "Delete `␍`".
+* text=auto eol=lf
+
+# Binary files git must never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
