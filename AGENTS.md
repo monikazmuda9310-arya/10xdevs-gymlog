@@ -115,5 +115,5 @@ Line endings are LF, pinned by `.gitattributes`. Do not disable this: the machin
   build fails against the Cloudflare adapter (`Could not find the prerender entry point`),
   reproduced on 7.1.6 and 7.2.0. Do not "helpfully" bump it; see
   `context/changes/bootstrap-verification/verification.md` for the full record.
-- `.github/workflows/ci.yml` still targets the `master` branch; this repository's default branch
-  is `main`.
+- CI (`.github/workflows/ci.yml`) runs lint + build only. Typecheck, unit tests, and the browser
+  test are not wired yet.
