@@ -168,7 +168,9 @@ Set `SUPABASE_URL` and `SUPABASE_KEY` as secrets in your Cloudflare dashboard or
 
 ## CI
 
-GitHub Actions runs lint + build on every push and PR to `master`. Configure `SUPABASE_URL` and `SUPABASE_KEY` as repository secrets in GitHub for the build step.
+GitHub Actions runs lint + build on every push and PR to `main`. Configure `SUPABASE_URL` and `SUPABASE_KEY` as repository secrets in GitHub for the build step.
+
+Those repository secrets are **build-time only**. They do not become Worker runtime secrets — for that, use `npx wrangler secret put SUPABASE_URL` and `npx wrangler secret put SUPABASE_KEY` against the deployed Worker. Skipping that step produces a deployment that builds, returns 200, and cannot log anybody in.
 
 ## License
 

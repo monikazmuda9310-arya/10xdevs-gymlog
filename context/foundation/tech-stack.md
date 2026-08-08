@@ -5,7 +5,7 @@ project_name: gymlog
 hints:
   language_family: js
   team_size: solo
-  deployment_target: cloudflare-pages
+  deployment_target: cloudflare-workers
   ci_provider: github-actions
   ci_default_flow: auto-deploy-on-merge
   bootstrapper_confidence: first-class
@@ -28,9 +28,11 @@ have to come out of the box, because three weeks does not survive hand-rolling a
 `10x-astro-starter` is the vetted default for a JavaScript web product and clears all four
 agent-friendly gates — typed end to end, convention-based, well represented in training data,
 and currently documented. Its scaffolding confidence is first-class rather than verified, which
-is acceptable here since the starter installs by clone. Deployment targets Cloudflare Pages, the
-starter's own default; CI runs on GitHub Actions with auto-deploy on merge, so a green pipeline
-and a live URL stay coupled. Only the auth feature flag is set — payments, realtime, background
+is acceptable here since the starter installs by clone. Deployment targets Cloudflare Workers —
+corrected from `cloudflare-pages` after infrastructure research established that
+`@astrojs/cloudflare` v13 dropped Pages support entirely and that `wrangler.jsonc` already
+declares a Workers Static Assets project. CI runs on GitHub Actions with auto-deploy on merge, so
+a green pipeline and a live URL stay coupled. Only the auth feature flag is set — payments, realtime, background
 jobs, and AI are all ruled out by the PRD's non-goals. The starter's own warning about
 configuring row-level authorization early is treated as a first-slice obligation, not a
 follow-up.

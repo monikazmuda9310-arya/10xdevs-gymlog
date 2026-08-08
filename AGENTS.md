@@ -109,6 +109,28 @@ Line endings are LF, pinned by `.gitattributes`. Do not disable this: the machin
 `core.autocrlf=true`, and without the pin every file checks out as CRLF and prettier fails all
 1022 lines of the repository.
 
+## Cloudflare traps
+
+Deployment target is Cloudflare **Workers**, not Pages: `@astrojs/cloudflare` v13 dropped Pages
+support, and `wrangler.jsonc` declares a Workers Static Assets project. The deploy command is
+`wrangler deploy`; `wrangler pages deploy` does not read this config shape.
+
+- **Missing secrets fail silently, not loudly.** `src/lib/supabase.ts` returns `null` when
+  `SUPABASE_URL` / `SUPABASE_KEY` are absent, and `src/middleware.ts` then sets
+  `locals.user = null`. The app builds, deploys, serves 200s, and nobody can sign in. GitHub
+  repository secrets are **build-time only** — the Worker needs its own
+  `wrangler secret put`. No pipeline can catch this; check it by signing in against the
+  deployed URL.
+- **`astro dev` already runs the real workerd runtime** (adapter v13 bundles
+  `@cloudflare/vite-plugin`). Do not add a `wrangler dev` step — it is legacy for this stack, and
+  `platformProxy` was removed.
+- Adapter v13 also removed `Astro.locals.runtime` and `cloudflareModules`, and flipped
+  `imageService` to default `cloudflare-binding`. Guidance written for v12 or earlier is wrong.
+- **The Workers Free plan caps CPU at 10 ms per invocation** — a hard kill (Error 1102), not a
+  throttle. Weekly tonnage and per-muscle-group rollups must be aggregated in Postgres, not
+  looped over every set inside the Worker. Doing it in the Worker passes in week one and fails
+  once the log grows.
+
 ## Known state
 
 - **Astro is held at 6.x.** Astro 7 resolves the four outstanding `npm audit` advisories but its
