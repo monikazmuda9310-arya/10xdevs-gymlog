@@ -119,6 +119,36 @@ npx wrangler secret put SUPABASE_KEY
    are build-time only and do **not** reach the Worker at runtime; step 2 is what does that.
    Setting one and not the other is the trap.
 
+### Stage 2 — run 2026-08-09
+
+Project `cdzybmwxtefhbanfytna`, region Central EU (Frankfurt), free plan. All four steps executed:
+`.env` + `.dev.vars` written (both gitignored, confirmed with `git check-ignore`), both runtime
+secrets uploaded via `wrangler secret bulk` and confirmed with `wrangler secret list`, both
+repository secrets set with `gh secret set`, and the Worker rebuilt and redeployed
+(version `9ad3c7de-00ac-4e86-beac-ee2ff109cbf6`).
+
+**The key is the new-format `sb_publishable_…`, not a legacy `anon` JWT.** It works unchanged —
+`@supabase/ssr` passes the key through opaquely, and `GET /auth/v1/settings` authenticates with it.
+Nothing in this repository needs to know the difference.
+
+Two traps found while verifying, both worth carrying into the browser-test phase:
+
+- **The auth endpoints read `formData()`, not JSON.** A JSON probe against
+  `POST /api/auth/signin` returns **500** from the failed `formData()` parse — which looks exactly
+  like the missing-credentials failure it is not. Send `application/x-www-form-urlencoded`.
+- **Astro's `security.checkOrigin` rejects the POST with 403** unless the request carries an
+  `Origin` header matching the deployment. A browser form does this automatically; a scripted
+  `fetch` does not. Any programmatic auth call in a test must set `Origin` explicitly.
+
+With both corrected, `POST /api/auth/signin` for a non-existent account returns
+`302 → /auth/signin?error=Invalid login credentials`. That error text is the proof the Worker
+reached Supabase and Supabase authenticated the request — the pre-secrets behaviour was a
+`Supabase is not configured` redirect, and a wrong key would have said so instead.
+
+**Still outstanding:** `mailer_autoconfirm` is `false`, so a new account cannot sign in until its
+email is confirmed. Signing in against the deployed URL — the check below — is therefore not yet
+done.
+
 ### Verification — the only check that counts
 
 Sign in against the deployed URL with a real account. Nothing else distinguishes a working
