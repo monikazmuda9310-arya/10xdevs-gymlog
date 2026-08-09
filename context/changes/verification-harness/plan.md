@@ -560,31 +560,31 @@ Flagged rather than silently worked around:
 
 #### Automated
 
-- [x] 1.1 Vitest installed and deduplicated — `npm ls vitest` shows vitest@4.x; every `npm ls vite` line reads 7.3.6, no nested copy, no ERESOLVE
-- [x] 1.2 Runner wired — `npm test -- --passWithNoTests` exits 0
-- [x] 1.3 Typecheck script works — `npm run typecheck` prints 0 errors, exits 0
-- [x] 1.4 New files survive the linter — `npm run lint` exits 0
-- [x] 1.5 Build undisturbed — `npm run build` exits 0
+- [x] 1.1 Vitest installed and deduplicated — `npm ls vitest` shows vitest@4.x; every `npm ls vite` line reads 7.3.6, no nested copy, no ERESOLVE — 32ef294
+- [x] 1.2 Runner wired — `npm test -- --passWithNoTests` exits 0 — 32ef294
+- [x] 1.3 Typecheck script works — `npm run typecheck` prints 0 errors, exits 0 — 32ef294
+- [x] 1.4 New files survive the linter — `npm run lint` exits 0 — 32ef294
+- [x] 1.5 Build undisturbed — `npm run build` exits 0 — 32ef294
 
 #### Manual
 
-- [ ] 1.6 `npm run test:watch` enters and stays in watch mode
+- [x] 1.6 `npm run test:watch` enters and stays in watch mode
 
 ### Phase 2: First domain rules under the harness
 
 #### Automated
 
-- [ ] 2.1 Tests pass — `npm test` exits 0 with 0 failed
-- [ ] 2.2 Glob matched — `npm test` output names `src/lib/services/one-rep-max.test.ts`
-- [ ] 2.3 Types clean including the test file — `npm run typecheck` prints 0 errors
-- [ ] 2.4 Lint passes on both new files — `npm run lint` exits 0
-- [ ] 2.5 Build undisturbed — `npm run build` exits 0
+- [x] 2.1 Tests pass — `npm test` exits 0 with 0 failed
+- [x] 2.2 Glob matched — `npm test` output names `src/lib/services/one-rep-max.test.ts`
+- [x] 2.3 Types clean including the test file — `npm run typecheck` prints 0 errors
+- [x] 2.4 Lint passes on both new files — `npm run lint` exits 0
+- [x] 2.5 Build undisturbed — `npm run build` exits 0
 
 #### Manual
 
-- [ ] 2.6 Red proof (arithmetic) — Brzycki numerator 36→35 fails the 100×5→112.5 test, then reverts green
-- [ ] 2.7 Red proof (the pin) — removing the reps===1 pin fails the Epley single test with 103.33, then reverts green
-- [ ] 2.8 No residual change after both reverts — `git status --porcelain src/lib/services/one-rep-max.ts` prints nothing
+- [x] 2.6 Red proof (arithmetic) — Brzycki numerator 36→35 fails the 100×5→112.5 test, then reverts green
+- [x] 2.7 Red proof (the pin) — removing the reps===1 pin fails the Epley single test with 103.33, then reverts green
+- [x] 2.8 No residual change after both reverts — `git status --porcelain src/lib/services/one-rep-max.ts` prints nothing
 
 ### Phase 3: Move the pipeline gate, and correct the documents that describe it
 
