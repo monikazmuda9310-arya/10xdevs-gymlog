@@ -2,7 +2,7 @@
 project: GymLog
 platform: cloudflare-workers
 planned_at: 2026-08-08
-status: stage-1-complete
+status: complete
 approval_gate: "first production deploy — contract §6.4, user decides"
 approved_at: 2026-08-09
 deployed_url: https://gymlog.10x-astro-starter.workers.dev
@@ -145,9 +145,11 @@ With both corrected, `POST /api/auth/signin` for a non-existent account returns
 reached Supabase and Supabase authenticated the request — the pre-secrets behaviour was a
 `Supabase is not configured` redirect, and a wrong key would have said so instead.
 
-**Still outstanding:** `mailer_autoconfirm` is `false`, so a new account cannot sign in until its
-email is confirmed. Signing in against the deployed URL — the check below — is therefore not yet
-done.
+**Email confirmation was turned off** by the owner in the dashboard (Authentication → Sign In /
+Providers → Email → Confirm email), confirmed by `mailer_autoconfirm: true` on
+`GET /auth/v1/settings`. The free plan sends two emails an hour, which would make the browser tests
+of the quality phase — every one of which has to create its own account — untenable. This is a
+development-environment setting and should be revisited before the product carries real users.
 
 ### Verification — the only check that counts
 
@@ -155,6 +157,29 @@ Sign in against the deployed URL with a real account. Nothing else distinguishes
 deployment from a broken one: the build passes, the pipeline is green, and every page returns
 200 in both cases. Automate this as an E2E smoke test against the deployed URL when the browser
 test lands in the quality phase.
+
+**Done, 2026-08-09.** Six steps against `https://gymlog.10x-astro-starter.workers.dev`, carrying
+cookies between them, with a throwaway account (`smoke-1786276093721@gymlog-test.dev`):
+
+| #   | Request                                    | Result                                                        |
+| --- | ------------------------------------------ | ------------------------------------------------------------- |
+| 1   | `POST /api/auth/signup`                    | 302 → `/auth/confirm-email`, session cookies set              |
+| 2   | `GET /dashboard`                           | **200** — signed in                                           |
+| 3   | `POST /api/auth/signout`                   | 302 → `/`                                                     |
+| 4   | `GET /dashboard`                           | **302 → `/auth/signin`** — session really is gone             |
+| 5   | `POST /api/auth/signin` (fresh cookie jar) | 302 → `/`                                                     |
+| 6   | `GET /dashboard`                           | **200**, and the page renders the account's own email address |
+
+Step 4 is the one that matters as much as step 6: it rules out a page that returns 200 to
+everybody. Step 6 rendering the account's own address rules out a session that authenticates but
+resolves to nobody.
+
+The signup step still redirects to `/auth/confirm-email` even though the account is usable
+immediately — the page is unconditional in the starter. Harmless, but it will read as a bug to
+anyone testing by hand, and belongs to S-01 (`account-access`) to fix.
+
+**The throwaway account still exists in `auth.users`** and cannot be deleted without a
+`service_role` key. Clean it up when S-09 lands account deletion, or from the dashboard.
 
 ## Approval gate
 
