@@ -597,5 +597,5 @@ Flagged rather than silently worked around:
 
 #### Manual
 
-- [ ] 3.5 GitHub Actions "CI" run for this change is green and shows the typecheck and test steps
+- [x] 3.5 GitHub Actions "CI" run for this change is green and shows the typecheck and test steps — run 31309843227, 1m08s, `npm run typecheck` → `Result (31 files): 0 errors`, `npm test` → `Test Files 1 passed (1)` — 6af30e4
 - [ ] 3.6 Optional end-to-end red proof — a commit breaking the Brzycki numerator turns CI red at the `npm test` step, then reverted
