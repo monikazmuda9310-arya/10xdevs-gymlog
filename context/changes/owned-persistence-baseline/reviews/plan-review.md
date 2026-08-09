@@ -31,24 +31,24 @@ needed).
 Codebase and network verification was run inline rather than via a sub-agent — every claim was directly
 checkable on this machine. Measured 2026-08-09:
 
-| Plan claim                                                            | Result                                                                                                                       |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `--db-url` needs no Docker, no login, no link                         | **Confirmed** — `db push --dry-run --db-url …@127.0.0.1:1` printed `DRY RUN` → `Connecting to remote database…` → `LegacyDbConnectError … ECONNREFUSED`. No Docker/login/link check preceded it. |
-| The CLI ignores `SUPABASE_DB_URL` from the environment                | **Confirmed** — env set, flag omitted → `LegacyProjectNotLinkedError: Cannot find project ref`, exit 1                        |
-| `db.<ref>.supabase.co` is IPv6-only                                   | **Confirmed** — `nslookup` returns AAAA `2a05:d014:8ef:5900:…` only; explicit `-type=A` returns no address                    |
-| That address is unreachable from here                                 | **Confirmed and strengthened** — raw TCP connect → `ENETUNREACH` (the plan's evidence was a weaker `curl: could not resolve host`) |
-| The session pooler answers on IPv4                                    | **Confirmed** — `aws-0-eu-central-1` (18.198.30.239, …) and `aws-1-eu-central-1` (3.65.151.229, …) both TCP-connect on 5432; both resolve, so "copy, do not construct" is correct |
-| `migration list` / `gen types` accept `--db-url`                      | **Confirmed** via `--help` on CLI 2.113.0; `migration list --db-url` reaches the connect step with **no** local `supabase/migrations/` directory present, so Phase 1's gate is runnable before any SQL exists |
-| `node_modules/supabase` bin is `dist/supabase.js`                     | **Confirmed** — and read: it is an ESM shim that `execFileSync`s `@supabase/cli-windows-x64/bin/supabase.exe` with `stdio: "inherit"` and propagates `e.status`. Spawning it with `process.execPath` works (I did exactly that), and because the shim *inherits* stdio, the wrapper's `stdout: "pipe"` for the `types` verb does reach the real binary's stdout. |
-| Criterion 1.1's `Local \| Remote \| Time (UTC)` table header is real  | **Confirmed** — `Time (UTC)` present in the CLI binary                                                                        |
-| Criteria 2.1 / 2.3 wording matches CLI output                         | **Confirmed** — `Applying migration`, `up to date`, `pending migration`, `Finished supabase db push` all present in the binary |
-| CI already gates lint + typecheck + unit tests + build                | **Confirmed** — `.github/workflows/ci.yml` runs `npm ci`, `npx astro sync`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` |
-| `@types/node` is now declared (previous review's F7)                  | **Confirmed** — `devDependencies["@types/node"] = "^26.2.0"`                                                                  |
-| `scripts/**.mjs` is safe under `astro check`                          | **Confirmed** — `astro/tsconfigs/base.json` sets `allowJs: true` and leaves `checkJs` unset, so a `.mjs` without `// @ts-check` is parsed but not error-checked |
-| `loadEnv` is importable from `vitest/config`                          | **Refuted** — `vitest/config` exports only `configDefaults`, `coverageConfigDefaults`, `defaultBrowserPort`, `defaultExclude`, `defaultInclude`, `defineConfig`, `defineProject`, `mergeConfig`. `loadEnv` exists only on `vite`, which is **not** a declared dependency (see F5) |
-| `process.loadEnvFile()` gives real env precedence over the file       | **Confirmed** — `FOO=fromenv` + `.env` containing `FOO=fromfile` → `process.env.FOO === "fromenv"`. Exactly the precedence the plan wants, with zero dependencies |
-| `git grep` / `git ls-files` / `git status` on an **untracked** file   | **Measured** — `git grep` → no output, exit 1; `git ls-files --eol` → **no output, exit 0**; `git status --porcelain` → `?? path`. This is what breaks Phase 3 (F2) |
-| `prettier --check` on the four Phase-6 documents                      | **Fails today** on `AGENTS.md` (2 lines, `*surviving*`/`*down*` vs Prettier's `_surviving_`/`_down_`) — see F9 |
+| Plan claim                                                           | Result                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--db-url` needs no Docker, no login, no link                        | **Confirmed** — `db push --dry-run --db-url …@127.0.0.1:1` printed `DRY RUN` → `Connecting to remote database…` → `LegacyDbConnectError … ECONNREFUSED`. No Docker/login/link check preceded it.                                                                                                                                                                 |
+| The CLI ignores `SUPABASE_DB_URL` from the environment               | **Confirmed** — env set, flag omitted → `LegacyProjectNotLinkedError: Cannot find project ref`, exit 1                                                                                                                                                                                                                                                           |
+| `db.<ref>.supabase.co` is IPv6-only                                  | **Confirmed** — `nslookup` returns AAAA `2a05:d014:8ef:5900:…` only; explicit `-type=A` returns no address                                                                                                                                                                                                                                                       |
+| That address is unreachable from here                                | **Confirmed and strengthened** — raw TCP connect → `ENETUNREACH` (the plan's evidence was a weaker `curl: could not resolve host`)                                                                                                                                                                                                                               |
+| The session pooler answers on IPv4                                   | **Confirmed** — `aws-0-eu-central-1` (18.198.30.239, …) and `aws-1-eu-central-1` (3.65.151.229, …) both TCP-connect on 5432; both resolve, so "copy, do not construct" is correct                                                                                                                                                                                |
+| `migration list` / `gen types` accept `--db-url`                     | **Confirmed** via `--help` on CLI 2.113.0; `migration list --db-url` reaches the connect step with **no** local `supabase/migrations/` directory present, so Phase 1's gate is runnable before any SQL exists                                                                                                                                                    |
+| `node_modules/supabase` bin is `dist/supabase.js`                    | **Confirmed** — and read: it is an ESM shim that `execFileSync`s `@supabase/cli-windows-x64/bin/supabase.exe` with `stdio: "inherit"` and propagates `e.status`. Spawning it with `process.execPath` works (I did exactly that), and because the shim _inherits_ stdio, the wrapper's `stdout: "pipe"` for the `types` verb does reach the real binary's stdout. |
+| Criterion 1.1's `Local \| Remote \| Time (UTC)` table header is real | **Confirmed** — `Time (UTC)` present in the CLI binary                                                                                                                                                                                                                                                                                                           |
+| Criteria 2.1 / 2.3 wording matches CLI output                        | **Confirmed** — `Applying migration`, `up to date`, `pending migration`, `Finished supabase db push` all present in the binary                                                                                                                                                                                                                                   |
+| CI already gates lint + typecheck + unit tests + build               | **Confirmed** — `.github/workflows/ci.yml` runs `npm ci`, `npx astro sync`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`                                                                                                                                                                                                                     |
+| `@types/node` is now declared (previous review's F7)                 | **Confirmed** — `devDependencies["@types/node"] = "^26.2.0"`                                                                                                                                                                                                                                                                                                     |
+| `scripts/**.mjs` is safe under `astro check`                         | **Confirmed** — `astro/tsconfigs/base.json` sets `allowJs: true` and leaves `checkJs` unset, so a `.mjs` without `// @ts-check` is parsed but not error-checked                                                                                                                                                                                                  |
+| `loadEnv` is importable from `vitest/config`                         | **Refuted** — `vitest/config` exports only `configDefaults`, `coverageConfigDefaults`, `defaultBrowserPort`, `defaultExclude`, `defaultInclude`, `defineConfig`, `defineProject`, `mergeConfig`. `loadEnv` exists only on `vite`, which is **not** a declared dependency (see F5)                                                                                |
+| `process.loadEnvFile()` gives real env precedence over the file      | **Confirmed** — `FOO=fromenv` + `.env` containing `FOO=fromfile` → `process.env.FOO === "fromenv"`. Exactly the precedence the plan wants, with zero dependencies                                                                                                                                                                                                |
+| `git grep` / `git ls-files` / `git status` on an **untracked** file  | **Measured** — `git grep` → no output, exit 1; `git ls-files --eol` → **no output, exit 0**; `git status --porcelain` → `?? path`. This is what breaks Phase 3 (F2)                                                                                                                                                                                              |
+| `prettier --check` on the four Phase-6 documents                     | **Fails today** on `AGENTS.md` (2 lines, `*surviving*`/`*down*` vs Prettier's `_surviving_`/`_down_`) — see F9                                                                                                                                                                                                                                                   |
 
 ### The SQL, read line by line
 
@@ -62,9 +62,9 @@ The migration in Phase 2 is **correct as written**, on every point that matters:
   `with check` — so a row cannot be rewritten to another owner's `id`. ✓ (This is the single most commonly
   omitted clause in this shape and the plan gets it right.)
 - `revoke all on public.profiles from anon, authenticated` precedes `grant select, insert, update … to
-  authenticated`, which is the correct order and neutralises Supabase's default `GRANT ALL ON TABLES` to
+authenticated`, which is the correct order and neutralises Supabase's default `GRANT ALL ON TABLES` to
   `anon`/`authenticated`. ✓
-- **Deletes are genuinely denied**: no DELETE grant *and* no DELETE policy — either alone suffices,
+- **Deletes are genuinely denied**: no DELETE grant _and_ no DELETE policy — either alone suffices,
   and PostgREST raises `42501`. ✓
 - **`anon` reaches nothing**: no grant and no policy. Double-locked. ✓
 - **No cross-account path exists.** SELECT is filtered by `uid = id`; UPDATE is filtered on both sides;
@@ -72,7 +72,7 @@ The migration in Phase 2 is **correct as written**, on every point that matters:
   function, and no RPC surface is created. `service_role` (which does carry `BYPASSRLS` on Supabase) keeps
   its default `ALL` grant — acceptable precisely because the plan bans that key from `.env`, CI and the
   Worker.
-- `force row level security` is correctly *not* used (it would subject the `postgres` owner to the policies
+- `force row level security` is correctly _not_ used (it would subject the `postgres` owner to the policies
   and break the dashboard table editor); the reasoning is written down.
 - Sequencing details are right: `after insert` (not `before`) on `auth.users`, so the FK to `auth.users(id)`
   is satisfiable; `set_updated_at` as a `before update` trigger, so the UPDATE policy's `with check` is
@@ -94,7 +94,7 @@ Two non-defects worth recording so nobody "fixes" them later: `set_updated_at` i
   `brzycki`. Assertion 7 **updates A's timezone and then restores it**. Two consequences the plan does not
   address.
   (a) **Poisoned fixture.** If assertion 7 fails, times out, or the runner is killed between the update and
-  the restore, A's row is left holding `America/New_York` (or whatever the test wrote) *permanently*. Every
+  the restore, A's row is left holding `America/New_York` (or whatever the test wrote) _permanently_. Every
   subsequent run — local and CI — then fails assertion 1, for a reason that has nothing to do with the code
   under test, and the only repair is manual SQL against the owner's live database. This is the same class of
   defect the previous review flagged as F1 on the last change: a mechanism that ships a permanently red
@@ -102,16 +102,16 @@ Two non-defects worth recording so nobody "fixes" them later: `set_updated_at` i
   (b) **Concurrency.** `.github/workflows/ci.yml` triggers on both `push` and `pull_request` and declares no
   `concurrency:` group, and the suite is also runnable locally at any time. Two overlapping runs share the
   same two rows: run X's assertion 7 (A's timezone mutated) races run Y's assertion 1 (A's timezone must be
-  the default). `fileParallelism: false` serialises files *within* a run and does nothing across runs.
+  the default). `fileParallelism: false` serialises files _within_ a run and does nothing across runs.
   This directly contradicts `AGENTS.md` § Testing — "Every test is independent: its own setup, action,
   assertion, and cleanup. Use unique ids (timestamp suffix) so parallel runs and re-runs cannot collide" —
   which the plan otherwise honours carefully.
 - **Fix A ⭐ Recommended**: Make the suite self-healing and collision-proof: (i) `beforeAll` resets both
   fixture rows to the defaults with an owner-scoped `update` (the UPDATE policy already permits exactly
-  this) *after* sign-in, so assertion 1 tests a known state instead of an inherited one; (ii) assertion 7
+  this) _after_ sign-in, so assertion 1 tests a known state instead of an inherited one; (ii) assertion 7
   writes a **unique** value (`Etc/GMT+${run-scoped suffix}` or `America/New_York` plus a timestamped
-  round-trip through `weight_unit`), restores in a `finally`, and asserts the read-back equals what *this
-  run* wrote; (iii) add a `concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: false }` block
+  round-trip through `weight_unit`), restores in a `finally`, and asserts the read-back equals what _this
+  run_ wrote; (iii) add a `concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: false }` block
   to `ci.yml` so two pipeline runs cannot interleave.
   - Strength: Removes both failure modes at the source, costs ~10 lines, and keeps the two-fixture-account
     design (which is what keeps junk users at exactly two — Progress 4.7).
@@ -143,14 +143,14 @@ Two non-defects worth recording so nobody "fixes" them later: `set_updated_at` i
   - 3.2 "`git grep -n "profiles" -- src/db/database.types.ts` returns matches" — `git grep` searches
     **tracked** files only: no output, exit 1. The criterion cannot pass.
   - 3.3 "`git ls-files --eol -- src/db/database.types.ts` prints `w/lf`" — `git ls-files` lists tracked
-    files only: **no output, exit 0**. This one is the worst of the three: it *silently passes* while
+    files only: **no output, exit 0**. This one is the worst of the three: it _silently passes_ while
     proving nothing about line endings, on the exact discipline `AGENTS.md` says will otherwise make
     "prettier fail all 1022 lines of the repository".
     Phase 2's criterion 2.4 gets this right — "`git add` it, **then** `git ls-files --eol`". Phase 3 forgot
     the same step three times.
 - **Fix**: Prefix Phase 3's verification with `git add src/db/database.types.ts` (as 2.4 already does), and
   restate 3.1 as: after `git add`, a second `npm run db:types` leaves `git status --porcelain
-  src/db/database.types.ts` showing at most the staged `A ` entry and no `M`/`??` change — or simply
+src/db/database.types.ts` showing at most the staged `A ` entry and no `M`/`??` change — or simply
   `git diff --stat -- src/db/database.types.ts` empty once staged.
 - **Decision**: PENDING
 
@@ -166,17 +166,17 @@ Two non-defects worth recording so nobody "fixes" them later: `set_updated_at` i
   suite**. It rests on the Phase 2 backfill plus the survival of `smoke-1786276093721@gymlog-test.dev`,
   an account `deploy-plan.md` explicitly schedules for deletion ("Clean it up when S-09 lands account
   deletion, or from the dashboard"). The day someone deletes it and the fixtures are the only accounts,
-  assertion 2 still passes with RLS *off* if the suite ever runs with a single account — and its
+  assertion 2 still passes with RLS _off_ if the suite ever runs with a single account — and its
   non-vacuity has quietly evaporated with no test turning red.
   (b) Because of (a), the plan reaches for a destructive proof: `alter table public.profiles disable row
-  level security` on the owner's **only** database — the one serving the public Worker and holding real
+level security` on the owner's **only** database — the one serving the public Worker and holding real
   auth accounts — for ~60 seconds. It is opt-in and honestly labelled, but the failure mode is asymmetric:
   an interrupted revert leaves reads **and writes** open on production, and this change exists precisely to
   make "a table without RLS is a defect" structural. Normalising "turn the guardrail off in production to
   prove the test" is a habit that becomes serious at S-02, when the same shape carries training data.
 - **Fix A ⭐ Recommended**: Make assertion 2 self-proving and delete the destructive proof. Assert, in one
   test: A's unfiltered `select *` returns exactly 1 row; B's unfiltered `select *` returns exactly 1 row;
-  the two ids differ. Those three facts together prove the table holds ≥ 2 rows *and* that each client sees
+  the two ids differ. Those three facts together prove the table holds ≥ 2 rows _and_ that each client sees
   only one — so if RLS were disabled, the first assertion would return ≥ 2 and fail. That is logically the
   same proof the manual step buys, obtained by construction, with no external dependency on the smoke
   account and no window in which production is unprotected. Replace Progress 4.8 with "assertion 2 is
@@ -189,7 +189,7 @@ Two non-defects worth recording so nobody "fixes" them later: `set_updated_at` i
   - Blind spot: Does not exercise the `enable row level security` flag itself; the grant revocation would
     still deny `anon` even with RLS off. Assertion 8 covers the anon path independently.
 - **Fix B**: Keep a schema-level red proof but never touch the RLS flag — `create policy "tmp_red_proof" on
-  public.profiles for select to authenticated using (true);` then `drop policy`.
+public.profiles for select to authenticated using (true);` then `drop policy`.
   - Strength: A genuine mutation test of the policy layer; an interrupted revert leaves reads open but
     **writes and deletes still protected**, and RLS still on — strictly a smaller blast radius than
     `disable row level security`.
@@ -209,7 +209,7 @@ Two non-defects worth recording so nobody "fixes" them later: `set_updated_at` i
   `on conflict do nothing` is the correct construction, that a failure surfaces as
   `Database error saving new user`, and that the fallback needs **no schema change** (the INSERT policy
   `with check ((select auth.uid()) = id)` plus the `insert` grant already permit an authenticated client to
-  create its own row). What is missing is *where the fallback code goes*. No phase, no file, no function
+  create its own row). What is missing is _where the fallback code goes_. No phase, no file, no function
   signature. If Phase 2's manual step 2.9 fails, the implementer is mid-change with a broken signup on the
   deployed URL and an instruction that reads "have the application upsert the profile on the first
   authenticated request" — which touches `src/middleware.ts` (already on the critical path of every
@@ -315,7 +315,7 @@ Two non-defects worth recording so nobody "fixes" them later: `set_updated_at` i
 - **Dimension**: Plan Completeness
 - **Location**: Phase 6 § Automated Verification · Progress 6.4 · 6.2
 - **Detail**: `npx prettier --check README.md AGENTS.md context/foundation/roadmap.md
-  context/deployment/deploy-plan.md` **currently fails** on `AGENTS.md` — two pre-existing lines use
+context/deployment/deploy-plan.md` **currently fails** on `AGENTS.md` — two pre-existing lines use
   `*surviving*` / `*down*` where Prettier wants `_surviving_` / `_down_`. lint-staged will rewrite them on
   the first commit that touches the file, so the criterion will pass, but it arrives as unrelated diff
   noise inside the change unless it is expected. Second, smaller point: criterion 6.2
@@ -332,7 +332,7 @@ Two non-defects worth recording so nobody "fixes" them later: `set_updated_at` i
 - **Dimension**: Architectural Fitness
 - **Location**: Phase 5 § Dashboard reads the profile · Phase 6 § Agent instructions
 - **Detail**: "No query filter by user id is needed and none should be added: the point is that **RLS**
-  returns exactly one row." Correct as a *demonstration*, and correct for a single-row primary-key table.
+  returns exactly one row." Correct as a _demonstration_, and correct for a single-row primary-key table.
   But this change's declared purpose is to be the shape every later table copies, and on `workouts` /
   `sets` an unfiltered `select` relying on the policy predicate for filtering is a full scan — the exact
   thing `AGENTS.md` § Cloudflare traps warns about under the 10 ms CPU cap, and the reason the plan itself
@@ -365,7 +365,7 @@ the SQL.** `security definer` is not optional here: at trigger time the executin
 `set search_path = ''` is the correct hardening for a `SECURITY DEFINER` function and forces the
 fully-qualified names, which the body has; `now()` still resolves through the implicit `pg_catalog`. Postgres
 does not re-check `EXECUTE` when firing a trigger, so no `grant … to supabase_auth_admin` is needed — that
-requirement belongs to Auth *hooks*, not triggers. `after insert` (not `before`) is required for the FK to
+requirement belongs to Auth _hooks_, not triggers. `after insert` (not `before`) is required for the FK to
 `auth.users(id)` and the plan has it. `on conflict (id) do nothing` makes a retried signup idempotent. And
 yes, a failure surfaces exactly as `Database error saving new user`: GoTrue wraps any error inside the
 user-insert transaction into that message. The fallback **is** genuinely schema-change-free — the INSERT
@@ -378,19 +378,19 @@ no function and no phase, so hitting it means improvising against a broken produ
 
 **3. CI writing to the owner's only database — keep one project. Recommendation, not a survey.** The
 "two projects" note in `context/foundation/infrastructure.md:252` and its risk-register row (`:300`) is
-scoped to a *different vector*: **public preview URLs** pointed at production, where the exposure is
+scoped to a _different vector_: **public preview URLs** pointed at production, where the exposure is
 unauthenticated reads by strangers. This project has no preview deploys — deployment is a manual
 `wrangler deploy` of one Worker — so that risk is inert, and it is not an argument about CI test isolation.
 On the merits for F-03: a second free-plan project would have to be migrated in lockstep, and **schema drift
 between a test project and production is a far more likely source of false green than shared data is** —
 CI would prove RLS on a table that is not the table serving users. The plan's Decision 12 leans on precisely
-this: an unpushed migration turns CI red *because* CI points at the real schema. That drift detector
+this: an unpushed migration turns CI red _because_ CI points at the real schema. That drift detector
 disappears the moment you split. Add the practical costs — a second database password, a second
 `SUPABASE_DB_URL`, doubled `db push`, and consumption of the free plan's only spare project slot, which is
 the slot a preview environment would want later — against a blast radius of two fixture rows in one table,
 confined by the very policy under test, and the answer is clear. **Single project, with two conditions**: (a)
 the concurrency guard in F1(iii), because the real risk here is not data corruption but two runs colliding;
-(b) revisit at S-02, when CI starts writing *workout* rows rather than two preference rows — that is where
+(b) revisit at S-02, when CI starts writing _workout_ rows rather than two preference rows — that is where
 the calculus genuinely changes, and S-09 is the natural owner. Record the revisit trigger in the plan; do
 not build the second project now.
 
@@ -400,7 +400,7 @@ and see the estimated one-rep max") cannot render an estimate without a formula 
 must exist before S-06 by construction; putting them here rather than in S-03 costs one line each in a
 migration that is being written anyway. Because all three are `not null default`, S-06 does zero data
 migration and keeps its whole feature (FR-016, FR-022, US-03) — F-03 creates storage, S-06 creates choice.
-No collision. Two caveats worth writing into the plan: the *defaults* (`Europe/Warsaw` / `kg` / `brzycki`)
+No collision. Two caveats worth writing into the plan: the _defaults_ (`Europe/Warsaw` / `kg` / `brzycki`)
 are a product decision the plan already flags as pending-owner (Decision 4) and should stay flagged; and the
 `enum` choice fixes the value sets, so S-06's UI must render exactly `kg|lb` and `epley|brzycki` and nothing
 else. The narrow-precedent note (enums only for closed sets fixed by the PRD; muscle groups become a lookup
@@ -419,10 +419,10 @@ session mode (5432, not 6543) is the right choice for DDL. `migration list --db-
 with no local `supabase/migrations/` directory, so Phase 1's gate is runnable before any SQL exists — and
 `Time (UTC)` really is in the binary, so criterion 1.1's expected table header is real. On the wrapper:
 `node_modules/supabase/dist/supabase.js` is exactly what the plan says, and reading it makes the design
-*better* founded than the plan claims — it is an ESM shim that `execFileSync`s the platform binary with
+_better_ founded than the plan claims — it is an ESM shim that `execFileSync`s the platform binary with
 `stdio: "inherit"` and re-exits with the child's status, so (a) `spawnSync(process.execPath, [thatFile, …])`
 works (I ran it), (b) exit codes propagate through two hops correctly, and (c) the `types` verb's stdout
-capture reaches the real binary *because* the shim inherits rather than pipes. Two things the plan gets
+capture reaches the real binary _because_ the shim inherits rather than pipes. Two things the plan gets
 wrong in that area: the masking requirement is unimplementable under inherited stdio (F6), and the sibling
 `vitest.integration.config.ts` reaches for `loadEnv` from an undeclared `vite` (F5). One robustness nit worth
 taking for free: resolve the shim with `createRequire(import.meta.url).resolve("supabase/package.json")`
@@ -445,14 +445,14 @@ than a command.
 
 **7. The Phase 4 red proof — not acceptable as written, and, better, not necessary (F3).** Disabling RLS on
 the single database that serves the public Worker and holds real auth accounts has an asymmetric failure
-mode: an interrupted revert leaves reads *and writes* open, on the table whose whole purpose is to be the
+mode: an interrupted revert leaves reads _and writes_ open, on the table whose whole purpose is to be the
 template for "a table without RLS is a defect, not a follow-up". The equally convincing alternative is
 already latent in the plan and costs nothing: assert that **A sees exactly one row, B sees exactly one row,
 and the two ids differ**. That trio proves the table holds ≥ 2 rows and that each client sees only its own —
 so with RLS disabled the first assertion returns ≥ 2 and the suite goes red. Same guarantee, obtained by
 construction, with no production window. It also fixes a quieter problem: assertion 2's non-vacuity currently
 depends on the backfilled `smoke-…@gymlog-test.dev` row, which `deploy-plan.md` schedules for deletion — the
-day that row goes, the "at least three rows" premise evaporates and *nothing turns red*. If a mutation-style
+day that row goes, the "at least three rows" premise evaporates and _nothing turns red_. If a mutation-style
 proof is still wanted afterwards, the safe form is adding and then dropping a permissive `for select … using
 (true)` policy (RLS stays on; writes stay protected), never toggling the `enable row level security` flag.
 
@@ -471,7 +471,7 @@ Fix before implementing:
 - **F1** — the fixture-mutation design will eventually leave a poisoned row and a permanently red pipeline,
   and it contradicts `AGENTS.md` § Testing. `beforeAll` reset + unique write values + a CI `concurrency`
   group.
-- **F2** — three Phase 3 criteria cannot produce their stated output; one of them *silently passes* while
+- **F2** — three Phase 3 criteria cannot produce their stated output; one of them _silently passes_ while
   verifying nothing about line endings. Copy 2.4's `git add` step.
 - **F3** — make assertion 2 self-proving (A sees 1, B sees 1, ids differ) and drop the production RLS
   toggle. This removes both a production risk and a hidden dependency on a row scheduled for deletion.
