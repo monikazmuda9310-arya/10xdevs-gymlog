@@ -1,7 +1,7 @@
 ---
 change_id: verification-harness
 title: Wire a unit-test runner and gate CI on typecheck plus unit tests
-status: implementing
+status: implemented
 created: 2026-08-09
 updated: 2026-08-09
 archived_at: null

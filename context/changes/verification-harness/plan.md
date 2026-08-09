@@ -590,10 +590,10 @@ Flagged rather than silently worked around:
 
 #### Automated
 
-- [x] 3.1 Full gate passes locally in CI order — lint, typecheck, test, build all exit 0
-- [x] 3.2 Workflow steps present and ordered — `git grep -n "run:" -- .github/workflows/ci.yml`
-- [x] 3.3 No document still claims the old gate — `git grep -n "lint + build" -- README.md AGENTS.md context/foundation/roadmap.md` returns nothing (exits 1 on success; do not `&&`-chain)
-- [x] 3.4 Roadmap § Baseline no longer calls verification tooling absent
+- [x] 3.1 Full gate passes locally in CI order — lint, typecheck, test, build all exit 0 — 8b3f529
+- [x] 3.2 Workflow steps present and ordered — `git grep -n "run:" -- .github/workflows/ci.yml` — 8b3f529
+- [x] 3.3 No document still claims the old gate — `git grep -n "lint + build" -- README.md AGENTS.md context/foundation/roadmap.md` returns nothing (exits 1 on success; do not `&&`-chain) — 8b3f529
+- [x] 3.4 Roadmap § Baseline no longer calls verification tooling absent — 8b3f529
 
 #### Manual
 
