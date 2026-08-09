@@ -53,7 +53,7 @@ the primary success criterion, and it is placed as early as its prerequisites al
 
 | ID   | Change ID                         | Outcome (user can …)                                                                    | Prerequisites                                                                                                                   | PRD refs                                                                            | Status   |
 | ---- | --------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------- |
-| F-01 | verification-harness              | (foundation) wrong derived numbers fail the pipeline instead of reaching a screen       | —                                                                                                                               | Business Logic §boundaries, NFR §determinism, US-04 AC §assert-against-stored-state | ready    |
+| F-01 | verification-harness              | (foundation) wrong derived numbers fail the pipeline instead of reaching a screen       | —                                                                                                                               | Business Logic §boundaries, NFR §determinism, US-04 AC §assert-against-stored-state | in-progress |
 | F-02 | smoke-deploy                      | (foundation) the product is reachable at a stable public address from a green pipeline  | —                                                                                                                               | NFR §browser support, NFR §2s p95 on mobile                                         | ready    |
 | F-03 | owned-persistence-baseline        | (foundation) rows belong to accounts and the database enforces it                       | F-02, a provisioned hosted database project (URL + key set as pipeline secrets and as runtime secrets on the deployed instance) | US-04, Access Control §ownership enforced, NFR §no cross-account reach              | proposed |
 | S-01 | account-access                    | create an account, sign in, sign out, and be sent to sign-in when signed out            | F-03                                                                                                                            | FR-001, FR-002, FR-003, US-04, Access Control                                       | proposed |
@@ -87,9 +87,9 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Backend / API:** present, scaffold only — server rendering is on by default and three authentication endpoints exist under `src/pages/api/auth/`. No endpoint touches training data, because none exists yet.
 - **Data:** **absent** — `supabase/config.toml` is present but there is no `supabase/migrations/` directory, no table, and no provisioned project. This is the roadmap's largest gap and the reason `data` is the deep-investment layer.
 - **Auth:** present, scaffold only — a cookie-session client (`src/lib/supabase.ts`), request middleware resolving the current user with a protected-route redirect (`src/middleware.ts`), and sign-in / sign-up / confirm-email pages. It has never run against a real identity provider, and there is no row-ownership enforcement anywhere, because there are no tables to enforce it on.
-- **Deploy / infra:** partial — the hosting configuration is correct and named, the pipeline (`.github/workflows/ci.yml`) runs lint and build on `main` and is green, and the hosting account is authenticated. The product has never been deployed; `context/deployment/deploy-plan.md` is written and awaiting the owner's approval.
+- **Deploy / infra:** partial — the hosting configuration is correct and named, the pipeline (`.github/workflows/ci.yml`) runs lint, typecheck, unit tests and build on `main` and is green, and the hosting account is authenticated. The product has never been deployed; `context/deployment/deploy-plan.md` is written and awaiting the owner's approval.
 - **Observability:** partial — platform-level observability is switched on in the hosting configuration. No error tracking, no metrics, no dashboards.
-- **Verification tooling (correction to the six probed layers):** **absent** — there is no unit-test runner, no browser-test runner, and no test script in the package manifest. The pipeline runs lint and build only; type checking and tests are not wired. This is what `F-01` exists to close.
+- **Verification tooling (correction to the six probed layers):** partial — a unit-test runner is wired (Vitest, `vitest.config.ts`, `npm test` / `npm run test:watch`) and the pipeline gate runs lint, typecheck, unit tests and build, so a wrong derived number fails the pipeline. This is what `F-01` closed. Still absent: a browser-test runner, and unit tests for every domain rule other than the one-rep-max boundaries — those land with the slices that own them.
 
 ## Foundations
 
@@ -107,7 +107,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Blockers:** —
 - **Unknowns:** —
 - **Risk:** sequenced first because the boundary arithmetic needs no database and no deployed environment — it is the only work available while the data environment is still being provisioned, which is exactly what the time constraint asks for. Scope is the runner and the pipeline gate only; the tests themselves belong to the slices that own the rules. Over-scoping this into a full test strategy would spend the scarcest resource on work no user ever sees.
-- **Status:** ready
+- **Status:** in-progress
 
 ### F-02: Public deployment path
 

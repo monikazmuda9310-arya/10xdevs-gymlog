@@ -568,32 +568,32 @@ Flagged rather than silently worked around:
 
 #### Manual
 
-- [x] 1.6 `npm run test:watch` enters and stays in watch mode
+- [x] 1.6 `npm run test:watch` enters and stays in watch mode — c40bc47
 
 ### Phase 2: First domain rules under the harness
 
 #### Automated
 
-- [x] 2.1 Tests pass — `npm test` exits 0 with 0 failed
-- [x] 2.2 Glob matched — `npm test` output names `src/lib/services/one-rep-max.test.ts`
-- [x] 2.3 Types clean including the test file — `npm run typecheck` prints 0 errors
-- [x] 2.4 Lint passes on both new files — `npm run lint` exits 0
-- [x] 2.5 Build undisturbed — `npm run build` exits 0
+- [x] 2.1 Tests pass — `npm test` exits 0 with 0 failed — c40bc47
+- [x] 2.2 Glob matched — `npm test` output names `src/lib/services/one-rep-max.test.ts` — c40bc47
+- [x] 2.3 Types clean including the test file — `npm run typecheck` prints 0 errors — c40bc47
+- [x] 2.4 Lint passes on both new files — `npm run lint` exits 0 — c40bc47
+- [x] 2.5 Build undisturbed — `npm run build` exits 0 — c40bc47
 
 #### Manual
 
-- [x] 2.6 Red proof (arithmetic) — Brzycki numerator 36→35 fails the 100×5→112.5 test, then reverts green
-- [x] 2.7 Red proof (the pin) — removing the reps===1 pin fails the Epley single test with 103.33, then reverts green
-- [x] 2.8 No residual change after both reverts — `git status --porcelain src/lib/services/one-rep-max.ts` prints nothing
+- [x] 2.6 Red proof (arithmetic) — Brzycki numerator 36→35 fails the 100×5→112.5 test, then reverts green — c40bc47
+- [x] 2.7 Red proof (the pin) — removing the reps===1 pin fails the Epley single test with 103.33, then reverts green — c40bc47
+- [x] 2.8 No residual change after both reverts — `git status --porcelain src/lib/services/one-rep-max.ts` prints nothing — c40bc47
 
 ### Phase 3: Move the pipeline gate, and correct the documents that describe it
 
 #### Automated
 
-- [ ] 3.1 Full gate passes locally in CI order — lint, typecheck, test, build all exit 0
-- [ ] 3.2 Workflow steps present and ordered — `git grep -n "run:" -- .github/workflows/ci.yml`
-- [ ] 3.3 No document still claims the old gate — `git grep -n "lint + build" -- README.md AGENTS.md context/foundation/roadmap.md` returns nothing (exits 1 on success; do not `&&`-chain)
-- [ ] 3.4 Roadmap § Baseline no longer calls verification tooling absent
+- [x] 3.1 Full gate passes locally in CI order — lint, typecheck, test, build all exit 0
+- [x] 3.2 Workflow steps present and ordered — `git grep -n "run:" -- .github/workflows/ci.yml`
+- [x] 3.3 No document still claims the old gate — `git grep -n "lint + build" -- README.md AGENTS.md context/foundation/roadmap.md` returns nothing (exits 1 on success; do not `&&`-chain)
+- [x] 3.4 Roadmap § Baseline no longer calls verification tooling absent
 
 #### Manual
 

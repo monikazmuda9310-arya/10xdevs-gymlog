@@ -55,6 +55,9 @@ npm run dev
 - `npm run lint` - Run ESLint with type-checked rules
 - `npm run lint:fix` - Auto-fix ESLint issues
 - `npm run format` - Run Prettier
+- `npm run typecheck` - Run `astro check` (type-checks `.astro` and `.ts` alike)
+- `npm test` - Run the unit tests once (Vitest, non-interactive)
+- `npm run test:watch` - Run the unit tests in watch mode
 
 ## Project Structure
 
@@ -168,7 +171,7 @@ Set `SUPABASE_URL` and `SUPABASE_KEY` as secrets in your Cloudflare dashboard or
 
 ## CI
 
-GitHub Actions runs lint + build on every push and PR to `main`. Configure `SUPABASE_URL` and `SUPABASE_KEY` as repository secrets in GitHub for the build step.
+GitHub Actions runs lint, typecheck, unit tests and build on every push and PR to `main`. Configure `SUPABASE_URL` and `SUPABASE_KEY` as repository secrets in GitHub for the typecheck and build steps.
 
 Those repository secrets are **build-time only**. They do not become Worker runtime secrets — for that, use `npx wrangler secret put SUPABASE_URL` and `npx wrangler secret put SUPABASE_KEY` against the deployed Worker. Skipping that step produces a deployment that builds, returns 200, and cannot log anybody in.
 

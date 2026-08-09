@@ -46,6 +46,11 @@ an identifier directly. This is enforced in the database, not only in the UI.
 
 Scripts, local Supabase setup, and deploy steps: @README.md
 
+The gate, in the order CI runs it: `npm run lint` → `npm run typecheck` → `npm test` →
+`npm run build`. Run all four before claiming a change is done. `npm run typecheck` is
+`astro check`, which covers `.astro` and `.ts` alike; `npm test` is a single non-interactive
+Vitest run, `npm run test:watch` is the local loop.
+
 Two things README does not cover:
 
 - `npx astro sync` — regenerate types. Run it after changing `astro.config.mjs` or any content
@@ -91,6 +96,12 @@ export `const prerender = false`.
 - **Unit tests are the primary defence for the domain rules above.** Cover the boundaries
   explicitly: 1-rep sets, the 12-rep edge, zero and negative loads, kg↔lb round-trip, week
   boundaries across timezones.
+- **Unit tests run on Vitest and live beside the code** as `src/**/*.test.ts` (`vitest.config.ts`
+  at the repository root). Import the subject through the `@/` alias, and import `describe` / `it` /
+  `expect` from `"vitest"` — globals are off on purpose.
+- **The harness deliberately does not load Astro's Vite pipeline.** Anything under test must not
+  import an `astro:*` virtual module (`astro:env/server` and friends) — it will fail to resolve.
+  That is the guardrail that keeps the domain calculations plain and dependency-free.
 - **E2E locators**: `getByRole` / `getByLabel` / `getByText` first. `getByTestId` only when
   accessibility attributes are genuinely ambiguous. Never CSS selectors, XPath, or DOM structure.
 - **Never `page.waitForTimeout()`.** Wait on state: `toBeVisible()`, `waitForURL()`,
@@ -137,5 +148,5 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
   build fails against the Cloudflare adapter (`Could not find the prerender entry point`),
   reproduced on 7.1.6 and 7.2.0. Do not "helpfully" bump it; see
   `context/changes/bootstrap-verification/verification.md` for the full record.
-- CI (`.github/workflows/ci.yml`) runs lint + build only. Typecheck, unit tests, and the browser
-  test are not wired yet.
+- CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit tests and build, in that order, on
+  every push and PR to `main`. The browser test is not wired yet.
