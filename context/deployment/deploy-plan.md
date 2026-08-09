@@ -2,8 +2,10 @@
 project: GymLog
 platform: cloudflare-workers
 planned_at: 2026-08-08
-status: awaiting-approval
+status: stage-1-complete
 approval_gate: "first production deploy — contract §6.4, user decides"
+approved_at: 2026-08-09
+deployed_url: https://gymlog.10x-astro-starter.workers.dev
 ---
 
 # Deploy plan — GymLog on Cloudflare Workers
@@ -34,14 +36,14 @@ authenticate satisfies none of the product's success criteria. Do not report it 
 
 ## Preconditions
 
-| Precondition | State |
-| --- | --- |
-| Cloudflare account | ✓ `monika.zmuda9310@gmail.com` |
-| `wrangler` authenticated | ✓ OAuth token, verified via `wrangler whoami` |
-| `wrangler.jsonc` name is `gymlog` | ✓ — this string becomes the public hostname |
+| Precondition                        | State                                                |
+| ----------------------------------- | ---------------------------------------------------- |
+| Cloudflare account                  | ✓ `monika.zmuda9310@gmail.com`                       |
+| `wrangler` authenticated            | ✓ OAuth token, verified via `wrangler whoami`        |
+| `wrangler.jsonc` name is `gymlog`   | ✓ — this string becomes the public hostname          |
 | Deploy target is Workers, not Pages | ✓ — `wrangler deploy`, never `wrangler pages deploy` |
-| `npm run build` green | ✓ |
-| Supabase project | ✗ **blocks Stage 2** |
+| `npm run build` green               | ✓                                                    |
+| Supabase project                    | ✗ **blocks Stage 2**                                 |
 
 ## Stage 1 — Smoke deploy (no data layer)
 
@@ -56,17 +58,40 @@ is the one-time choice that fixes the public hostname as `gymlog.<subdomain>.wor
 
 ### Expected outcome — including the parts that must fail
 
-| Check | Expected |
-| --- | --- |
-| `/` renders | ✓ |
-| `/auth/signin` renders the form | ✓ |
-| Submitting the sign-in form | **fails** — no data layer yet |
-| `/dashboard` | redirects to `/auth/signin` |
-| HTTP status on public pages | 200 |
+| Check                           | Expected                      |
+| ------------------------------- | ----------------------------- |
+| `/` renders                     | ✓                             |
+| `/auth/signin` renders the form | ✓                             |
+| Submitting the sign-in form     | **fails** — no data layer yet |
+| `/dashboard`                    | redirects to `/auth/signin`   |
+| HTTP status on public pages     | 200                           |
 
 A green Stage 1 proves the Worker builds, uploads, boots, and serves assets. It proves **nothing**
 about auth. Treating a 200 here as success is precisely the failure mode the infrastructure
 research flagged as risk #1.
+
+### Actual outcome — run 2026-08-09, approved under §6.4
+
+Public URL: **https://gymlog.10x-astro-starter.workers.dev** · Version ID
+`6d4b7093-1592-4cc9-9420-73af9b50f572` · Worker startup 30 ms · 8 assets, 1931 KiB (395 KiB gzip).
+
+Every row of the table above came back exactly as predicted: `/` 200, `/auth/signin` 200 with both
+the email and password inputs present, `/auth/signup` 200, `/dashboard` 302 → `/auth/signin`, and
+`POST /api/auth/signin` **500** — the expected failure, because `src/lib/supabase.ts` returns
+`null` without credentials. **This is not a working deployment.** It is a validated deploy path.
+
+Three things the plan did not anticipate:
+
+- **The `workers.dev` subdomain was already registered** on this account as `10x-astro-starter`,
+  so no one-time prompt appeared and the hostname is `gymlog.10x-astro-starter.workers.dev`, not
+  `gymlog.<new-subdomain>.workers.dev`. The `gymlog` half still comes from `wrangler.jsonc`
+  `"name"`, so renaming the Worker still abandons this URL.
+- **A KV namespace was auto-provisioned.** `wrangler deploy` found an unbound `env.SESSION`
+  binding and created `gymlog-session` (`177a1a6f2ef64192a7bb63ff116d10cf`) without being asked.
+  It backs Astro's session store. Nothing in the repository referenced it before this deploy.
+- **The edge certificate for a fresh hostname is not instant.** For the first ~30 seconds every
+  request died at the TLS handshake (`SSL alert number 40`) while general connectivity was fine.
+  A failed handshake immediately after a first deploy means wait, not debug.
 
 ### Rollback
 
