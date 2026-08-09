@@ -6,8 +6,13 @@
       "Bash(git push --force:*)",
       "Bash(git reset --hard:*)",
       "Read(./.env)",
-      "Read(./.env.*)",
-      "Read(./.dev.vars)"
+      "Read(./.env.local)",
+      "Read(./.env.*.local)",
+      "Read(./.env.development)",
+      "Read(./.env.test)",
+      "Read(./.env.production)",
+      "Read(./.dev.vars)",
+      "Read(./.dev.vars.*)"
     ],
     "ask": [
       "Bash(git push:*)",
