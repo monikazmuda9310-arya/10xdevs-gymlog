@@ -671,31 +671,31 @@ All eight were taken by the owner during planning on 2026-08-10, with the trade-
 
 #### Automated
 
-- [x] 3.1 `npm test` names `auth.test.ts`, exits 0, and stays offline
-- [x] 3.2 `npm run test:integration` exits 0 and reports both files
-- [x] 3.3 The new suite cannot reach production — `git grep -nE "SUPABASE_URL|SUPABASE_KEY" -- tests/` returns nothing
-- [x] 3.4 `npm run lint` and `npm run typecheck` exit 0 with the new files present
+- [x] 3.1 `npm test` names `auth.test.ts`, exits 0, and stays offline — c9ed01c
+- [x] 3.2 `npm run test:integration` exits 0 and reports both files — c9ed01c
+- [x] 3.3 The new suite cannot reach production — `git grep -nE "SUPABASE_URL|SUPABASE_KEY" -- tests/` returns nothing — c9ed01c
+- [x] 3.4 `npm run lint` and `npm run typecheck` exit 0 with the new files present — c9ed01c
 
 #### Manual
 
-- [ ] 3.5 CI green, `npm run test:integration` step shows both files
-- [x] 3.6 New accounts appear in `gymlog-test` and not in production
+- [x] 3.5 CI green, `npm run test:integration` step shows both files — c9ed01c
+- [x] 3.6 New accounts appear in `gymlog-test` and not in production — c9ed01c
 
 ### Phase 4: Turn confirmation on for production, deploy, verify
 
 #### Automated
 
-- [ ] 4.1 Full five-command gate exits 0 after the setting change
-- [ ] 4.2 Worker holds only `SUPABASE_URL` and `SUPABASE_KEY`
-- [ ] 4.3 `npx wrangler deploy` exits 0 and prints a new version id
+- [x] 4.1 Full five-command gate exits 0 after the setting change
+- [x] 4.2 Worker holds only `SUPABASE_URL` and `SUPABASE_KEY`
+- [x] 4.3 `npx wrangler deploy` exits 0 and prints a new version id
 
 #### Manual
 
-- [ ] 4.4 Signup at the deployed URL lands on `/auth/confirm-email` and an email arrives
-- [ ] 4.5 Clicking the link then signing in lands on `/dashboard` with that account's timezone
-- [ ] 4.6 Signing in before confirming is refused with the neutral message
-- [ ] 4.7 Signed out, `/dashboard` still redirects to `/auth/signin`
-- [ ] 4.8 The confirmed account is recorded for S-09 alongside the four existing throwaways
+- [x] 4.4 Signup at the deployed URL lands on `/auth/confirm-email` and an email arrives
+- [x] 4.5 Clicking the link then signing in lands on `/dashboard` with that account's timezone
+- [x] 4.6 Signing in before confirming is refused with the neutral message
+- [x] 4.7 Signed out, `/dashboard` still redirects to `/auth/signin`
+- [x] 4.8 The confirmed account is recorded for S-09 alongside the four existing throwaways
 
 ### Phase 5: Truth up the documents
 
