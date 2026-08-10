@@ -14,6 +14,23 @@ deviations:
       import. Verified instead with `git grep -nE 'from "astro:|import "astro:'`, which matches an
       import and nothing else; that returns nothing. The criterion's intent holds — the wording
       does not, and a later phase should not copy the loose pattern.
+  - phase: 3
+    criterion: "3.5 — scripted create-workout / add-entry / add-set round trip"
+    what: >-
+      Implemented as an integration suite (tests/integration/workout-endpoints.test.ts) calling the
+      exported handlers, not as a standalone script over HTTP. `astro dev` reads its Supabase
+      credentials from `.dev.vars`, which points at production, and a process-env override does not
+      displace it — so an HTTP round trip would have written test data into the database the owner
+      trains against, or failed to authenticate at all. Overwriting the owner's `.dev.vars` was
+      refused. The suite exercises the same validation, ownership checks, unit-from-profile rule and
+      error mapping against gymlog-test, and unlike a one-off script it stays inside the gate. Not
+      covered: Astro's routing and origin check, which Phase 4 exercises through a browser.
+  - phase: 3
+    criterion: "3.6 — a signed-out POST creates no row (was manual)"
+    what: >-
+      Automated inside the same suite rather than performed by hand: all three handlers are called
+      with `locals.user` null, each must answer 401 `unauthenticated`, and the tables are re-read as
+      the owner afterwards to prove nothing landed. Stronger than the manual version and repeatable.
 ---
 
 ## Notes

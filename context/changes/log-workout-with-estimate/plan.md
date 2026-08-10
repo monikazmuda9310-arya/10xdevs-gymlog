@@ -995,29 +995,29 @@ planning session, and four by the planner. Each states what would have to be tru
 
 #### Automated
 
-- [x] 2.1 Gate green — lint, typecheck, unit tests, build all exit 0
-- [x] 2.2 The two new unit suites assert every boundary listed in the phase
-- [x] 2.3 The new modules are hermetic — no `astro:` import in `set-estimate.ts` or `calendar.ts`
-- [x] 2.4 `estimateForSet` imports `./one-rep-max` and nothing else
-- [x] 2.5 `curl -s localhost:4321/api/dev/tz-probe` against `npm run dev` returns three distinct dates for Kiritimati, UTC and Niue
+- [x] 2.1 Gate green — lint, typecheck, unit tests, build all exit 0 — 3ef39db
+- [x] 2.2 The two new unit suites assert every boundary listed in the phase — 3ef39db
+- [x] 2.3 The new modules are hermetic — no `astro:` import in `set-estimate.ts` or `calendar.ts` — 3ef39db
+- [x] 2.4 `estimateForSet` imports `./one-rep-max` and nothing else — 3ef39db
+- [x] 2.5 `curl -s localhost:4321/api/dev/tz-probe` against `npm run dev` returns three distinct dates for Kiritimati, UTC and Niue — 3ef39db
 
 #### Manual
 
-- [x] 2.6 All four mutations applied, the failing test observed and named in the commit message, then reverted
+- [x] 2.6 All four mutations applied, the failing test observed and named in the commit message, then reverted — 3ef39db
 
 ### Phase 3: Services, validation, and the three endpoints
 
 #### Automated
 
-- [ ] 3.1 Gate green — lint, typecheck, unit tests, build all exit 0
-- [ ] 3.2 Unit tests cover the input boundaries and `isWeightAllowed` across all four sign/flag combinations
-- [ ] 3.3 No provider prose escapes — `git grep -n "error.message"` over the three endpoint folders returns nothing
-- [ ] 3.4 No hydrated module imports `workout-schemas` — `git grep -rn "workout-schemas" -- src/components/`
-- [ ] 3.5 Scripted create-workout → add-entry → add-set round trip; duplicate entry returns the first id; zero weight on a non-bodyweight exercise is refused with its own code
+- [x] 3.1 Gate green — lint, typecheck, unit tests, build all exit 0
+- [x] 3.2 Unit tests cover the input boundaries and `isWeightAllowed` across all four sign/flag combinations
+- [x] 3.3 No provider prose escapes — `git grep -n "error.message"` over the three endpoint folders returns nothing
+- [x] 3.4 No hydrated module imports `workout-schemas` — `git grep -rn "workout-schemas" -- src/components/`
+- [x] 3.5 Scripted create-workout → add-entry → add-set round trip; duplicate entry returns the first id; zero weight on a non-bodyweight exercise is refused with its own code
 
 #### Manual
 
-- [ ] 3.6 A POST to each endpoint from a signed-out session creates no row, verified by re-reading the tables
+- [x] 3.6 A POST to each endpoint from a signed-out session creates no row, verified by re-reading the tables
 
 ### Phase 4: The screens
 
