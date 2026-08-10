@@ -981,15 +981,15 @@ planning session, and four by the planner. Each states what would have to be tru
 
 #### Automated
 
-- [x] 1.1 `npm run db:push` applies to both projects; `npm run db:status` shows identical histories
-- [x] 1.2 `npm run db:types` regenerated and staged — `git grep -n "exercise_entries" -- src/db/database.types.ts`
-- [x] 1.3 Gate green — lint, typecheck, unit tests, build all exit 0
-- [x] 1.4 `npm run test:integration` exits 0 and reports four files
-- [x] 1.5 RLS on for all three tables and exactly twelve policies, read from the database
+- [x] 1.1 `npm run db:push` applies to both projects; `npm run db:status` shows identical histories — 585bd55
+- [x] 1.2 `npm run db:types` regenerated and staged — `git grep -n "exercise_entries" -- src/db/database.types.ts` — 585bd55
+- [x] 1.3 Gate green — lint, typecheck, unit tests, build all exit 0 — 585bd55
+- [x] 1.4 `npm run test:integration` exits 0 and reports four files — 585bd55
+- [x] 1.5 RLS on for all three tables and exactly twelve policies, read from the database — 585bd55
 
 #### Manual
 
-- [x] 1.6 `npm run test:integration -- --reporter=verbose` prints every refused crossing with a named reason, never an empty result
+- [x] 1.6 `npm run test:integration -- --reporter=verbose` prints every refused crossing with a named reason, never an empty result — 585bd55
 
 ### Phase 2: The estimate as a displayable value
 
