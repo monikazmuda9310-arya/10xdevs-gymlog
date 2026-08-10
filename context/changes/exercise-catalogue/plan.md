@@ -652,27 +652,27 @@ rather than re-argued.
 
 #### Automated
 
-- [x] 2.1 `npm run db:push` applies to both projects; histories identical
-- [x] 2.2 Seed assertions pass — 38 shared rows, and the per-group distribution 9/7/7/5/6/4
-- [x] 2.3 Re-running `npm run db:push` is a no-op, not a duplicate-key error
-- [x] 2.4 Full gate exits 0
+- [x] 2.1 `npm run db:push` applies to both projects; histories identical — 2268295
+- [x] 2.2 Seed assertions pass — 38 shared rows, and the per-group distribution 9/7/7/5/6/4 — 2268295
+- [x] 2.3 Re-running `npm run db:push` is a no-op, not a duplicate-key error — 2268295
+- [x] 2.4 Full gate exits 0 — 2268295
 
 #### Manual
 
-- [x] 2.5 Five assignments spot-checked against the PRD table by querying the database
+- [x] 2.5 Five assignments spot-checked against the PRD table by querying the database — 2268295
 
 ### Phase 3: The service layer and the create endpoint
 
 #### Automated
 
-- [ ] 3.1 Gate green — lint, typecheck, unit tests, build all exit 0
-- [ ] 3.2 Unit tests cover the validation boundaries and the `%`/`_` search escaping
-- [ ] 3.3 No provider prose escapes — `git grep -n "error.message" -- src/pages/api/exercises/` returns nothing
-- [ ] 3.4 A scripted POST creates a row; a duplicate name returns the duplicate code, not a 500
+- [x] 3.1 Gate green — lint, typecheck, unit tests, build all exit 0
+- [x] 3.2 Unit tests cover the validation boundaries and the `%`/`_` search escaping
+- [x] 3.3 No provider prose escapes — `git grep -n "error.message" -- src/pages/api/exercises/` returns nothing
+- [ ] 3.4 A scripted POST creates a row; a duplicate name returns the duplicate code, not a 500 — MOVED TO PHASE 4 (needs a browser session; the dev server points at production and no password is available to a script)
 
 #### Manual
 
-- [ ] 3.5 A POST from a signed-out session creates no row, verified by re-reading the table
+- [x] 3.5 A POST from a signed-out session creates no row, verified by re-reading the table
 
 ### Phase 4: The catalogue screen
 

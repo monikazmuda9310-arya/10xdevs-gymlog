@@ -173,6 +173,33 @@ describe("exercises: the private half", () => {
     expect(asB.data).toHaveLength(0);
   });
 
+  it("12. a duplicate name for the same account is refused by the database", async () => {
+    // What the create endpoint maps to `duplicate_name` (23505). The partial unique index is over
+    // lower(name), so the second insert differs only in case — "the same exercise to a person
+    // typing on a phone at the rack", which is what the index was written for.
+    const name = `s02-dup-${RUN_ID}`;
+    const first = await ownerA.client
+      .from("exercises")
+      .insert({ user_id: ownerA.userId, name, muscle_group: "chest" })
+      .select()
+      .single();
+    expect(first.error).toBeNull();
+
+    const second = await ownerA.client
+      .from("exercises")
+      .insert({ user_id: ownerA.userId, name: name.toUpperCase(), muscle_group: "chest" });
+
+    expect(second.error?.code).toBe("23505");
+
+    // And the other account is unaffected: the index is per owner, so B may use the same name.
+    const forB = await ownerB.client
+      .from("exercises")
+      .insert({ user_id: ownerB.userId, name, muscle_group: "chest" })
+      .select()
+      .single();
+    expect(forB.error).toBeNull();
+  });
+
   it("8. an account can update and delete its own row", async () => {
     // Without this, every negative assertion above would pass against a table nobody can use.
     const name = `s02-mine-${RUN_ID}`;
