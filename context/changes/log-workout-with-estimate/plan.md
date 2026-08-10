@@ -995,15 +995,15 @@ planning session, and four by the planner. Each states what would have to be tru
 
 #### Automated
 
-- [ ] 2.1 Gate green — lint, typecheck, unit tests, build all exit 0
-- [ ] 2.2 The two new unit suites assert every boundary listed in the phase
-- [ ] 2.3 The new modules are hermetic — no `astro:` import in `set-estimate.ts` or `calendar.ts`
-- [ ] 2.4 `estimateForSet` imports `./one-rep-max` and nothing else
-- [ ] 2.5 `curl -s localhost:4321/api/dev/tz-probe` against `npm run dev` returns three distinct dates for Kiritimati, UTC and Niue
+- [x] 2.1 Gate green — lint, typecheck, unit tests, build all exit 0
+- [x] 2.2 The two new unit suites assert every boundary listed in the phase
+- [x] 2.3 The new modules are hermetic — no `astro:` import in `set-estimate.ts` or `calendar.ts`
+- [x] 2.4 `estimateForSet` imports `./one-rep-max` and nothing else
+- [x] 2.5 `curl -s localhost:4321/api/dev/tz-probe` against `npm run dev` returns three distinct dates for Kiritimati, UTC and Niue
 
 #### Manual
 
-- [ ] 2.6 All four mutations applied, the failing test observed and named in the commit message, then reverted
+- [x] 2.6 All four mutations applied, the failing test observed and named in the commit message, then reverted
 
 ### Phase 3: Services, validation, and the three endpoints
 
