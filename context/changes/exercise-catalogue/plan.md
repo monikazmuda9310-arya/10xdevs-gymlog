@@ -638,15 +638,15 @@ rather than re-argued.
 
 #### Automated
 
-- [ ] 1.1 `npm run db:push` applies to both projects; `npm run db:status` shows identical histories
-- [ ] 1.2 Gate green — lint, typecheck, unit tests, build all exit 0
-- [ ] 1.3 `npm run test:integration` exits 0 and reports three files
-- [ ] 1.4 Generated types carry the new table — `git grep -n "muscle_group" -- src/db/database.types.ts`
-- [ ] 1.5 RLS on and exactly four policies, read from the database (`pg_class.relrowsecurity`, `pg_policies`)
+- [x] 1.1 `npm run db:push` applies to both projects; `npm run db:status` shows identical histories
+- [x] 1.2 Gate green — lint, typecheck, unit tests, build all exit 0
+- [x] 1.3 `npm run test:integration` exits 0 and reports three files
+- [x] 1.4 Generated types carry the new table — `git grep -n "muscle_group" -- src/db/database.types.ts`
+- [x] 1.5 RLS on and exactly four policies, read from the database (`pg_class.relrowsecurity`, `pg_policies`)
 
 #### Manual
 
-- [ ] 1.6 The migration makes the nullable-`user_id` convention obvious without reading the plan
+- [x] 1.6 The migration makes the nullable-`user_id` convention obvious without reading the plan
 
 ### Phase 2: Seed the 38 exercises
 

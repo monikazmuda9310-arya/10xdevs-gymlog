@@ -12,6 +12,24 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"];
 export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 
+/**
+ * A catalogue entry. `user_id === null` marks a seeded row every account reads and none may write;
+ * a non-null `user_id` marks a custom exercise private to that account.
+ */
+export type Exercise = Database["public"]["Tables"]["exercises"]["Row"];
+export type ExerciseInsert = Database["public"]["Tables"]["exercises"]["Insert"];
+export type ExerciseUpdate = Database["public"]["Tables"]["exercises"]["Update"];
+
+/** The one primary muscle group every exercise carries (FR-013). Exactly six, closed set. */
+export type MuscleGroup = Database["public"]["Enums"]["muscle_group"];
+
+/**
+ * The same six, as a value — the UI needs to iterate them for a filter and a select, and a
+ * hand-written list in a component is how a seventh group ships to the database and never reaches
+ * the screen. Order matches the enum's declaration order, which is what any `order by` will use.
+ */
+export const MUSCLE_GROUPS = ["legs", "back", "chest", "shoulders", "arms", "core"] as const;
+
 /** Unit weights are entered and displayed in. Storage is canonical; see S-03. */
 export type WeightUnit = Database["public"]["Enums"]["weight_unit"];
 
@@ -30,3 +48,9 @@ export type EstimationFormula = Database["public"]["Enums"]["estimation_formula"
 type MutuallyAssignable<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 type Assert<T extends true> = T;
 export type _EstimationFormulaUnionsAgree = Assert<MutuallyAssignable<EstimationFormula, ServiceEstimationFormula>>;
+
+// The same guard for the muscle-group tuple above. Add a seventh value to the Postgres enum without
+// adding it to MUSCLE_GROUPS and this stops compiling — instead of the new group existing in the
+// database, being assignable to exercises through the API, and silently missing from every filter
+// and select on screen. `false`, not `never`, for the reason spelled out above.
+export type _MuscleGroupTupleCoversEnum = Assert<MutuallyAssignable<MuscleGroup, (typeof MUSCLE_GROUPS)[number]>>;

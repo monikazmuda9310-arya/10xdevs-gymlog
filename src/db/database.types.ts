@@ -8,6 +8,36 @@ export type Database = {
   };
   public: {
     Tables: {
+      exercises: {
+        Row: {
+          created_at: string;
+          id: string;
+          is_bodyweight: boolean;
+          muscle_group: Database["public"]["Enums"]["muscle_group"];
+          name: string;
+          updated_at: string;
+          user_id: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          is_bodyweight?: boolean;
+          muscle_group: Database["public"]["Enums"]["muscle_group"];
+          name: string;
+          updated_at?: string;
+          user_id?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          is_bodyweight?: boolean;
+          muscle_group?: Database["public"]["Enums"]["muscle_group"];
+          name?: string;
+          updated_at?: string;
+          user_id?: string | null;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           created_at: string;
@@ -44,6 +74,7 @@ export type Database = {
     };
     Enums: {
       estimation_formula: "epley" | "brzycki";
+      muscle_group: "legs" | "back" | "chest" | "shoulders" | "arms" | "core";
       weight_unit: "kg" | "lb";
     };
     CompositeTypes: {
@@ -165,6 +196,7 @@ export const Constants = {
   public: {
     Enums: {
       estimation_formula: ["epley", "brzycki"],
+      muscle_group: ["legs", "back", "chest", "shoulders", "arms", "core"],
       weight_unit: ["kg", "lb"],
     },
   },

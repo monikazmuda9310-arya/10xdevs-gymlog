@@ -1,7 +1,7 @@
 ---
 change_id: exercise-catalogue
 title: Exercise catalogue with one primary muscle group and a bodyweight flag
-status: planned
+status: implementing
 created: 2026-08-10
 updated: 2026-08-10
 archived_at: null
