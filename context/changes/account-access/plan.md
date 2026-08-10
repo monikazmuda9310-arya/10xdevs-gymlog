@@ -657,29 +657,29 @@ All eight were taken by the owner during planning on 2026-08-10, with the trade-
 
 #### Automated
 
-- [x] 2.1 Gate green — lint, typecheck, unit tests, build all exit 0
-- [x] 2.2 Both route lists declared in `src/middleware.ts`
+- [x] 2.1 Gate green — lint, typecheck, unit tests, build all exit 0 — 6713046
+- [x] 2.2 Both route lists declared in `src/middleware.ts` — 6713046
 
 #### Manual
 
-- [x] 2.3 Signed out, `/dashboard` redirects to `/auth/signin`
-- [x] 2.4 Signed in, `/auth/signin` and `/auth/signup` redirect to `/dashboard`
-- [x] 2.5 Signed in, `/auth/confirm-email` still renders
-- [x] 2.6 Signed out, `/` and `/auth/*` render normally
+- [x] 2.3 Signed out, `/dashboard` redirects to `/auth/signin` — 6713046
+- [x] 2.4 Signed in, `/auth/signin` and `/auth/signup` redirect to `/dashboard` — 6713046
+- [x] 2.5 Signed in, `/auth/confirm-email` still renders — 6713046
+- [x] 2.6 Signed out, `/` and `/auth/*` render normally — 6713046
 
 ### Phase 3: Cover it automatically
 
 #### Automated
 
-- [ ] 3.1 `npm test` names `auth.test.ts`, exits 0, and stays offline
-- [ ] 3.2 `npm run test:integration` exits 0 and reports both files
-- [ ] 3.3 The new suite cannot reach production — `git grep -nE "SUPABASE_URL|SUPABASE_KEY" -- tests/` returns nothing
-- [ ] 3.4 `npm run lint` and `npm run typecheck` exit 0 with the new files present
+- [x] 3.1 `npm test` names `auth.test.ts`, exits 0, and stays offline
+- [x] 3.2 `npm run test:integration` exits 0 and reports both files
+- [x] 3.3 The new suite cannot reach production — `git grep -nE "SUPABASE_URL|SUPABASE_KEY" -- tests/` returns nothing
+- [x] 3.4 `npm run lint` and `npm run typecheck` exit 0 with the new files present
 
 #### Manual
 
 - [ ] 3.5 CI green, `npm run test:integration` step shows both files
-- [ ] 3.6 New accounts appear in `gymlog-test` and not in production
+- [x] 3.6 New accounts appear in `gymlog-test` and not in production
 
 ### Phase 4: Turn confirmation on for production, deploy, verify
 
