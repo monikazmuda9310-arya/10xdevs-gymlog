@@ -665,31 +665,31 @@ rather than re-argued.
 
 #### Automated
 
-- [x] 3.1 Gate green — lint, typecheck, unit tests, build all exit 0
-- [x] 3.2 Unit tests cover the validation boundaries and the `%`/`_` search escaping
-- [x] 3.3 No provider prose escapes — `git grep -n "error.message" -- src/pages/api/exercises/` returns nothing
-- [ ] 3.4 A scripted POST creates a row; a duplicate name returns the duplicate code, not a 500 — MOVED TO PHASE 4 (needs a browser session; the dev server points at production and no password is available to a script)
+- [x] 3.1 Gate green — lint, typecheck, unit tests, build all exit 0 — 3ce603c
+- [x] 3.2 Unit tests cover the validation boundaries and the `%`/`_` search escaping — 3ce603c
+- [x] 3.3 No provider prose escapes — `git grep -n "error.message" -- src/pages/api/exercises/` returns nothing — 3ce603c
+- [x] 3.4 A scripted POST creates a row; a duplicate name returns the duplicate code, not a 500 — verified in Phase 4 through the browser form instead (201 on create, the duplicate message on retry, including a case-only difference)
 
 #### Manual
 
-- [x] 3.5 A POST from a signed-out session creates no row, verified by re-reading the table
+- [x] 3.5 A POST from a signed-out session creates no row, verified by re-reading the table — 3ce603c
 
 ### Phase 4: The catalogue screen
 
 #### Automated
 
-- [ ] 4.1 Full five-command gate exits 0
-- [ ] 4.2 `/exercises` is in `PROTECTED_ROUTES`
-- [ ] 4.3 Signed out, `/exercises` returns 302 to `/auth/signin`
+- [x] 4.1 Full five-command gate exits 0
+- [x] 4.2 `/exercises` is in `PROTECTED_ROUTES`
+- [x] 4.3 Signed out, `/exercises` returns 302 to `/auth/signin`
 
 #### Manual
 
-- [ ] 4.4 Signed in, `/exercises` lists 38 and each group filter's count matches the seed
-- [ ] 4.5 Search is case-insensitive; a nonsense term shows the empty state
-- [ ] 4.6 A added exercise appears immediately and survives a reload
-- [ ] 4.7 A duplicate name shows the duplicate message, not a crash
-- [ ] 4.8 A second account sees the 38 but not the first account's custom exercise
-- [ ] 4.9 The screen is usable one-handed at phone width
+- [x] 4.4 Signed in, `/exercises` lists 38 and each group filter's count matches the seed
+- [x] 4.5 Search is case-insensitive; a nonsense term shows the empty state
+- [x] 4.6 A added exercise appears immediately and survives a reload
+- [x] 4.7 A duplicate name shows the duplicate message, not a crash
+- [x] 4.8 A second account sees the 38 but not the first account's custom exercise
+- [x] 4.9 The screen is usable one-handed at phone width
 
 ### Phase 5: Truth up the documents
 

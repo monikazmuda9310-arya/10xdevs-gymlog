@@ -33,6 +33,9 @@ if (error) {
         Training week: <span class="font-semibold text-white">{profile?.timezone ?? "not set"}</span>
       </p>
       <p class="mt-2 text-sm text-blue-100/50">This page is only for authenticated users.</p>
+      <p class="mt-4">
+        <a href="/exercises" class="text-sm text-purple-300 hover:underline">Browse exercises →</a>
+      </p>
       <form method="POST" action="/api/auth/signout" class="mt-6">
         <button
           type="submit"

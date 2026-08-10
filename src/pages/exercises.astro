@@ -1,0 +1,49 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import ExerciseCatalogue from "@/components/exercises/ExerciseCatalogue";
+import { listExercises } from "@/lib/services/exercises";
+
+const { user, supabase } = Astro.locals;
+
+// The middleware guarantees a user here — /exercises is in PROTECTED_ROUTES — but the types do not
+// know that, and a page that assumes it would break silently if the route were ever removed from
+// the list.
+let exercises: Awaited<ReturnType<typeof listExercises>> = [];
+let loadFailed = false;
+
+if (supabase && user) {
+  try {
+    exercises = await listExercises(supabase, user.id);
+  } catch (error) {
+    // Without this branch a failed read renders as an empty catalogue — indistinguishable from a
+    // seed that never landed. That is the silent-failure class AGENTS.md § Cloudflare traps warns
+    // about, arriving through a second door.
+    loadFailed = true;
+    // eslint-disable-next-line no-console -- deliberate server-side diagnostic
+    console.error("exercises: catalogue read failed", error);
+  }
+}
+---
+
+<Layout title="Exercises">
+  <div class="bg-cosmic min-h-screen p-4">
+    <div class="mx-auto w-full max-w-2xl py-8">
+      <header class="mb-6 flex items-baseline justify-between gap-4">
+        <h1 class="bg-gradient-to-r from-blue-200 to-purple-200 bg-clip-text text-2xl font-bold text-transparent">
+          Exercises
+        </h1>
+        <a href="/dashboard" class="text-sm text-purple-300 hover:underline">Back to dashboard</a>
+      </header>
+
+      {
+        loadFailed ? (
+          <p class="rounded-lg border border-red-400/30 bg-red-900/30 px-4 py-6 text-center text-red-200">
+            The catalogue could not be loaded. Please refresh; if it keeps happening, the database may be unreachable.
+          </p>
+        ) : (
+          <ExerciseCatalogue initialExercises={exercises} client:load />
+        )
+      }
+    </div>
+  </div>
+</Layout>
