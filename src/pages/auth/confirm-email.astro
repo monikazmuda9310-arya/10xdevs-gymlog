@@ -1,21 +1,16 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 
-const isAutoConfirmed = import.meta.env.DEV;
-
-const content = isAutoConfirmed
-  ? {
-      emoji: "✅",
-      heading: "Registration successful",
-      description: "Your account has been created. You can now sign in.",
-      linkText: "Go to sign in",
-    }
-  : {
-      emoji: "📧",
-      heading: "Check your email",
-      description: "We've sent a confirmation link to your email address. Click it to activate your account.",
-      linkText: "Back to sign in",
-    };
+// No branch. `/api/auth/signup` sends the caller here only when `signUp` returned no session,
+// which is precisely when a confirmation email is on its way. The previous condition keyed off
+// `import.meta.env.DEV` — i.e. build mode, not the Supabase project's actual setting — so every
+// production build told new users to check an inbox that received nothing.
+const content = {
+  emoji: "📧",
+  heading: "Check your email",
+  description: "We've sent a confirmation link to your email address. Click it to activate your account.",
+  linkText: "Back to sign in",
+};
 ---
 
 <Layout title={content.heading}>

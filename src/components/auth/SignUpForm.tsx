@@ -4,8 +4,20 @@ import { FormField } from "@/components/auth/FormField";
 import { PasswordToggle } from "@/components/auth/PasswordToggle";
 import { SubmitButton } from "@/components/auth/SubmitButton";
 import { ServerError } from "@/components/auth/ServerError";
-
-const MIN_PASSWORD_LENGTH = 6;
+// Constants and the predicate only — never the zod schemas. This component is hydrated with
+// `client:load` on one of the two most-visited unauthenticated pages, so anything it imports is
+// bundled for the browser. The parser stays on the server; what can actually drift between the
+// two sides is the minimum length and the email pattern, and those are shared.
+import {
+  MIN_PASSWORD_LENGTH,
+  isValidEmail,
+  EMAIL_REQUIRED_MESSAGE,
+  EMAIL_INVALID_MESSAGE,
+  PASSWORD_REQUIRED_MESSAGE,
+  PASSWORD_TOO_SHORT_MESSAGE,
+  CONFIRM_REQUIRED_MESSAGE,
+  CONFIRM_MISMATCH_MESSAGE,
+} from "@/lib/validation/auth";
 
 interface Props {
   serverError?: string | null;
@@ -23,21 +35,21 @@ export default function SignUpForm({ serverError }: Props) {
     const next: typeof errors = {};
 
     if (!email.trim()) {
-      next.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      next.email = "Enter a valid email address";
+      next.email = EMAIL_REQUIRED_MESSAGE;
+    } else if (!isValidEmail(email)) {
+      next.email = EMAIL_INVALID_MESSAGE;
     }
 
     if (!password) {
-      next.password = "Password is required";
+      next.password = PASSWORD_REQUIRED_MESSAGE;
     } else if (password.length < MIN_PASSWORD_LENGTH) {
-      next.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+      next.password = PASSWORD_TOO_SHORT_MESSAGE;
     }
 
     if (!confirmPassword) {
-      next.confirmPassword = "Please confirm your password";
+      next.confirmPassword = CONFIRM_REQUIRED_MESSAGE;
     } else if (password !== confirmPassword) {
-      next.confirmPassword = "Passwords do not match";
+      next.confirmPassword = CONFIRM_MISMATCH_MESSAGE;
     }
 
     setErrors(next);
@@ -87,7 +99,7 @@ export default function SignUpForm({ serverError }: Props) {
           setPassword(v);
           clearError("password");
         }}
-        placeholder="Min. 6 characters"
+        placeholder={`Min. ${MIN_PASSWORD_LENGTH} characters`}
         error={errors.password}
         hint={passwordHint}
         icon={<Lock className="size-4" />}

@@ -641,17 +641,17 @@ All eight were taken by the owner during planning on 2026-08-10, with the trade-
 
 #### Automated
 
-- [ ] 1.1 Gate green — `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0
-- [ ] 1.2 `zod` is a runtime dependency
-- [ ] 1.3 No provider prose reaches a redirect — `git grep -n "error.message" -- src/pages/api/auth/` returns nothing
-- [ ] 1.4 The rules exist once — `MIN_PASSWORD_LENGTH` defined in `src/lib/validation/auth.ts`, imported elsewhere
-- [ ] 1.5 A fieldless POST to `/api/auth/signin` returns a 302 to `/auth/signin?error=…` (403 = missing Origin, 500 = still unvalidated)
+- [x] 1.1 Gate green — `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0
+- [x] 1.2 `zod` is a runtime dependency
+- [x] 1.3 No provider prose reaches a redirect — `git grep -n "error.message" -- src/pages/api/auth/` returns nothing
+- [x] 1.4 The rules exist once — `MIN_PASSWORD_LENGTH` defined in `src/lib/validation/auth.ts`, imported elsewhere
+- [x] 1.5 A fieldless POST to `/api/auth/signin` returns a 302 to `/auth/signin?error=…` (403 = missing Origin, 500 = still unvalidated)
 
 #### Manual
 
-- [ ] 1.6 Wrong password and unknown address produce the same message
-- [ ] 1.7 Mismatched confirmation and a 7-character password each produce a specific message
-- [ ] 1.8 Sign-in lands on `/dashboard`; sign-out lands on `/auth/signin`
+- [x] 1.6 Wrong password and unknown address produce the same message
+- [x] 1.7 Mismatched confirmation and a 7-character password each produce a specific message
+- [x] 1.8 Sign-in lands on `/dashboard`; sign-out lands on `/auth/signin`
 
 ### Phase 2: Protect the routes in both directions
 

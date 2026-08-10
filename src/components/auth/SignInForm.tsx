@@ -4,6 +4,13 @@ import { FormField } from "@/components/auth/FormField";
 import { PasswordToggle } from "@/components/auth/PasswordToggle";
 import { SubmitButton } from "@/components/auth/SubmitButton";
 import { ServerError } from "@/components/auth/ServerError";
+// Constants and the predicate only — never the zod schemas; see SignUpForm for why.
+import {
+  isValidEmail,
+  EMAIL_REQUIRED_MESSAGE,
+  EMAIL_INVALID_MESSAGE,
+  PASSWORD_REQUIRED_MESSAGE,
+} from "@/lib/validation/auth";
 
 interface Props {
   serverError?: string | null;
@@ -18,12 +25,12 @@ export default function SignInForm({ serverError }: Props) {
   function validate() {
     const next: typeof errors = {};
     if (!email.trim()) {
-      next.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      next.email = "Enter a valid email address";
+      next.email = EMAIL_REQUIRED_MESSAGE;
+    } else if (!isValidEmail(email)) {
+      next.email = EMAIL_INVALID_MESSAGE;
     }
     if (!password) {
-      next.password = "Password is required";
+      next.password = PASSWORD_REQUIRED_MESSAGE;
     }
     setErrors(next);
     return Object.keys(next).length === 0;

@@ -6,5 +6,6 @@ export const POST: APIRoute = async (context) => {
   if (supabase) {
     await supabase.auth.signOut();
   }
-  return context.redirect("/");
+  // Sign-in, not "/": returning must require authenticating again (US-04's third criterion).
+  return context.redirect("/auth/signin");
 };

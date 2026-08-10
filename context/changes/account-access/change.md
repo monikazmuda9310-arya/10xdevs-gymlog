@@ -1,9 +1,18 @@
 ---
 change_id: account-access
 title: Account creation, sign-in, sign-out and the signed-out redirect
-status: plan_reviewed
+status: implementing
 created: 2026-08-10
 updated: 2026-08-10
+deviations:
+  - "Phase 1 §2/§5: the shared constants and the zod schemas live in two files, not one.
+    `src/lib/validation/auth.ts` stays import-free (MIN_PASSWORD_LENGTH, isValidEmail, the
+    message constants) and is what the hydrated forms import; the schemas and the FormData
+    parsers moved to `src/lib/validation/auth-schemas.ts`, imported by the endpoints only.
+    Reason: with both in one module the `client:load` islands pulled zod's runtime into the
+    browser — the exact cost the plan's §5 rationale exists to avoid. Measured over two builds:
+    client chunk 96 746 B merged vs 36 135 B split. Success criterion 1.4 is unaffected — the
+    definition is still in auth.ts. Approved by the owner on 2026-08-10."
 archived_at: null
 ---
 
@@ -31,6 +40,12 @@ Two constraints inherited from F-03 that any plan here must respect:
   which looks identical to "Supabase is not configured" and is not that.
 - **Astro's `security.checkOrigin` rejects a POST with 403** unless `Origin` matches the host. A
   browser form does this itself; a scripted `fetch` must set it explicitly.
+
+**Accounts in `gymlog` (production), for S-09 to clean up.** Four throwaways from F-03, plus a
+fifth created on 2026-08-10 during Phase 1's manual verification: `proroknh@gmail.com` — the
+owner's, created while email confirmation was still off, and the account Phase 1's account-existence
+check was proven against. `monika.zmuda9310@gmail.com` was tried first and could not sign in, so
+whether it has an account here is unknown; do not assume it does.
 
 Email confirmation is currently **off** on both Supabase projects so that tests can create accounts
 (the free plan sends two emails an hour). It must be switched back on before the product sees real
