@@ -419,8 +419,39 @@ a user (FR-012) are private to that account.
    lift actually taxes, but it is per-person and drifts over time, so the same seeded exercise
    would belong to different groups for two accounts — unusable for a shared catalogue.
 
-   **Still open**: the roughly 30–40 seeded exercises themselves. Owner: user. By: before the
-   catalogue is seeded (S-02 planning). Block: no.
+   **The seeded catalogue is RESOLVED too (owner, 2026-08-10): 38 exercises.** Chosen for the
+   persona — a recreational lifter, three or four evenings a week, commercial gym, a few compound
+   lifts plus accessories — not for completeness. `bw` marks the bodyweight flag of FR-014, which
+   means "may carry zero or negative load", not "never loaded": a weighted pull-up still works.
+
+   | Group       | Exercises                                                                                                              |
+   | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
+   | `legs`      | Back Squat, Front Squat, Leg Press, Romanian Deadlift, Dumbbell Lunge, Hip Thrust, Leg Extension, Leg Curl, Calf Raise |
+   | `back`      | Deadlift, Pull-Up (bw), Chin-Up (bw), Lat Pulldown, Barbell Row, Dumbbell Row, Seated Cable Row                        |
+   | `chest`     | Bench Press, Incline Bench Press, Dumbbell Bench Press, Dumbbell Fly, Cable Crossover, Dip (bw), Push-Up (bw)          |
+   | `shoulders` | Overhead Press, Dumbbell Shoulder Press, Lateral Raise, Rear Delt Fly, Face Pull                                       |
+   | `arms`      | Barbell Curl, Dumbbell Curl, Hammer Curl, Skull Crusher, Triceps Pushdown, Overhead Triceps Extension                  |
+   | `core`      | Plank (bw), Hanging Leg Raise (bw), Cable Crunch, Ab Wheel Rollout (bw)                                                |
+
+   Five assignments are deliberate and should not be "corrected" without a decision:
+   - **Deadlift → `back` while Romanian Deadlift → `legs`.** This looks inconsistent and is the
+     clearest demonstration that the rule works: the conventional pull is programmed on pull day,
+     the Romanian variant on leg day for the hamstrings. An anatomical rule would file both under
+     `legs`.
+   - **Hip Thrust → `legs`**, the direct consequence of declining a `glutes` group. If it is
+     trained heavily and often, it will inflate the `legs` bar — that is the signal that a seventh
+     group has become worth its cost.
+   - **Dip → `chest`**, per the rule. The forward-leaning variant is mostly triceps; a lifter who
+     programmes it that way re-tags their own copy.
+   - **Face Pull → `shoulders`**, not `back`: usually done on pull day, but it targets the rear
+     delts and that is how lifters think of it.
+   - **Push-Up and Plank carry the bodyweight flag** even though nobody assists them, because the
+     flag is what permits a zero load — a plank logged with weight 0 must not be a validation
+     error.
+
+   Deliberately absent: Olympic lifts (a different population), brand-specific machines (not
+   portable between gyms), and grip or angle variants such as close-grip bench — FR-012 exists so
+   the user adds those themselves.
 
 2. **How is an exercise's muscle group corrected after the fact?** — If a user assigns the wrong
    group to a custom exercise, changing it retroactively rewrites every historical per-group
