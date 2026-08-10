@@ -1,7 +1,7 @@
 ---
 change_id: account-access
 title: Account creation, sign-in, sign-out and the signed-out redirect
-status: impl_reviewed
+status: archived
 created: 2026-08-10
 updated: 2026-08-10
 deviations:
@@ -30,7 +30,7 @@ deviations:
     `signUpDestination()` in `src/lib/validation/auth-outcomes.ts` so it can be unit-tested. The
     plan called this branch 'the heart of this change' and nothing covered it: changing
     `data.session` to `data.user` passed every test while breaking every production signup."
-archived_at: null
+archived_at: 2026-08-10T15:49:17Z
 ---
 
 ## Notes
