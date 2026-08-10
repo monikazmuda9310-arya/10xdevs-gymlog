@@ -128,26 +128,49 @@ npm run db:types
 `src/db/database.types.ts` is generated from the **production** schema and committed, because CI
 has no database credentials and must not gain any. Never hand-edit it.
 
-### Email confirmation in local development
+### Email confirmation — set per project, and the two differ
 
-By default Supabase requires email confirmation before a user can sign in. To skip this during local development:
+This is **not** one setting to copy across both projects. Each has a different job:
 
-1. Open the Supabase dashboard for your project
-2. Go to **Authentication → Email → Confirm email**
-3. Toggle it **off**
+| Project       | Confirm email | Why                                                                                                                       |
+| ------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `gymlog`      | **on**        | Nobody may create an account on an address they do not own.                                                               |
+| `gymlog-test` | **off**       | The integration check must be able to create accounts without an inbox — `signUp` has to return a session for it to work. |
 
-Users can then sign in immediately after sign-up without clicking a confirmation link.
+Turning it on for `gymlog-test` breaks `npm run test:integration` on its first assertion, which
+exists precisely to catch that. Turning it off for `gymlog` leaves real accounts unprotected and
+**nothing automated will notice**.
+
+The application does not need to be told which is which: `/api/auth/signup` branches on whether
+`signUp` returned a session, so it follows each project's actual setting without a redeploy.
+
+The toggle lives in the dashboard under **Authentication → Sign In / Providers → Email → Confirm
+email**. Check both without leaving the terminal:
+
+```bash
+node -e "process.loadEnvFile();const t=process.env.SUPABASE_ACCESS_TOKEN;const r=v=>new URL(process.env[v]).hostname.split('.')[0];(async()=>{for(const[l,v]of[['gymlog','SUPABASE_URL'],['gymlog-test','SUPABASE_TEST_URL']]){const c=await(await fetch('https://api.supabase.com/v1/projects/'+r(v)+'/config/auth',{headers:{Authorization:'Bearer '+t}})).json();console.log(l,'Confirm email:',c.mailer_autoconfirm===false?'ON':'off')}})()"
+```
+
+**Also check `site_url` whenever the deployed URL changes.** It decides where a confirmation link
+sends the user, it lives in project config rather than in this repository, and getting it wrong is
+invisible to every test: the account is confirmed correctly and the user still sees "site
+unreachable". It must be the deployed sign-in page, with `uri_allow_list` covering the deployed host
+and `http://localhost:4321/**` for local work.
 
 ### Auth routes
 
-| Route                 | Description                                                             |
-| --------------------- | ----------------------------------------------------------------------- |
-| `/auth/signin`        | Email/password sign-in form                                             |
-| `/auth/signup`        | Email/password sign-up form                                             |
-| `/auth/confirm-email` | Post-signup "check your inbox" page                                     |
-| `/dashboard`          | Example protected page (redirects to `/auth/signin` if unauthenticated) |
+| Route                 | Description                                                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `/auth/signin`        | Email/password sign-in form. On success → `/dashboard`                                                                   |
+| `/auth/signup`        | Email/password sign-up form. On success → `/dashboard`, or `/auth/confirm-email` when a confirmation email is on its way |
+| `/auth/confirm-email` | "Check your inbox" page — reached only when an email is genuinely coming                                                 |
+| `/dashboard`          | Protected page (redirects to `/auth/signin` when signed out)                                                             |
+| `/api/auth/signout`   | POST. Always → `/auth/signin`, so returning requires authenticating again                                                |
 
-Route protection is handled in `src/middleware.ts`. Add paths to the `PROTECTED_ROUTES` array there to require authentication.
+Route protection is handled in `src/middleware.ts`, in **both** directions: `PROTECTED_ROUTES` keeps
+signed-out visitors out of the application, and `AUTH_ROUTES` sends a signed-in visitor away from
+the sign-in and sign-up forms to `/dashboard`. Add new paths to the matching array there rather than
+writing per-page checks.
 
 ## Deployment
 

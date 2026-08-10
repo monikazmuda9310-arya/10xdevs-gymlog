@@ -141,10 +141,32 @@ export `const prerender = false`.
   `SUPABASE_URL` / `SUPABASE_KEY` through `astro:env/server` (declared in `astro.config.mjs`
   under `env.schema`).
 - `src/middleware.ts` — runs on every request, resolves the current user onto
-  `context.locals.user`, redirects unauthenticated requests away from `PROTECTED_ROUTES`. **Add
-  new protected routes there**, not with per-page checks.
-- API endpoints: `src/pages/api/auth/{signin,signup,signout}.ts`
-- Pages: `src/pages/auth/{signin,signup,confirm-email}.astro`, `src/pages/dashboard.astro`
+  `context.locals.user`, and guards **two** lists. `PROTECTED_ROUTES` sends a request with no user
+  to `/auth/signin`; `AUTH_ROUTES` sends a request that _has_ a user away from `/auth/signin` and
+  `/auth/signup` to `/dashboard`. **Route protection lives here in both directions**, never in
+  per-page checks. `/auth/confirm-email` is deliberately in neither list: with confirmation on,
+  `signUp` returns no session, so somebody who has just signed up is not authenticated and the
+  guard would never fire on them — bouncing them off the page that explains what to do next would
+  be actively unhelpful.
+- API endpoints: `src/pages/api/auth/{signin,signup,signout}.ts`. **Every one validates through the
+  shared schema before touching Supabase, and no provider error text ever reaches a response.**
+  - `src/lib/validation/auth.ts` is the single definition of each credential rule
+    (`MIN_PASSWORD_LENGTH`, `isValidEmail`, the user-facing messages). It **imports nothing**, on
+    purpose: both auth forms are `client:load` islands, so everything reachable from it is bundled
+    for the browser. Measured — moving the zod schemas into it costs ~59 KB of client bundle.
+  - `src/lib/validation/auth-schemas.ts` builds the zod schemas _from_ those rules and turns
+    `FormData` into a parse result. **Server-only.** Nothing hydrated may import it.
+  - `src/lib/validation/auth-errors.ts` maps a Supabase `AuthError` onto a small fixed set of
+    project-owned messages, matching on `error.code` rather than on its prose (the prose changes
+    between releases; the codes are the contract). Sign-in collapses to one message regardless of
+    cause. **Validation failures are NOT routed through it** — "password is too short" is caused by
+    the user and must stay specific, or the form becomes unusable.
+- **`signup.ts` branches on whether `signUp` returned a session**, which is the real outcome. Do not
+  reintroduce a config flag, an env var or `import.meta.env.DEV` for this — all three can disagree
+  with what the Supabase project is set to right now, and that is exactly the bug S-01 removed.
+- Pages: `src/pages/auth/{signin,signup,confirm-email}.astro`, `src/pages/dashboard.astro`.
+  `confirm-email.astro` is unconditional: it is reached only when a confirmation email is genuinely
+  on its way.
 
 ## Conventions
 
@@ -185,6 +207,16 @@ export `const prerender = false`.
   - **Fixture discipline**: reset the fixture rows in `beforeAll`, write run-unique values, restore
     in a `finally`. Shared rows plus an interrupted run is how a suite starts failing for reasons
     unrelated to the code, repairable only by hand-written SQL.
+  - **Auth flows are covered in `tests/integration/auth-flows.test.ts`**, which creates its own
+    account per run (`s01-signup-<run>@gymlog-test.dev`) rather than reusing the RLS suite's
+    `rls-owner-a/b` — a signup test must own the account it asserts about. Two of its assertions
+    look redundant and are not:
+    - **"a fresh signup returns a session"** is the tripwire for email confirmation being switched
+      on for the wrong project. It is the only automated signal that would catch it; the other
+      outcome — production left unprotected — is silent.
+    - **"an address with no account is indistinguishable from a wrong password"** compares the
+      provider's `status`, `code` _and_ `message` across both cases. Asserting only that both fail
+      would pass against a real account-existence oracle sitting underneath a neutral message.
 - **E2E locators**: `getByRole` / `getByLabel` / `getByText` first. `getByTestId` only when
   accessibility attributes are genuinely ambiguous. Never CSS selectors, XPath, or DOM structure.
 - **Never `page.waitForTimeout()`.** Wait on state: `toBeVisible()`, `waitForURL()`,
@@ -224,6 +256,36 @@ Node version, secrets and deployment: @README.md. **Never commit a real key** �
   password still works while the _new_ one is rejected (`SQLSTATE 28P01`). Both signals at once
   look exactly like "the owner did not confirm the reset" and it is not that. Poll every 60 s
   before concluding anything.
+
+### The two projects differ on email confirmation, deliberately
+
+**`gymlog` has Confirm email ON. `gymlog-test` has it OFF.** This is the concrete return on running
+two projects, and making them uniform in either direction breaks something:
+
+- **Turning it OFF for `gymlog`** lets anybody create an account on an address they do not own —
+  the thing FR-001 and US-04 exist to prevent.
+- **Turning it ON for `gymlog-test`** breaks `npm run test:integration` immediately, because
+  `signUp` stops returning a session and both suites depend on bootstrapping accounts without an
+  inbox. `auth-flows.test.ts`'s first assertion exists to fail loudly the moment this happens.
+
+Read the current state instead of trusting this paragraph — no dashboard needed:
+
+```bash
+node -e "process.loadEnvFile();const t=process.env.SUPABASE_ACCESS_TOKEN;const r=v=>new URL(process.env[v]).hostname.split('.')[0];(async()=>{for(const[l,v]of[['gymlog','SUPABASE_URL'],['gymlog-test','SUPABASE_TEST_URL']]){const c=await(await fetch('https://api.supabase.com/v1/projects/'+r(v)+'/config/auth',{headers:{Authorization:'Bearer '+t}})).json();console.log(l,'Confirm email:',c.mailer_autoconfirm===false?'ON':'off')}})()"
+```
+
+`mailer_autoconfirm: false` means confirmation is **on** — the field names the bypass, not the
+feature.
+
+**`site_url` is the trap that no test can see.** It is where Supabase sends a user after they click
+a confirmation link, and it lives in project config, not in this repository. It shipped as
+`http://localhost:3000` — a Next.js port from the starter template, which `astro dev` does not even
+use — and stayed wrong until a human clicked a real link during S-01. The failure is silent in
+exactly the worst way: **the account is confirmed correctly, the database looks right, every test
+passes, and the user sees "site unreachable" and concludes the signup failed.** It is now
+`https://gymlog.10x-astro-starter.workers.dev/auth/signin`, with `uri_allow_list` covering that host
+and `http://localhost:4321/**`. If the deployed URL ever changes, this must change with it, and the
+only way to verify is to click a real link.
 
 Line endings are LF, pinned by `.gitattributes`. Do not disable this: the machine has
 `core.autocrlf=true`, and without the pin every file checks out as CRLF and prettier fails all

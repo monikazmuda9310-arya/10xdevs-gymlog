@@ -685,27 +685,27 @@ All eight were taken by the owner during planning on 2026-08-10, with the trade-
 
 #### Automated
 
-- [x] 4.1 Full five-command gate exits 0 after the setting change
-- [x] 4.2 Worker holds only `SUPABASE_URL` and `SUPABASE_KEY`
-- [x] 4.3 `npx wrangler deploy` exits 0 and prints a new version id
+- [x] 4.1 Full five-command gate exits 0 after the setting change — 15afb33
+- [x] 4.2 Worker holds only `SUPABASE_URL` and `SUPABASE_KEY` — 15afb33
+- [x] 4.3 `npx wrangler deploy` exits 0 and prints a new version id — 15afb33
 
 #### Manual
 
-- [x] 4.4 Signup at the deployed URL lands on `/auth/confirm-email` and an email arrives
-- [x] 4.5 Clicking the link then signing in lands on `/dashboard` with that account's timezone
-- [x] 4.6 Signing in before confirming is refused with the neutral message
-- [x] 4.7 Signed out, `/dashboard` still redirects to `/auth/signin`
-- [x] 4.8 The confirmed account is recorded for S-09 alongside the four existing throwaways
+- [x] 4.4 Signup at the deployed URL lands on `/auth/confirm-email` and an email arrives — 15afb33
+- [x] 4.5 Clicking the link then signing in lands on `/dashboard` with that account's timezone — 15afb33
+- [x] 4.6 Signing in before confirming is refused with the neutral message — 15afb33
+- [x] 4.7 Signed out, `/dashboard` still redirects to `/auth/signin` — 15afb33
+- [x] 4.8 The confirmed account is recorded for S-09 alongside the four existing throwaways — 15afb33
 
 ### Phase 5: Truth up the documents
 
 #### Automated
 
-- [ ] 5.1 Per-project confirmation rule documented in `README.md` and `AGENTS.md`
-- [ ] 5.2 Roadmap **Auth** bullet no longer contains `scaffold only` (grep the Auth line only, never the whole file)
-- [ ] 5.3 Markdown Prettier-clean across the three documents
-- [ ] 5.4 Gate still green
+- [x] 5.1 Per-project confirmation rule documented in `README.md` and `AGENTS.md`
+- [x] 5.2 Roadmap **Auth** bullet no longer contains `scaffold only` (grep the Auth line only, never the whole file)
+- [x] 5.3 Markdown Prettier-clean across the three documents
+- [x] 5.4 Gate still green
 
 #### Manual
 
-- [ ] 5.5 `AGENTS.md` § Environment makes the two-project confirmation difference obvious and explains what breaks if it is made uniform
+- [x] 5.5 `AGENTS.md` § Environment makes the two-project confirmation difference obvious and explains what breaks if it is made uniform
