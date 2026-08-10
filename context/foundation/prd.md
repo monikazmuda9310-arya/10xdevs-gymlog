@@ -50,6 +50,7 @@ shown to.
 ## Success Criteria
 
 ### Primary
+
 - A signed-in user can record a complete workout — date, at least one exercise, at least one set
   with repetitions and weight — on a phone in under two minutes, and on save sees, without any
   further input, an estimated one-rep max for each exercise and an explicit flag on any set that
@@ -58,6 +59,7 @@ shown to.
   week-over-week comparison requires no manual arithmetic.
 
 ### Secondary
+
 - Tonnage broken down by muscle group and by exercise, so the user can see where the week's work
   actually went and spot a neglected group at a glance.
 - Kilogram / pound switching, so the numbers read naturally regardless of how the gym's plates
@@ -65,6 +67,7 @@ shown to.
 - A per-exercise history of estimated one-rep max over time.
 
 ### Guardrails
+
 - No user can ever reach another user's workouts, sets, or records — through the interface or
   through a request that names an identifier directly. A breach here is a failure even if
   everything else works.
@@ -83,6 +86,7 @@ shown to.
   and the week's tonnage on the home screen includes it
 
 #### Acceptance Criteria
+
 - The date field defaults to today; the user does not have to touch it in the common case.
 - Repetitions and weight are the only mandatory fields on a set; RPE and the workout note are
   optional and never block a save.
@@ -100,6 +104,7 @@ shown to.
   the records list updates to the new value
 
 #### Acceptance Criteria
+
 - The first-ever set for an exercise establishes the baseline and is NOT announced as a record.
 - Sets excluded from estimation — over twelve repetitions, or assisted with a negative load —
   never trigger a record.
@@ -121,6 +126,7 @@ shown to.
   group and by exercise
 
 #### Acceptance Criteria
+
 - A training week runs Monday to Sunday evaluated in the user's own timezone; a session logged
   on Sunday evening belongs to that week, not the next.
 - Each exercise contributes its tonnage to exactly one muscle group, so the per-group figures
@@ -140,6 +146,7 @@ shown to.
 - **Then** the attempt fails and the target workout is left exactly as it was
 
 #### Acceptance Criteria
+
 - The failure is verified against the recorded data, not only against the response the caller
   sees.
 - The same protection applies at every level of the record — workouts, exercise entries, and
@@ -255,7 +262,7 @@ shown to.
   > one-rep-max estimate so that volume is never the only signal on screen.
 - FR-018: User sees the week's tonnage broken down per exercise. Priority: must-have
   > Socrates: Counter-argument considered: "a single weekly number is enough for one person."
-  > Resolution: kept — the aggregate alone cannot tell the user *where* the work went, which is
+  > Resolution: kept — the aggregate alone cannot tell the user _where_ the work went, which is
   > the only actionable part of the figure.
 - FR-019: User sees the week's tonnage broken down per muscle group. Priority: must-have
   > Socrates: Counter-argument considered: "this is the per-exercise breakdown with fewer rows —
@@ -388,13 +395,33 @@ a user (FR-012) are private to that account.
 
 ## Open Questions
 
-1. **What is the muscle-group taxonomy, and which exercises ship in the seeded catalogue?** —
-   FR-013 requires every exercise to carry exactly one primary muscle group, so the list of
-   groups is now load-bearing: too coarse (push / pull / legs) and the breakdown says nothing,
-   too fine (fifteen groups) and every week looks sparse. A working starting point is legs,
-   back, chest, shoulders, arms, core. Roughly 30–40 seeded exercises covering the main lifts is
-   the target; an exhaustive collection is explicitly not. Owner: user. By: before the catalogue
-   is seeded. Block: no.
+1. ~~**What is the muscle-group taxonomy, and which exercises ship in the seeded catalogue?**~~ —
+   **The taxonomy half is RESOLVED (owner, 2026-08-10); the seeded exercise list is not yet.**
+
+   **Six groups: `legs`, `back`, `chest`, `shoulders`, `arms`, `core`.** Six sits inside the band
+   this document already argued for — coarser than push/pull/legs, which says nothing, and far
+   from fifteen, which makes every week look sparse. Glutes were considered as a seventh and
+   biceps/triceps as an eighth and ninth; both were declined for now on an asymmetry that decides
+   the whole question: **adding a group later is cheap** (a new enum value, no historical figure
+   moves) **while merging or removing one is expensive** (every exercise re-tagged and every
+   historical per-group tonnage rewritten — Open Question 2). When in doubt, start narrower.
+
+   **The assignment rule for multi-joint lifts: the group the lifter has in mind when they put
+   the exercise in their programme.** This is the load-bearing half of the decision — without a
+   stated rule the catalogue goes inconsistent at the first deadlift. Worked examples, which are
+   the rule rather than illustrations of it: deadlift → `back`, pull-up → `back`, dip → `chest`,
+   overhead press → `shoulders`, squat → `legs`, row → `back`, skull crusher → `arms`.
+
+   Rejected alternatives, with the reason: _primary anatomical mover_ is objective and checkable
+   but counter-intuitive here — it files the deadlift under `legs`, so the `back` bar reads as
+   neglected for someone who trains it on pull day, and the chart's whole job is to show whether
+   a real training week is unbalanced. _Whichever muscle limits the load_ is closest to what the
+   lift actually taxes, but it is per-person and drifts over time, so the same seeded exercise
+   would belong to different groups for two accounts — unusable for a shared catalogue.
+
+   **Still open**: the roughly 30–40 seeded exercises themselves. Owner: user. By: before the
+   catalogue is seeded (S-02 planning). Block: no.
+
 2. **How is an exercise's muscle group corrected after the fact?** — If a user assigns the wrong
    group to a custom exercise, changing it retroactively rewrites every historical per-group
    tonnage figure that exercise contributed to. Whether that is acceptable (numbers the user

@@ -32,6 +32,17 @@ without changing the test and saying so.**
   user typed. Rounding or conversion must never create or erase a record.
 - **Every exercise has exactly one primary muscle group**, so per-group tonnage sums exactly to
   the week's total. Never invent weighted multi-group splits.
+  - **The groups are exactly six: `legs`, `back`, `chest`, `shoulders`, `arms`, `core`** (owner,
+    2026-08-10). Do not add a seventh without asking — glutes and a biceps/triceps split were
+    both considered and declined. Adding one later is cheap; merging or removing one means
+    re-tagging every exercise and rewriting every historical per-group figure.
+  - **A multi-joint lift is filed under the group the lifter has in mind when they programme it**,
+    not under its primary anatomical mover. So **deadlift → `back`** (not `legs`), pull-up →
+    `back`, dip → `chest`, overhead press → `shoulders`, squat → `legs`, row → `back`, skull
+    crusher → `arms`. The rule exists because the per-group chart's only job is to show whether a
+    real training week is unbalanced, and people plan in splits: filing the deadlift anatomically
+    makes `back` read as neglected for someone who trains it on pull day. Reasoning and the two
+    rejected alternatives: `context/foundation/prd.md` § Open Questions #1.
 
 ## Access control is a hard guardrail
 

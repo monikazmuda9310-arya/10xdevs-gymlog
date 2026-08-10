@@ -169,7 +169,8 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Parallel with:** F-01
 - **Blockers:** —
 - **Unknowns:**
-  - What is the muscle-group taxonomy, and which exercises ship in the seeded catalogue? Working starting point: legs, back, chest, shoulders, arms, core; roughly 30–40 exercises covering the main lifts. — Owner: user. Block: no.
+  - ~~What is the muscle-group taxonomy?~~ **Resolved 2026-08-10**: six groups — `legs`, `back`, `chest`, `shoulders`, `arms`, `core` — and multi-joint lifts are filed under the group the lifter programmes them for, not their primary anatomical mover (deadlift → `back`). See `AGENTS.md` § Domain rules and `prd.md` § Open Questions #1.
+  - Which exercises ship in the seeded catalogue? Roughly 30–40 covering the main lifts; an exhaustive collection is explicitly not the target. — Owner: user. By: before seeding. Block: no.
 - **Risk:** the group list is load-bearing rather than cosmetic — because every exercise carries exactly one group, the per-group figures later have to reconcile with the week's total, so a taxonomy chosen carelessly here is re-tagged across every custom exercise the owner has already created. Sequenced before the north star because logging a workout requires an exercise to log it against, and free-text names would make per-exercise records impossible to compute at all. The bodyweight flag lands here rather than later so the zero and negative load rules are explicit at the moment sets first become storable.
 - **Status:** proposed
 
