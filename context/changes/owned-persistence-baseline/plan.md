@@ -1406,34 +1406,34 @@ to the implementer's file tools.
 
 #### Automated
 
-- [x] 2.1 Migration applies to both databases — `npm run db:push` exits 0 and names the migration file twice, `gymlog-test` before `gymlog`
-- [x] 2.2 Recorded remotely in both — `npm run db:status` shows the timestamp in Local and Remote of both project tables
-- [x] 2.3 Re-running is a no-op — a second `npm run db:push` reports no pending migrations for either project
-- [x] 2.4 Migration file is LF — `git add` it, then `git ls-files --eol -- supabase/migrations` prints `w/lf`
-- [x] 2.5 Gate undisturbed — `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0
+- [x] 2.1 Migration applies to both databases — `npm run db:push` exits 0 and names the migration file twice, `gymlog-test` before `gymlog` — ccbb8ad
+- [x] 2.2 Recorded remotely in both — `npm run db:status` shows the timestamp in Local and Remote of both project tables — ccbb8ad
+- [x] 2.3 Re-running is a no-op — a second `npm run db:push` reports no pending migrations for either project — ccbb8ad
+- [x] 2.4 Migration file is LF — `git add` it, then `git ls-files --eol -- supabase/migrations` prints `w/lf` — ccbb8ad
+- [x] 2.5 Gate undisturbed — `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0 — ccbb8ad
 
 #### Manual
 
-- [x] 2.6 Production backfill worked — one `profiles` row per existing account, including the smoke account
-- [x] 2.7 `public.profiles` exists and is empty in `gymlog-test` — that project has no accounts yet
-- [x] 2.8 Every existing row reads `Europe/Warsaw` / `kg` / `brzycki`
-- [x] 2.9 RLS enabled on `public.profiles` with three policies listed in both dashboards
-- [x] 2.10 Trigger works — a fresh signup at the deployed URL produces a new `profiles` row in production
+- [x] 2.6 Production backfill worked — one `profiles` row per existing account, including the smoke account — ccbb8ad
+- [x] 2.7 `public.profiles` exists and is empty in `gymlog-test` — that project has no accounts yet — ccbb8ad
+- [x] 2.8 Every existing row reads `Europe/Warsaw` / `kg` / `brzycki` — ccbb8ad
+- [x] 2.9 RLS enabled on `public.profiles` with three policies listed in both dashboards — ccbb8ad
+- [x] 2.10 Trigger works — a fresh signup at the deployed URL produces a new `profiles` row in production — ccbb8ad
 
 ### Phase 3: Generated types, a typed client, and the first entity type
 
 #### Automated
 
-- [ ] 3.1 Generation reproducible — after `git add src/db/database.types.ts`, a second `npm run db:types` leaves `git diff --stat -- src/db/database.types.ts` empty
-- [ ] 3.2 Schema present in the file — with it staged, `git grep -n "profiles"` and `git grep -n "brzycki"` in `src/db/database.types.ts` return matches
-- [ ] 3.3 Generated file is LF — with it staged, `git ls-files --eol -- src/db/database.types.ts` prints a line, and that line reads `w/lf`
-- [ ] 3.4 Types are load-bearing — `npm run typecheck` exits 0, and a deliberate table-name typo makes it exit 1 (reverted)
-- [ ] 3.5 `npm run lint`, `npm test`, `npm run build` all exit 0
+- [x] 3.1 Generation reproducible — after `git add src/db/database.types.ts`, a second `npm run db:types` leaves `git diff --stat -- src/db/database.types.ts` empty
+- [x] 3.2 Schema present in the file — with it staged, `git grep -n "profiles"` and `git grep -n "brzycki"` in `src/db/database.types.ts` return matches
+- [x] 3.3 Generated file is LF — with it staged, `git ls-files --eol -- src/db/database.types.ts` prints a line, and that line reads `w/lf`
+- [x] 3.4 Types are load-bearing — `npm run typecheck` exits 0, and a deliberate table-name typo makes it exit 1 (reverted)
+- [x] 3.5 `npm run lint`, `npm test`, `npm run build` all exit 0
 
 #### Manual
 
-- [ ] 3.6 Cross-shell — `npm run db:types` from PowerShell and from Git Bash produces a byte-identical, still-`w/lf` file
-- [ ] 3.7 `src/types.ts` contains no hand-written column list — every member derives from `Database`
+- [x] 3.6 Cross-shell — `npm run db:types` from PowerShell and from Git Bash produces a byte-identical, still-`w/lf` file
+- [x] 3.7 `src/types.ts` contains no hand-written column list — every member derives from `Database`
 
 ### Phase 4: The check that asserts against stored rows
 

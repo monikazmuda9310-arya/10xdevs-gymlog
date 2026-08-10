@@ -139,12 +139,42 @@ function push(cli) {
   return 0;
 }
 
+// `gen types --db-url` runs the generator in a postgres-meta container, and this machine has no
+// container runtime by contract. `--project-id` generates through the Management API instead,
+// which needs SUPABASE_ACCESS_TOKEN (a personal access token, read from the environment by the
+// CLI itself) and no Docker. The ref is derived from SUPABASE_URL rather than configured
+// separately, so the types can only ever come from the project the production URL points at.
+function productionProjectRef() {
+  const url = process.env.SUPABASE_URL;
+  if (!url) {
+    fail("SUPABASE_URL is not set. The production project ref is derived from it.");
+  }
+  let host;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    fail("SUPABASE_URL is not a valid URL, so the production project ref cannot be derived from it.");
+  }
+  const ref = host.split(".")[0];
+  if (!ref || !host.includes(".supabase.")) {
+    fail(`cannot derive a project ref from SUPABASE_URL (host "${host}"). Expected https://<project-ref>.supabase.co.`);
+  }
+  return ref;
+}
+
 function types(cli) {
   // Production is the schema of record; `npm run db:status` is what proves the test project matches.
   const target = TARGETS.find((candidate) => candidate.key === "production");
-  const url = urlFor(target);
+  if (!process.env.SUPABASE_ACCESS_TOKEN) {
+    fail(
+      "SUPABASE_ACCESS_TOKEN is not set. Generate a personal access token at " +
+        "https://supabase.com/dashboard/account/tokens and put it in .env. " +
+        "It is needed only for type generation; never add it to .dev.vars, CI or the Worker."
+    );
+  }
+  const ref = productionProjectRef();
   banner(`${target.label} → src/db/database.types.ts`);
-  const { status: code, stdout } = capture(cli, ["gen", "types", "typescript", "--db-url", url, "--schema", "public"]);
+  const { status: code, stdout } = capture(cli, ["gen", "types", "typescript", "--project-id", ref, "--schema", "public"]);
   if (code !== 0) {
     console.error("supabase-db: type generation failed; src/db/database.types.ts was left untouched.");
     return code;
