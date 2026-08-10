@@ -1,10 +1,10 @@
 ---
 change_id: owned-persistence-baseline
 title: Connect the hosted database and establish the row-ownership policy shape
-status: impl_reviewed
+status: archived
 created: 2026-08-09
 updated: 2026-08-10
-archived_at: null
+archived_at: 2026-08-10T09:15:24Z
 ---
 
 ## Notes
