@@ -1391,34 +1391,34 @@ to the implementer's file tools.
 
 #### Automated
 
-- [x] 1.1 Both connections work and both histories are empty — `npm run db:status` exits 0 and prints two labelled `Local | Remote | Time (UTC)` tables with no rows
-- [x] 1.2 Wrapper fails loudly and names the right variable — with `SUPABASE_TEST_DB_URL` cleared, then with `SUPABASE_DB_URL` cleared, `npm run db:status` exits non-zero naming the missing one
-- [x] 1.3 Neither secret is tracked — `git check-ignore -v .env` matches, `git status --porcelain` shows no `.env`
-- [x] 1.4 `.env.example` documents the new keys and holds no values — `git grep -n "SUPABASE_TEST_DB_URL" -- .env.example` matches, `git grep -nE "pooler\.supabase\.com|sb_publishable_" -- .env.example` returns nothing
-- [x] 1.5 Gate undisturbed — `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0
+- [x] 1.1 Both connections work and both histories are empty — `npm run db:status` exits 0 and prints two labelled `Local | Remote | Time (UTC)` tables with no rows — f7fc08b
+- [x] 1.2 Wrapper fails loudly and names the right variable — with `SUPABASE_TEST_DB_URL` cleared, then with `SUPABASE_DB_URL` cleared, `npm run db:status` exits non-zero naming the missing one — f7fc08b
+- [x] 1.3 Neither secret is tracked — `git check-ignore -v .env` matches, `git status --porcelain` shows no `.env` — f7fc08b
+- [x] 1.4 `.env.example` documents the new keys and holds no values — `git grep -n "SUPABASE_TEST_DB_URL" -- .env.example` matches, `git grep -nE "pooler\.supabase\.com|sb_publishable_" -- .env.example` returns nothing — f7fc08b
+- [x] 1.5 Gate undisturbed — `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0 — f7fc08b
 
 #### Manual
 
-- [x] 1.6 The two `db:status` tables are visibly labelled and distinct, so divergence is readable at a glance
-- [x] 1.7 No terminal output, commit message or plan file contains either database password
+- [x] 1.6 The two `db:status` tables are visibly labelled and distinct, so divergence is readable at a glance — f7fc08b
+- [x] 1.7 No terminal output, commit message or plan file contains either database password — f7fc08b
 
 ### Phase 2: The profiles migration — table, RLS, policies, trigger
 
 #### Automated
 
-- [ ] 2.1 Migration applies to both databases — `npm run db:push` exits 0 and names the migration file twice, `gymlog-test` before `gymlog`
-- [ ] 2.2 Recorded remotely in both — `npm run db:status` shows the timestamp in Local and Remote of both project tables
-- [ ] 2.3 Re-running is a no-op — a second `npm run db:push` reports no pending migrations for either project
-- [ ] 2.4 Migration file is LF — `git add` it, then `git ls-files --eol -- supabase/migrations` prints `w/lf`
-- [ ] 2.5 Gate undisturbed — `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0
+- [x] 2.1 Migration applies to both databases — `npm run db:push` exits 0 and names the migration file twice, `gymlog-test` before `gymlog`
+- [x] 2.2 Recorded remotely in both — `npm run db:status` shows the timestamp in Local and Remote of both project tables
+- [x] 2.3 Re-running is a no-op — a second `npm run db:push` reports no pending migrations for either project
+- [x] 2.4 Migration file is LF — `git add` it, then `git ls-files --eol -- supabase/migrations` prints `w/lf`
+- [x] 2.5 Gate undisturbed — `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0
 
 #### Manual
 
-- [ ] 2.6 Production backfill worked — one `profiles` row per existing account, including the smoke account
-- [ ] 2.7 `public.profiles` exists and is empty in `gymlog-test` — that project has no accounts yet
-- [ ] 2.8 Every existing row reads `Europe/Warsaw` / `kg` / `brzycki`
-- [ ] 2.9 RLS enabled on `public.profiles` with three policies listed in both dashboards
-- [ ] 2.10 Trigger works — a fresh signup at the deployed URL produces a new `profiles` row in production
+- [x] 2.6 Production backfill worked — one `profiles` row per existing account, including the smoke account
+- [x] 2.7 `public.profiles` exists and is empty in `gymlog-test` — that project has no accounts yet
+- [x] 2.8 Every existing row reads `Europe/Warsaw` / `kg` / `brzycki`
+- [x] 2.9 RLS enabled on `public.profiles` with three policies listed in both dashboards
+- [x] 2.10 Trigger works — a fresh signup at the deployed URL produces a new `profiles` row in production
 
 ### Phase 3: Generated types, a typed client, and the first entity type
 
