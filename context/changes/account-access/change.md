@@ -45,7 +45,9 @@ Two constraints inherited from F-03 that any plan here must respect:
 fifth created on 2026-08-10 during Phase 1's manual verification: `proroknh@gmail.com` — the
 owner's, created while email confirmation was still off, and the account Phase 1's account-existence
 check was proven against. `monika.zmuda9310@gmail.com` was tried first and could not sign in, so
-whether it has an account here is unknown; do not assume it does.
+whether it has an account here is unknown; do not assume it does. A sixth,
+`s01-manual-1786367266171@example.com`, was created by the script that verified Phase 2's
+signed-in redirects — a session was the only way to observe them.
 
 Email confirmation is currently **off** on both Supabase projects so that tests can create accounts
 (the free plan sends two emails an hour). It must be switched back on before the product sees real

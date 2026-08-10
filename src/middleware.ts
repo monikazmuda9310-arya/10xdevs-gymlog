@@ -1,7 +1,16 @@
 import { defineMiddleware } from "astro:middleware";
 import { createClient } from "@/lib/supabase";
 
+// Route protection lives here, in one place, not in per-page checks (AGENTS.md § Auth wiring).
 const PROTECTED_ROUTES = ["/dashboard"];
+
+// The mirror image of PROTECTED_ROUTES: a signed-in visitor has no business staring at a login
+// form. `/auth/confirm-email` is deliberately absent, and the reason is checkable rather than
+// precautionary — with confirmation on, `signUp` returns no session, so somebody who has just
+// signed up is not authenticated and this guard would never fire on them anyway. Excluding it
+// costs nothing today and keeps the page reachable if that ever changes; bouncing someone off the
+// page that explains what to do next would be actively unhelpful.
+const AUTH_ROUTES = ["/auth/signin", "/auth/signup"];
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const supabase = createClient(context.request.headers, context.cookies);
@@ -22,6 +31,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
     if (!context.locals.user) {
       return context.redirect("/auth/signin");
     }
+  }
+
+  if (context.locals.user && AUTH_ROUTES.some((route) => context.url.pathname.startsWith(route))) {
+    return context.redirect("/dashboard");
   }
 
   return next();

@@ -641,31 +641,31 @@ All eight were taken by the owner during planning on 2026-08-10, with the trade-
 
 #### Automated
 
-- [x] 1.1 Gate green — `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0
-- [x] 1.2 `zod` is a runtime dependency
-- [x] 1.3 No provider prose reaches a redirect — `git grep -n "error.message" -- src/pages/api/auth/` returns nothing
-- [x] 1.4 The rules exist once — `MIN_PASSWORD_LENGTH` defined in `src/lib/validation/auth.ts`, imported elsewhere
-- [x] 1.5 A fieldless POST to `/api/auth/signin` returns a 302 to `/auth/signin?error=…` (403 = missing Origin, 500 = still unvalidated)
+- [x] 1.1 Gate green — `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0 — e4fb7e1
+- [x] 1.2 `zod` is a runtime dependency — e4fb7e1
+- [x] 1.3 No provider prose reaches a redirect — `git grep -n "error.message" -- src/pages/api/auth/` returns nothing — e4fb7e1
+- [x] 1.4 The rules exist once — `MIN_PASSWORD_LENGTH` defined in `src/lib/validation/auth.ts`, imported elsewhere — e4fb7e1
+- [x] 1.5 A fieldless POST to `/api/auth/signin` returns a 302 to `/auth/signin?error=…` (403 = missing Origin, 500 = still unvalidated) — e4fb7e1
 
 #### Manual
 
-- [x] 1.6 Wrong password and unknown address produce the same message
-- [x] 1.7 Mismatched confirmation and a 7-character password each produce a specific message
-- [x] 1.8 Sign-in lands on `/dashboard`; sign-out lands on `/auth/signin`
+- [x] 1.6 Wrong password and unknown address produce the same message — e4fb7e1
+- [x] 1.7 Mismatched confirmation and a 7-character password each produce a specific message — e4fb7e1
+- [x] 1.8 Sign-in lands on `/dashboard`; sign-out lands on `/auth/signin` — e4fb7e1
 
 ### Phase 2: Protect the routes in both directions
 
 #### Automated
 
-- [ ] 2.1 Gate green — lint, typecheck, unit tests, build all exit 0
-- [ ] 2.2 Both route lists declared in `src/middleware.ts`
+- [x] 2.1 Gate green — lint, typecheck, unit tests, build all exit 0
+- [x] 2.2 Both route lists declared in `src/middleware.ts`
 
 #### Manual
 
-- [ ] 2.3 Signed out, `/dashboard` redirects to `/auth/signin`
-- [ ] 2.4 Signed in, `/auth/signin` and `/auth/signup` redirect to `/dashboard`
-- [ ] 2.5 Signed in, `/auth/confirm-email` still renders
-- [ ] 2.6 Signed out, `/` and `/auth/*` render normally
+- [x] 2.3 Signed out, `/dashboard` redirects to `/auth/signin`
+- [x] 2.4 Signed in, `/auth/signin` and `/auth/signup` redirect to `/dashboard`
+- [x] 2.5 Signed in, `/auth/confirm-email` still renders
+- [x] 2.6 Signed out, `/` and `/auth/*` render normally
 
 ### Phase 3: Cover it automatically
 
