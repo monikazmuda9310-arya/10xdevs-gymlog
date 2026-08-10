@@ -56,8 +56,12 @@ npm run dev
 - `npm run lint:fix` - Auto-fix ESLint issues
 - `npm run format` - Run Prettier
 - `npm run typecheck` - Run `astro check` (type-checks `.astro` and `.ts` alike)
-- `npm test` - Run the unit tests once (Vitest, non-interactive)
+- `npm test` - Run the unit tests once (Vitest, non-interactive, hermetic — no network)
 - `npm run test:watch` - Run the unit tests in watch mode
+- `npm run test:integration` - Run the RLS check against the `gymlog-test` project (needs network)
+- `npm run db:status` - Print both projects' migration histories — the drift check
+- `npm run db:push` - Apply pending migrations to both projects, `gymlog-test` first
+- `npm run db:types` - Regenerate `src/db/database.types.ts` from the production schema
 
 ## Project Structure
 
@@ -75,60 +79,54 @@ npm run dev
 
 ## Supabase Configuration
 
-This project uses [Supabase](https://supabase.com/) for authentication. Environment variables are declared via Astro's `astro:env` schema and are treated as **server-only secrets** — they are never exposed to the client.
+This project uses [Supabase](https://supabase.com/) for authentication **and for data**. Environment variables are declared via Astro's `astro:env` schema and are treated as **server-only secrets** — they are never exposed to the client.
 
-### First-time setup (local, no cloud project needed)
+### Database setup — two hosted projects, no local stack
 
-Requires [Docker](https://www.docker.com/) and ~7 GB RAM.
+There is **no local database stack and none is wanted**: this project has no container runtime
+available, so `npx supabase start` is not an option and nothing here needs it. Development,
+migrations and the integration check all run against hosted Supabase projects.
 
-1. Create your `.env` file:
+There are two, and the split is deliberate:
+
+| Project       | Role                                                                   |
+| ------------- | ---------------------------------------------------------------------- |
+| `gymlog`      | production — the schema of record, and what the deployed Worker serves |
+| `gymlog-test` | what CI and `npm run test:integration` write to; holds no real data    |
+
+CI never authenticates to production's database, so the blast radius of a runaway check is a
+project with nothing in it.
+
+1. Copy the template and fill it in from the Supabase dashboard:
 
 ```bash
 cp .env.example .env
+cp .env.example .dev.vars   # only SUPABASE_URL and SUPABASE_KEY are read here
 ```
 
-2. Initialize the local Supabase project (creates a `supabase/` config folder):
+`.env` carries eight keys — see `.env.example`, which documents what each is for. Two of them are
+session-mode pooler connection strings (`SUPABASE_DB_URL`, `SUPABASE_TEST_DB_URL`): **copy them
+from the dashboard's Connect dialog, do not construct them**, use port 5432 (transaction mode
+cannot run DDL), and percent-encode the password.
+
+2. Apply the schema to both projects:
 
 ```bash
-npx supabase init
+npm run db:push     # gymlog-test first, then gymlog — there is no single-target push
+npm run db:status   # prints both migration histories side by side
 ```
 
-3. Start the local stack (downloads Docker images on first run):
+`db:push` applies to both in one invocation on purpose: advancing one schema and forgetting the
+other is the only way the two drift. If the test push fails, production is never touched.
+
+3. After any migration, regenerate the committed types:
 
 ```bash
-npx supabase start
+npm run db:types
 ```
 
-4. Copy the credentials printed by the CLI into your `.env` and `.dev.vars`:
-
-```
-SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_KEY=<anon key from CLI output>
-```
-
-5. To stop the stack when done:
-
-```bash
-npx supabase stop
-```
-
-The local Studio UI is available at `http://localhost:54323`.
-
-No database tables or migrations are required — this project uses Supabase Auth's built-in `auth.users` table only.
-
-### Using a cloud Supabase project instead
-
-If you prefer to use a hosted Supabase project, add these variables to your `.env` and `.dev.vars` files:
-
-| Variable       | Description                                                |
-| -------------- | ---------------------------------------------------------- |
-| `SUPABASE_URL` | Project URL from Supabase dashboard → Settings → API       |
-| `SUPABASE_KEY` | `anon` public key from Supabase dashboard → Settings → API |
-
-```
-SUPABASE_URL=https://<project-ref>.supabase.co
-SUPABASE_KEY=<anon-key>
-```
+`src/db/database.types.ts` is generated from the **production** schema and committed, because CI
+has no database credentials and must not gain any. Never hand-edit it.
 
 ### Email confirmation in local development
 
@@ -171,7 +169,17 @@ Set `SUPABASE_URL` and `SUPABASE_KEY` as secrets in your Cloudflare dashboard or
 
 ## CI
 
-GitHub Actions runs lint, typecheck, unit tests and build on every push and PR to `main`. Configure `SUPABASE_URL` and `SUPABASE_KEY` as repository secrets in GitHub for the typecheck and build steps.
+GitHub Actions runs lint, typecheck, unit tests, the integration check and build on every push and PR to `main`. The workflow carries a `concurrency` group so two runs cannot race the integration check's shared fixture rows.
+
+Five repository secrets:
+
+| Secret                                   | Project       | Used by                       |
+| ---------------------------------------- | ------------- | ----------------------------- |
+| `SUPABASE_URL`, `SUPABASE_KEY`           | `gymlog`      | the typecheck and build steps |
+| `SUPABASE_TEST_URL`, `SUPABASE_TEST_KEY` | `gymlog-test` | `npm run test:integration`    |
+| `GYMLOG_TEST_PASSWORD`                   | `gymlog-test` | its two fixture accounts      |
+
+**CI holds no production database credential and never will.** Migrations are applied by hand from a developer machine, deliberately: putting a database-owner connection string in repository secrets would let any merge rewrite the schema.
 
 Those repository secrets are **build-time only**. They do not become Worker runtime secrets — for that, use `npx wrangler secret put SUPABASE_URL` and `npx wrangler secret put SUPABASE_KEY` against the deployed Worker. Skipping that step produces a deployment that builds, returns 200, and cannot log anybody in.
 

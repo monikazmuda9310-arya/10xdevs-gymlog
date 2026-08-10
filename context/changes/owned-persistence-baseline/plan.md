@@ -1458,30 +1458,30 @@ to the implementer's file tools.
 
 #### Automated
 
-- [x] 5.1 Full gate green — lint, typecheck, unit tests, integration check, build all exit 0
-- [x] 5.2 No build-time database dependency — `npm run build` succeeds with both `*_DB_URL` cleared, and the CI build is green
-- [x] 5.3 Worker holds no database or test-project secret — `npx wrangler secret list` names only `SUPABASE_URL` and `SUPABASE_KEY`
-- [x] 5.4 Worker deploys — `npx wrangler deploy` exits 0 and prints a new version id
+- [x] 5.1 Full gate green — lint, typecheck, unit tests, integration check, build all exit 0 — 4b0b346
+- [x] 5.2 No build-time database dependency — `npm run build` succeeds with both `*_DB_URL` cleared, and the CI build is green — 4b0b346
+- [x] 5.3 Worker holds no database or test-project secret — `npx wrangler secret list` names only `SUPABASE_URL` and `SUPABASE_KEY` — 4b0b346
+- [x] 5.4 Worker deploys — `npx wrangler deploy` exits 0 and prints a new version id — 4b0b346
 
 #### Manual
 
-- [x] 5.5 A fresh throwaway account signed up at the deployed URL sees `Europe/Warsaw` on `/dashboard` beside its email
-- [x] 5.6 Changing that row's timezone in the production table editor changes the rendered value; restored afterwards
-- [x] 5.7 A second throwaway account renders its own row while the first is unchanged — the value is per-account
-- [x] 5.8 Signed out, `/dashboard` still redirects to `/auth/signin`
-- [x] 5.9 Throwaway accounts kept to two, named recognisably, and handed to S-09 with the smoke account
+- [x] 5.5 A fresh throwaway account signed up at the deployed URL sees `Europe/Warsaw` on `/dashboard` beside its email — 4b0b346
+- [x] 5.6 Changing that row's timezone in the production table editor changes the rendered value; restored afterwards — 4b0b346
+- [x] 5.7 A second throwaway account renders its own row while the first is unchanged — the value is per-account — 4b0b346
+- [x] 5.8 Signed out, `/dashboard` still redirects to `/auth/signin` — 4b0b346
+- [x] 5.9 Throwaway accounts kept to two, named recognisably, and handed to S-09 with the smoke account — 4b0b346
 
 ### Phase 6: Truth up the documents this change falsifies
 
 #### Automated
 
-- [ ] 6.1 README no longer denies the schema — `git grep -n "No database tables or migrations are required" -- README.md` returns nothing (exits 1 on success; do not `&&`-chain)
-- [ ] 6.2 Roadmap Baseline updated — `git grep -n "no schema" -- context/foundation/roadmap.md` returns nothing (exits 1 on success; do not `&&`-chain)
-- [ ] 6.3 New commands documented — `git grep -n "db:push" -- README.md AGENTS.md` returns matches in both
-- [ ] 6.4 Both projects documented — `git grep -n "gymlog-test" -- README.md AGENTS.md` returns matches in both
-- [ ] 6.5 Markdown Prettier-clean — `npx prettier --check README.md AGENTS.md context/foundation/roadmap.md context/deployment/deploy-plan.md` exits 0
-- [ ] 6.6 Gate still green — `npm run lint && npm run typecheck && npm test && npm run build`
+- [x] 6.1 README no longer denies the schema — `git grep -n "No database tables or migrations are required" -- README.md` returns nothing (exits 1 on success; do not `&&`-chain)
+- [x] 6.2 Roadmap Baseline updated — `git grep -n "no schema" -- context/foundation/roadmap.md` returns nothing (exits 1 on success; do not `&&`-chain)
+- [x] 6.3 New commands documented — `git grep -n "db:push" -- README.md AGENTS.md` returns matches in both
+- [x] 6.4 Both projects documented — `git grep -n "gymlog-test" -- README.md AGENTS.md` returns matches in both
+- [x] 6.5 Markdown Prettier-clean — `npx prettier --check README.md AGENTS.md context/foundation/roadmap.md context/deployment/deploy-plan.md` exits 0
+- [x] 6.6 Gate still green — `npm run lint && npm run typecheck && npm test && npm run build`
 
 #### Manual
 
-- [ ] 6.7 `AGENTS.md` § Access control policy template is copy-pasteable onto a `workouts` table without further questions, including the `.eq("user_id", …)` index-path sentence
+- [x] 6.7 `AGENTS.md` § Access control policy template is copy-pasteable onto a `workouts` table without further questions, including the `.eq("user_id", …)` index-path sentence

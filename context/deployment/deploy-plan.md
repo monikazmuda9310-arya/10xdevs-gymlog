@@ -100,9 +100,26 @@ npx wrangler rollback            # previous version of the Worker
 npx wrangler deployments list    # inspect version history first
 ```
 
-Rollback is near-instant and carries no data caveat at this stage, because there is no data.
-Once migrations exist this stops being true — a Worker rollback does not roll back a schema
-change. Revisit this section when the first migration lands.
+Rollback is near-instant **for code only**. It does not touch the schema.
+
+The first migration landed on 2026-08-10 (`20260810063450_create_profiles_with_row_ownership`),
+so the caveat this section used to defer is now live:
+
+- **`npx wrangler rollback` reverts the Worker, on production only.** The database stays where the
+  last `npm run db:push` left it. A rollback past a migration therefore leaves code that predates
+  the schema running against it.
+- **There are no down migrations.** Supabase's model is forward-only. A schema mistake is undone by
+  a **new forward migration** dropping what the old one created, in reverse dependency order —
+  for this one that reads `drop trigger on_auth_user_created on auth.users;` →
+  `drop function public.handle_new_user, public.set_updated_at;` → `drop table public.profiles;` →
+  `drop type public.weight_unit, public.estimation_formula;`. It is applied with
+  `npm run db:push` like any other, which rolls **both** databases forward together.
+- **Order matters, and it is the deploy's constraint, not the migration's.** Deploy code that
+  tolerates the old schema first, or accept a window in which the two disagree. There is no
+  ordering that avoids the window entirely; there is only choosing which side of it is safe.
+- **`gymlog-test` is not a backup.** It holds no recoverable data — it is a schema mirror whose
+  only job is to catch a bad migration before production sees it. A rollback that fixes production
+  must be pushed to it too, or the next `npm run db:status` shows divergence.
 
 ## Stage 2 — Wire the data layer (blocked on Supabase)
 
