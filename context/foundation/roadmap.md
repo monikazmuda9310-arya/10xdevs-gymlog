@@ -3,7 +3,7 @@ project: "GymLog"
 version: 1
 status: draft
 created: 2026-08-09
-updated: 2026-08-10
+updated: 2026-08-11
 prd_version: 1
 main_goal: speed
 top_blocker: time
@@ -58,7 +58,7 @@ the primary success criterion, and it is placed as early as its prerequisites al
 | F-03 | owned-persistence-baseline        | (foundation) rows belong to accounts and the database enforces it                       | F-02, a provisioned hosted database project (URL + key set as pipeline secrets and as runtime secrets on the deployed instance) | US-04, Access Control §ownership enforced, NFR §no cross-account reach              | done     |
 | S-01 | account-access                    | create an account, sign in, sign out, and be sent to sign-in when signed out            | F-03                                                                                                                            | FR-001, FR-002, FR-003, US-04, Access Control                                       | done     |
 | S-02 | exercise-catalogue                | browse and search exercises, and add their own with a muscle group and bodyweight flag  | S-01, F-03                                                                                                                      | FR-011, FR-012, FR-013, FR-014, Access Control §catalogue visibility                | done     |
-| S-03 | log-workout-with-estimate         | log a workout and see the estimated one-rep max for the set they just entered           | S-02, F-01, F-03                                                                                                                | US-01, FR-004, FR-005, FR-008, FR-009, FR-015                                       | proposed |
+| S-03 | log-workout-with-estimate         | log a workout and see the estimated one-rep max for the set they just entered           | S-02, F-01, F-03                                                                                                                | US-01, FR-004, FR-005, FR-008, FR-009, FR-015                                       | in-progress |
 | S-04 | personal-records                  | be told at save time when a set beats their best, and see current records per exercise  | S-03, F-01                                                                                                                      | US-02, FR-020, FR-021                                                               | proposed |
 | S-05 | edit-and-delete-log               | correct or remove a workout or a set, warned first about any record that will fall      | S-04, F-01                                                                                                                      | FR-006, FR-007, FR-010, US-02                                                       | proposed |
 | S-06 | unit-formula-timezone-preferences | choose kilograms or pounds, the estimation formula, and the timezone their week runs in | S-03, F-03                                                                                                                      | FR-016, FR-022, US-03, NFR §unit round-trip                                         | proposed |
@@ -184,7 +184,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Blockers:** —
 - **Unknowns:** —
 - **Risk:** the estimate is the product, so its boundaries are the risk: at exactly one repetition the estimate must equal the weight lifted, and above twelve repetitions no estimate may be shown rather than a fabricated one. Two storage decisions are also made here and are expensive to reverse — weights are held in one canonical unit, and estimates are derived on read rather than written down — because S-06 later lets the user change both the unit and the formula, and neither change may rewrite a logged value or a past estimate.
-- **Status:** proposed
+- **Status:** in-progress
 
 ### S-04: A record is announced when it happens, and listed afterwards
 

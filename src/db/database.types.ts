@@ -8,6 +8,48 @@ export type Database = {
   };
   public: {
     Tables: {
+      exercise_entries: {
+        Row: {
+          created_at: string;
+          exercise_id: string;
+          id: string;
+          updated_at: string;
+          user_id: string;
+          workout_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          exercise_id: string;
+          id?: string;
+          updated_at?: string;
+          user_id: string;
+          workout_id: string;
+        };
+        Update: {
+          created_at?: string;
+          exercise_id?: string;
+          id?: string;
+          updated_at?: string;
+          user_id?: string;
+          workout_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "exercise_entries_exercise_id_fkey";
+            columns: ["exercise_id"];
+            isOneToOne: false;
+            referencedRelation: "exercises";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "exercise_entries_workout_owner_fkey";
+            columns: ["workout_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "workouts";
+            referencedColumns: ["id", "user_id"];
+          },
+        ];
+      };
       exercises: {
         Row: {
           created_at: string;
@@ -62,6 +104,80 @@ export type Database = {
           timezone?: string;
           updated_at?: string;
           weight_unit?: Database["public"]["Enums"]["weight_unit"];
+        };
+        Relationships: [];
+      };
+      sets: {
+        Row: {
+          created_at: string;
+          exercise_entry_id: string;
+          id: string;
+          reps: number;
+          rpe: number | null;
+          updated_at: string;
+          user_id: string;
+          weight: number;
+          weight_kg: number | null;
+          weight_unit: Database["public"]["Enums"]["weight_unit"];
+        };
+        Insert: {
+          created_at?: string;
+          exercise_entry_id: string;
+          id?: string;
+          reps: number;
+          rpe?: number | null;
+          updated_at?: string;
+          user_id: string;
+          weight: number;
+          weight_kg?: number | null;
+          weight_unit: Database["public"]["Enums"]["weight_unit"];
+        };
+        Update: {
+          created_at?: string;
+          exercise_entry_id?: string;
+          id?: string;
+          reps?: number;
+          rpe?: number | null;
+          updated_at?: string;
+          user_id?: string;
+          weight?: number;
+          weight_kg?: number | null;
+          weight_unit?: Database["public"]["Enums"]["weight_unit"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sets_entry_owner_fkey";
+            columns: ["exercise_entry_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "exercise_entries";
+            referencedColumns: ["id", "user_id"];
+          },
+        ];
+      };
+      workouts: {
+        Row: {
+          created_at: string;
+          id: string;
+          note: string | null;
+          performed_on: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          note?: string | null;
+          performed_on: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          note?: string | null;
+          performed_on?: string;
+          updated_at?: string;
+          user_id?: string;
         };
         Relationships: [];
       };
