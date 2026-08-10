@@ -1347,6 +1347,29 @@ dissent is recorded alongside rather than deleted.
 
 ## Revision history
 
+### 2026-08-10 — deviations taken during implementation
+
+Recorded here rather than rewritten into the phase text above, so the plan stays a record of what
+was decided _and_ what actually happened. All four were forced by measurement, not preference, and
+each is also documented where an implementer would trip over it (`AGENTS.md`, `.env.example`, the
+commit messages).
+
+| Deviation                                                                                                                                                        | Why                                                                                                                                                                                                                                                                                                                                                                                                               | Where else recorded                                            |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| **`db:types` uses `--project-id` + `SUPABASE_ACCESS_TOKEN`, not `--db-url`** (supersedes Phase 1 §2, Phase 3 §1 and Decision 1's "same flag serves `gen types`") | Measured on 2026-08-10: `supabase gen types --db-url` connects to the database and then runs the generator in a `postgres-meta` **container**. This machine has no container runtime by contract, so the flag the plan chose cannot work for this one verb. The Management API path needs no Docker. The project ref is **derived from `SUPABASE_URL`**, so types still cannot come from anywhere but production. | `AGENTS.md` § Commands, `.env.example`, roadmap OQ3, `abe0499` |
+| **`.env` carries eight keys, not six** (supersedes § Current State and Decision 2)                                                                               | `SUPABASE_ACCESS_TOKEN` (above) and `GYMLOG_TEST_PASSWORD` (Phase 4, which the plan specified but did not count).                                                                                                                                                                                                                                                                                                 | `AGENTS.md` § Environment, `.env.example`                      |
+| **`--yes` on both `db push` invocations**                                                                                                                        | A single command addressing two databases cannot stop for the CLI's interactive confirmation. The safety mechanism is the ordering — the test database is always pushed first and a failure there stops the run before production is touched — not the prompt.                                                                                                                                                    | `scripts/supabase-db.mjs`, `f7fc08b`                           |
+| **`--output-format text` pinned on every CLI invocation**                                                                                                        | The CLI detects that it is being driven by an agent and switches to JSON: `migration list` returned `{"migrations":[]}` instead of the labelled table, and `gen types` would have wrapped the generated TypeScript in a JSON envelope, silently breaking Phase 3.                                                                                                                                                 | `scripts/supabase-db.mjs`, `f7fc08b`                           |
+
+**Decision 30 (new): `SUPABASE_ACCESS_TOKEN` is used after all.** Decision row 30's predecessor —
+the "Not used" verdict on `SUPABASE_ACCESS_TOKEN` in § The working method — applied to _migrations_,
+where it remains true: `db push` and `migration list` still take `--db-url` and need no token. The
+token authenticates **type generation only**. It is account-wide in scope, lives only in `.env`,
+and is deliberately absent from CI (which never regenerates types) and from the Worker.
+
+**Not taken:** the Phase 2 § Contingency. The `auth.users` trigger was accepted by both databases,
+so `src/lib/services/profiles.ts` and its `ensureProfile()` were never created.
+
 ### 2026-08-09 — review findings F1–F10 applied, and the owner's two-project decision
 
 **Owner decision (Part B).** GymLog now runs **two** Supabase projects: `gymlog` (production) and

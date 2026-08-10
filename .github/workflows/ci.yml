@@ -9,10 +9,14 @@ on:
 # The integration check writes to two shared fixture rows in gymlog-test. fileParallelism: false
 # serialises files within a run and does nothing across runs, so two overlapping runs would race:
 # run X's assertion 7 (A's timezone mutated) against run Y's assertion 1 (A's timezone is default).
-# cancel-in-progress: false matters as much as the group — cancelling mid-suite is exactly how a
-# fixture row gets left holding a test value.
+#
+# The group is CONSTANT, not ${{ github.ref }}: the shared resource is a pair of database rows, not
+# a branch. A ref-scoped group leaves a push to main and a pull_request run in different groups —
+# different refs — racing over the same two rows, which is the exact interleaving this exists to
+# prevent. cancel-in-progress: false matters as much: cancelling mid-suite is how a fixture row
+# gets left holding a test value.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: gymlog-test-fixtures
   cancel-in-progress: false
 
 jobs:

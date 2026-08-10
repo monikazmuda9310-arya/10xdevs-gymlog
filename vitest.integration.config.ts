@@ -12,6 +12,17 @@ try {
   /* no .env — CI's environment is the source there */
 }
 
+// The suite's guarantee is that it is INCAPABLE of reaching production, not merely disinclined to.
+// `.env` holds production's URL, key and database password plus an account-wide access token, and
+// loadEnvFile above has just pulled all of them into this process. Strip everything the check is
+// not entitled to, so the local blast radius matches CI's — where only these three are supplied.
+const ALLOWED = new Set(["SUPABASE_TEST_URL", "SUPABASE_TEST_KEY", "GYMLOG_TEST_PASSWORD"]);
+for (const key of Object.keys(process.env)) {
+  if (/^(SUPABASE|GYMLOG)_/.test(key) && !ALLOWED.has(key)) {
+    Reflect.deleteProperty(process.env, key);
+  }
+}
+
 // A second Vitest project for checks that are deliberately NOT hermetic. It is kept strictly apart
 // from `npm test`: the unit suite's include glob is src/**, this one lives in tests/, so neither
 // config can match the other's files and the F-01 gate stays fast and offline.

@@ -6,7 +6,18 @@ const { user, supabase } = Astro.locals;
 // Deliberately unfiltered: the point of this read is that RLS returns exactly one row — the
 // signed-in account's own. maybeSingle(), not single(), so a missing row renders as a missing
 // value rather than a 500.
-const { data: profile } = (await supabase?.from("profiles").select("timezone").maybeSingle()) ?? { data: null };
+const { data: profile, error } = (await supabase?.from("profiles").select("timezone").maybeSingle()) ?? {
+  data: null,
+  error: null,
+};
+
+if (error) {
+  // Without this, a failed read is indistinguishable from an absent row: both render the fallback.
+  // That is the silent-failure class AGENTS.md § Cloudflare traps warns about, arriving by a
+  // second door — a revoked grant or a schema-cache miss would look like "no data yet".
+  // eslint-disable-next-line no-console
+  console.warn(`dashboard: profile read failed (${error.code}): ${error.message}`);
+}
 ---
 
 <Layout title="Dashboard">

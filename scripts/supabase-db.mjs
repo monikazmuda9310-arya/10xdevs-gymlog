@@ -63,13 +63,38 @@ function resolveCli() {
   return join(dirname(manifestPath), bin);
 }
 
-// Never printed, never echoed: the URL carries a database password.
+// Never printed, never echoed: the URL carries a database password. Validated here rather than
+// left to the CLI, because the CLI's parse-failure path echoes the string it could not parse —
+// which for an unencoded `@`, `#` or `/` in a password means the password lands in the terminal.
 function urlFor(target) {
   const url = process.env[target.variable];
   if (!url) {
-    fail(`${target.variable} is not set. It holds the ${target.label} session-pooler connection string; put it in .env.`);
+    fail(
+      `${target.variable} is not set. It holds the ${target.label} session-pooler connection string; put it in .env.`,
+    );
+  }
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    fail(
+      `${target.variable} is not a parseable URI. Copy it from the dashboard's Connect dialog and ` +
+        `percent-encode the password if it contains @ : / ? # [ ] % or a space.`,
+    );
+  }
+  if (parsed.protocol !== "postgresql:" && parsed.protocol !== "postgres:") {
+    fail(`${target.variable} must be a postgresql:// URI (session-mode pooler), not ${parsed.protocol}//.`);
+  }
+  if (!parsed.hostname || !parsed.password) {
+    fail(`${target.variable} is missing a host or a password. Copy the full URI from the Connect dialog.`);
   }
   return url;
+}
+
+// Defence in depth for the same hazard: whatever the child writes to stderr passes through here
+// before it reaches the terminal, with any `//user:password@` credential pair masked.
+function maskCredentials(text) {
+  return text.replace(/(\/\/[^:/@\s]+:)[^@\s]+@/g, "$1****@");
 }
 
 // The CLI switches to JSON when it detects it is being driven by an agent, which would turn the
@@ -77,6 +102,10 @@ function urlFor(target) {
 const OUTPUT_FORMAT = ["--output-format", "text"];
 
 function run(cli, args) {
+  // Both streams inherited so the CLI's progress lines interleave with its tables in the order it
+  // wrote them — buffering stderr to mask it puts "Connecting to remote database…" *after* the
+  // table it precedes, which makes `db:status` harder to read for a hazard urlFor() has already
+  // closed at the source. `capture` still masks, because it buffers anyway.
   const result = spawnSync(process.execPath, [cli, ...args, ...OUTPUT_FORMAT], { stdio: "inherit" });
   if (result.error) {
     fail(`failed to start the Supabase CLI: ${result.error.message}`);
@@ -86,10 +115,13 @@ function run(cli, args) {
 
 function capture(cli, args) {
   const result = spawnSync(process.execPath, [cli, ...args, ...OUTPUT_FORMAT], {
-    stdio: ["inherit", "pipe", "inherit"],
+    stdio: ["inherit", "pipe", "pipe"],
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
   });
+  if (result.stderr) {
+    process.stderr.write(maskCredentials(result.stderr));
+  }
   if (result.error) {
     fail(`failed to start the Supabase CLI: ${result.error.message}`);
   }
@@ -118,7 +150,7 @@ function push(cli) {
   if (testCode !== 0) {
     console.error(
       `\nsupabase-db: the ${test.target.label} push failed, so ${production.target.label} was NOT touched.` +
-        `\nFix the migration and re-run \`npm run db:push\` — nothing has been applied anywhere.`
+        `\nFix the migration and re-run \`npm run db:push\` — nothing has been applied anywhere.`,
     );
     return testCode;
   }
@@ -131,7 +163,7 @@ function push(cli) {
         `\nThe migration applied to the test database and failed on production.` +
         `\nRecovery: fix the cause and re-run \`npm run db:push\`. It is idempotent — the test push will` +
         `\nreport "up to date" and the production push will apply what is missing.` +
-        `\nDo NOT apply the SQL by hand in the dashboard: that desynchronises the remote migration history.`
+        `\nDo NOT apply the SQL by hand in the dashboard: that desynchronises the remote migration history.`,
     );
     return productionCode;
   }
@@ -169,12 +201,20 @@ function types(cli) {
     fail(
       "SUPABASE_ACCESS_TOKEN is not set. Generate a personal access token at " +
         "https://supabase.com/dashboard/account/tokens and put it in .env. " +
-        "It is needed only for type generation; never add it to .dev.vars, CI or the Worker."
+        "It is needed only for type generation; never add it to .dev.vars, CI or the Worker.",
     );
   }
   const ref = productionProjectRef();
   banner(`${target.label} → src/db/database.types.ts`);
-  const { status: code, stdout } = capture(cli, ["gen", "types", "typescript", "--project-id", ref, "--schema", "public"]);
+  const { status: code, stdout } = capture(cli, [
+    "gen",
+    "types",
+    "typescript",
+    "--project-id",
+    ref,
+    "--schema",
+    "public",
+  ]);
   if (code !== 0) {
     console.error("supabase-db: type generation failed; src/db/database.types.ts was left untouched.");
     return code;

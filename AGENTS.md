@@ -88,7 +88,9 @@ create policy "<t> are deletable by their owner" on public.<t>
 Scripts, local Supabase setup, and deploy steps: @README.md
 
 The gate, in the order CI runs it: `npm run lint` → `npm run typecheck` → `npm test` →
-`npm run build`. Run all four before claiming a change is done. `npm run typecheck` is
+`npm run test:integration` → `npm run build`. Run all five before claiming a change is done —
+the integration check needs network and the test project's credentials, so it is the one that
+fails first on a fresh clone. `npm run typecheck` is
 `astro check`, which covers `.astro` and `.ts` alike; `npm test` is a single non-interactive
 Vitest run, `npm run test:watch` is the local loop.
 
