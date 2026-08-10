@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+# The integration check writes to two shared fixture rows in gymlog-test. fileParallelism: false
+# serialises files within a run and does nothing across runs, so two overlapping runs would race:
+# run X's assertion 7 (A's timezone mutated) against run Y's assertion 1 (A's timezone is default).
+# cancel-in-progress: false matters as much as the group — cancelling mid-suite is exactly how a
+# fixture row gets left holding a test value.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -23,6 +32,13 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       - run: npm test
+      # Against gymlog-test only. No production credential is present on this step, by design:
+      # the blast radius of a bad check is a project holding no real data.
+      - run: npm run test:integration
+        env:
+          SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+          SUPABASE_TEST_KEY: ${{ secrets.SUPABASE_TEST_KEY }}
+          GYMLOG_TEST_PASSWORD: ${{ secrets.GYMLOG_TEST_PASSWORD }}
       - run: npm run build
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

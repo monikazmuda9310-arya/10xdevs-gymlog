@@ -1424,35 +1424,35 @@ to the implementer's file tools.
 
 #### Automated
 
-- [x] 3.1 Generation reproducible — after `git add src/db/database.types.ts`, a second `npm run db:types` leaves `git diff --stat -- src/db/database.types.ts` empty
-- [x] 3.2 Schema present in the file — with it staged, `git grep -n "profiles"` and `git grep -n "brzycki"` in `src/db/database.types.ts` return matches
-- [x] 3.3 Generated file is LF — with it staged, `git ls-files --eol -- src/db/database.types.ts` prints a line, and that line reads `w/lf`
-- [x] 3.4 Types are load-bearing — `npm run typecheck` exits 0, and a deliberate table-name typo makes it exit 1 (reverted)
-- [x] 3.5 `npm run lint`, `npm test`, `npm run build` all exit 0
+- [x] 3.1 Generation reproducible — after `git add src/db/database.types.ts`, a second `npm run db:types` leaves `git diff --stat -- src/db/database.types.ts` empty — abe0499
+- [x] 3.2 Schema present in the file — with it staged, `git grep -n "profiles"` and `git grep -n "brzycki"` in `src/db/database.types.ts` return matches — abe0499
+- [x] 3.3 Generated file is LF — with it staged, `git ls-files --eol -- src/db/database.types.ts` prints a line, and that line reads `w/lf` — abe0499
+- [x] 3.4 Types are load-bearing — `npm run typecheck` exits 0, and a deliberate table-name typo makes it exit 1 (reverted) — abe0499
+- [x] 3.5 `npm run lint`, `npm test`, `npm run build` all exit 0 — abe0499
 
 #### Manual
 
-- [x] 3.6 Cross-shell — `npm run db:types` from PowerShell and from Git Bash produces a byte-identical, still-`w/lf` file
-- [x] 3.7 `src/types.ts` contains no hand-written column list — every member derives from `Database`
+- [x] 3.6 Cross-shell — `npm run db:types` from PowerShell and from Git Bash produces a byte-identical, still-`w/lf` file — abe0499
+- [x] 3.7 `src/types.ts` contains no hand-written column list — every member derives from `Database` — abe0499
 
 ### Phase 4: The check that asserts against stored rows
 
 #### Automated
 
-- [ ] 4.1 `npm run test:integration` exits 0 with 8 passing test cases in one file
-- [ ] 4.2 Fails loudly without credentials — missing `GYMLOG_TEST_PASSWORD`, then missing `SUPABASE_TEST_URL`, exits non-zero naming it; does not skip or report 0 tests
-- [ ] 4.3 Never touches production — `git grep -nE "SUPABASE_URL|SUPABASE_KEY" -- tests/ vitest.integration.config.ts` returns nothing
-- [ ] 4.4 Not in the unit suite — `npm test` output does not name `profiles-rls.test.ts` and still exits 0 offline
-- [ ] 4.5 `npm run lint` and `npm run typecheck` exit 0 with the new files present
-- [ ] 4.6 Pipeline step present and ordered — `git grep -n "run:" -- .github/workflows/ci.yml` lists `npm run test:integration` between `npm test` and `npm run build`
-- [ ] 4.7 Concurrency guard present — `git grep -n "cancel-in-progress" -- .github/workflows/ci.yml` matches and the group is `ci-${{ github.ref }}`
+- [x] 4.1 `npm run test:integration` exits 0 with 8 passing test cases in one file
+- [x] 4.2 Fails loudly without credentials — missing `GYMLOG_TEST_PASSWORD`, then missing `SUPABASE_TEST_URL`, exits non-zero naming it; does not skip or report 0 tests
+- [x] 4.3 Never touches production — `git grep -nE "SUPABASE_URL|SUPABASE_KEY" -- tests/ vitest.integration.config.ts` returns nothing
+- [x] 4.4 Not in the unit suite — `npm test` output does not name `profiles-rls.test.ts` and still exits 0 offline
+- [x] 4.5 `npm run lint` and `npm run typecheck` exit 0 with the new files present
+- [x] 4.6 Pipeline step present and ordered — `git grep -n "run:" -- .github/workflows/ci.yml` lists `npm run test:integration` between `npm test` and `npm run build`
+- [x] 4.7 Concurrency guard present — `git grep -n "cancel-in-progress" -- .github/workflows/ci.yml` matches and the group is `ci-${{ github.ref }}`
 
 #### Manual
 
 - [ ] 4.8 GitHub Actions run is green and shows the `npm run test:integration` step
-- [ ] 4.9 Exactly two fixture accounts exist in the `gymlog-test` Auth users list after several runs, and neither exists in production
-- [ ] 4.10 Both fixture rows read `Europe/Warsaw` / `kg` / `brzycki` after a run — assertion 7 restored what it wrote
-- [ ] 4.11 Owner-approved red proof on `gymlog-test` only — a temporary permissive `for select … using (true)` policy fails assertion 2; dropping it turns the suite green. RLS is never disabled
+- [x] 4.9 Exactly two fixture accounts exist in the `gymlog-test` Auth users list after several runs, and neither exists in production
+- [x] 4.10 Both fixture rows read `Europe/Warsaw` / `kg` / `brzycki` after a run — assertion 7 restored what it wrote
+- [x] 4.11 Owner-approved red proof on `gymlog-test` only — a temporary permissive `for select … using (true)` policy fails assertion 2; dropping it turns the suite green. RLS is never disabled
 
 ### Phase 5: Prove the deployed instance reads the database
 
