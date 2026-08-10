@@ -1,7 +1,7 @@
 ---
 change_id: account-access
 title: Account creation, sign-in, sign-out and the signed-out redirect
-status: implementing
+status: implemented
 created: 2026-08-10
 updated: 2026-08-10
 deviations:

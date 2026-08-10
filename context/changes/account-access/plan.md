@@ -701,11 +701,11 @@ All eight were taken by the owner during planning on 2026-08-10, with the trade-
 
 #### Automated
 
-- [x] 5.1 Per-project confirmation rule documented in `README.md` and `AGENTS.md`
-- [x] 5.2 Roadmap **Auth** bullet no longer contains `scaffold only` (grep the Auth line only, never the whole file)
-- [x] 5.3 Markdown Prettier-clean across the three documents
-- [x] 5.4 Gate still green
+- [x] 5.1 Per-project confirmation rule documented in `README.md` and `AGENTS.md` — dd7c0f1
+- [x] 5.2 Roadmap **Auth** bullet no longer contains `scaffold only` (grep the Auth line only, never the whole file) — dd7c0f1
+- [x] 5.3 Markdown Prettier-clean across the three documents — dd7c0f1
+- [x] 5.4 Gate still green — dd7c0f1
 
 #### Manual
 
-- [x] 5.5 `AGENTS.md` § Environment makes the two-project confirmation difference obvious and explains what breaks if it is made uniform
+- [x] 5.5 `AGENTS.md` § Environment makes the two-project confirmation difference obvious and explains what breaks if it is made uniform — dd7c0f1
