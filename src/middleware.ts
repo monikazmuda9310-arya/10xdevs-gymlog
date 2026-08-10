@@ -5,6 +5,9 @@ const PROTECTED_ROUTES = ["/dashboard"];
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const supabase = createClient(context.request.headers, context.cookies);
+  // Hand the client on rather than building a second one per page: the cookie plumbing is easy to
+  // get subtly wrong, and a duplicate construction is waste under the Workers Free 10 ms CPU cap.
+  context.locals.supabase = supabase;
 
   if (supabase) {
     const {

@@ -1439,37 +1439,37 @@ to the implementer's file tools.
 
 #### Automated
 
-- [x] 4.1 `npm run test:integration` exits 0 with 8 passing test cases in one file
-- [x] 4.2 Fails loudly without credentials — missing `GYMLOG_TEST_PASSWORD`, then missing `SUPABASE_TEST_URL`, exits non-zero naming it; does not skip or report 0 tests
-- [x] 4.3 Never touches production — `git grep -nE "SUPABASE_URL|SUPABASE_KEY" -- tests/ vitest.integration.config.ts` returns nothing
-- [x] 4.4 Not in the unit suite — `npm test` output does not name `profiles-rls.test.ts` and still exits 0 offline
-- [x] 4.5 `npm run lint` and `npm run typecheck` exit 0 with the new files present
-- [x] 4.6 Pipeline step present and ordered — `git grep -n "run:" -- .github/workflows/ci.yml` lists `npm run test:integration` between `npm test` and `npm run build`
-- [x] 4.7 Concurrency guard present — `git grep -n "cancel-in-progress" -- .github/workflows/ci.yml` matches and the group is `ci-${{ github.ref }}`
+- [x] 4.1 `npm run test:integration` exits 0 with 8 passing test cases in one file — 34d7cca
+- [x] 4.2 Fails loudly without credentials — missing `GYMLOG_TEST_PASSWORD`, then missing `SUPABASE_TEST_URL`, exits non-zero naming it; does not skip or report 0 tests — 34d7cca
+- [x] 4.3 Never touches production — `git grep -nE "SUPABASE_URL|SUPABASE_KEY" -- tests/ vitest.integration.config.ts` returns nothing — 34d7cca
+- [x] 4.4 Not in the unit suite — `npm test` output does not name `profiles-rls.test.ts` and still exits 0 offline — 34d7cca
+- [x] 4.5 `npm run lint` and `npm run typecheck` exit 0 with the new files present — 34d7cca
+- [x] 4.6 Pipeline step present and ordered — `git grep -n "run:" -- .github/workflows/ci.yml` lists `npm run test:integration` between `npm test` and `npm run build` — 34d7cca
+- [x] 4.7 Concurrency guard present — `git grep -n "cancel-in-progress" -- .github/workflows/ci.yml` matches and the group is `ci-${{ github.ref }}` — 34d7cca
 
 #### Manual
 
-- [ ] 4.8 GitHub Actions run is green and shows the `npm run test:integration` step
-- [x] 4.9 Exactly two fixture accounts exist in the `gymlog-test` Auth users list after several runs, and neither exists in production
-- [x] 4.10 Both fixture rows read `Europe/Warsaw` / `kg` / `brzycki` after a run — assertion 7 restored what it wrote
-- [x] 4.11 Owner-approved red proof on `gymlog-test` only — a temporary permissive `for select … using (true)` policy fails assertion 2; dropping it turns the suite green. RLS is never disabled
+- [x] 4.8 GitHub Actions run is green and shows the `npm run test:integration` step — 34d7cca
+- [x] 4.9 Exactly two fixture accounts exist in the `gymlog-test` Auth users list after several runs, and neither exists in production — 34d7cca
+- [x] 4.10 Both fixture rows read `Europe/Warsaw` / `kg` / `brzycki` after a run — assertion 7 restored what it wrote — 34d7cca
+- [x] 4.11 Owner-approved red proof on `gymlog-test` only — a temporary permissive `for select … using (true)` policy fails assertion 2; dropping it turns the suite green. RLS is never disabled — 34d7cca
 
 ### Phase 5: Prove the deployed instance reads the database
 
 #### Automated
 
-- [ ] 5.1 Full gate green — lint, typecheck, unit tests, integration check, build all exit 0
-- [ ] 5.2 No build-time database dependency — `npm run build` succeeds with both `*_DB_URL` cleared, and the CI build is green
-- [ ] 5.3 Worker holds no database or test-project secret — `npx wrangler secret list` names only `SUPABASE_URL` and `SUPABASE_KEY`
-- [ ] 5.4 Worker deploys — `npx wrangler deploy` exits 0 and prints a new version id
+- [x] 5.1 Full gate green — lint, typecheck, unit tests, integration check, build all exit 0
+- [x] 5.2 No build-time database dependency — `npm run build` succeeds with both `*_DB_URL` cleared, and the CI build is green
+- [x] 5.3 Worker holds no database or test-project secret — `npx wrangler secret list` names only `SUPABASE_URL` and `SUPABASE_KEY`
+- [x] 5.4 Worker deploys — `npx wrangler deploy` exits 0 and prints a new version id
 
 #### Manual
 
-- [ ] 5.5 A fresh throwaway account signed up at the deployed URL sees `Europe/Warsaw` on `/dashboard` beside its email
-- [ ] 5.6 Changing that row's timezone in the production table editor changes the rendered value; restored afterwards
-- [ ] 5.7 A second throwaway account renders its own row while the first is unchanged — the value is per-account
-- [ ] 5.8 Signed out, `/dashboard` still redirects to `/auth/signin`
-- [ ] 5.9 Throwaway accounts kept to two, named recognisably, and handed to S-09 with the smoke account
+- [x] 5.5 A fresh throwaway account signed up at the deployed URL sees `Europe/Warsaw` on `/dashboard` beside its email
+- [x] 5.6 Changing that row's timezone in the production table editor changes the rendered value; restored afterwards
+- [x] 5.7 A second throwaway account renders its own row while the first is unchanged — the value is per-account
+- [x] 5.8 Signed out, `/dashboard` still redirects to `/auth/signin`
+- [x] 5.9 Throwaway accounts kept to two, named recognisably, and handed to S-09 with the smoke account
 
 ### Phase 6: Truth up the documents this change falsifies
 
