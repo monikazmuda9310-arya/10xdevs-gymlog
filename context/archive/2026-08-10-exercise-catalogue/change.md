@@ -1,10 +1,10 @@
 ---
 change_id: exercise-catalogue
 title: Exercise catalogue with one primary muscle group and a bodyweight flag
-status: impl_reviewed
+status: archived
 created: 2026-08-10
 updated: 2026-08-10
-archived_at: null
+archived_at: 2026-08-10T20:04:03Z
 deviations:
   - "Phase 1 §4: assertions 3, 6 and 7 (a seeded row is readable by both accounts and writable by
     neither) moved to Phase 2. The plan asked them to run against 'a row inserted for the test with
