@@ -1,8 +1,9 @@
 import type { APIRoute } from "astro";
-import { createClient } from "@/lib/supabase";
 
 export const POST: APIRoute = async (context) => {
-  const supabase = createClient(context.request.headers, context.cookies);
+  // The middleware's client, not a second one — see signin.ts. Null when credentials are absent,
+  // in which case there is no session to end and the redirect below is still the right answer.
+  const { supabase } = context.locals;
   if (supabase) {
     await supabase.auth.signOut();
   }

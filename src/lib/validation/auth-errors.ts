@@ -1,23 +1,14 @@
 import type { AuthError } from "@supabase/supabase-js";
+import type { AuthMessageCode } from "@/lib/validation/auth";
 
 // Provider prose is an account-existence oracle: "User already registered" tells an attacker which
-// addresses have accounts, and US-04 requires that boundary to be real rather than apparent. Every
-// message a caller sees on an auth failure is written here, by this project.
+// addresses have accounts, and US-04 requires that boundary to be real rather than apparent. This
+// maps a Supabase failure onto one of the codes in AUTH_MESSAGES — never onto text, and never onto
+// the provider's own words.
 //
 // This does NOT apply to validation failures. "Password must be at least 8 characters" is caused by
 // the user and must stay specific, or the form becomes unusable — see the plan's § Critical
 // Implementation Details. Only the provider's *identity* errors are flattened.
-
-/** Sign-in: one message for every cause — wrong password, no such account, unconfirmed address. */
-export const SIGN_IN_FAILED_MESSAGE = "Invalid email or password";
-
-/** Sign-up: says nothing about whether the address was already taken. */
-export const SIGN_UP_FAILED_MESSAGE = "We could not create that account. Check your details and try again.";
-
-export const RATE_LIMITED_MESSAGE = "Too many attempts. Wait a moment and try again.";
-
-/** Shown when the provider returned something this project has never seen. Also logged. */
-export const UNEXPECTED_ERROR_MESSAGE = "Something went wrong. Please try again.";
 
 export type AuthAction = "signin" | "signup";
 
@@ -39,18 +30,23 @@ const IDENTITY_CODES: Record<AuthAction, ReadonlySet<string>> = {
 const RATE_LIMIT_CODES = new Set(["over_request_rate_limit", "over_email_send_rate_limit"]);
 
 /**
- * Map a Supabase auth failure onto one of this project's fixed messages.
+ * Map a Supabase auth failure onto one of this project's message codes.
  *
- * Anything unrecognised falls through to the generic message and is logged server-side, so a
- * provider that renames an error is diagnosable without the new string reaching a screen.
+ * Sign-in identity failures all collapse to `sign_in_failed` — wrong password, no such account and
+ * unconfirmed address are one answer. Rate limiting is reported honestly because it is not an
+ * account-existence oracle: Supabase limits `signInWithPassword` per IP, not per address, and
+ * telling a throttled user "invalid email or password" would send them to reset a working password.
+ *
+ * Anything unrecognised falls through to `unexpected` and is logged server-side, so a provider that
+ * renames an error is diagnosable without the new string reaching a screen.
  */
-export function neutralAuthMessage(action: AuthAction, error: AuthError): string {
+export function neutralAuthCode(action: AuthAction, error: AuthError): AuthMessageCode {
   if ((error.code && RATE_LIMIT_CODES.has(error.code)) || error.status === 429) {
-    return RATE_LIMITED_MESSAGE;
+    return "rate_limited";
   }
 
   if (error.code && IDENTITY_CODES[action].has(error.code)) {
-    return action === "signin" ? SIGN_IN_FAILED_MESSAGE : SIGN_UP_FAILED_MESSAGE;
+    return action === "signin" ? "sign_in_failed" : "sign_up_failed";
   }
 
   // Unmapped provider errors must be visible in the Worker log precisely because they are never
@@ -62,5 +58,5 @@ export function neutralAuthMessage(action: AuthAction, error: AuthError): string
     status: error.status,
     message: error.message,
   });
-  return UNEXPECTED_ERROR_MESSAGE;
+  return "unexpected";
 }

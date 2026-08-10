@@ -9,22 +9,15 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   MIN_PASSWORD_LENGTH,
+  MAX_EMAIL_LENGTH,
+  MAX_PASSWORD_LENGTH,
   isValidEmail,
-  EMAIL_REQUIRED_MESSAGE,
-  EMAIL_INVALID_MESSAGE,
-  PASSWORD_REQUIRED_MESSAGE,
-  PASSWORD_TOO_SHORT_MESSAGE,
-  CONFIRM_REQUIRED_MESSAGE,
-  CONFIRM_MISMATCH_MESSAGE,
+  AUTH_MESSAGES,
+  messageForCode,
 } from "@/lib/validation/auth";
 import { parseSignInForm, parseSignUpForm } from "@/lib/validation/auth-schemas";
-import {
-  neutralAuthMessage,
-  SIGN_IN_FAILED_MESSAGE,
-  SIGN_UP_FAILED_MESSAGE,
-  RATE_LIMITED_MESSAGE,
-  UNEXPECTED_ERROR_MESSAGE,
-} from "@/lib/validation/auth-errors";
+import { neutralAuthCode } from "@/lib/validation/auth-errors";
+import { signUpDestination } from "@/lib/validation/auth-outcomes";
 
 function formOf(fields: Record<string, string>): FormData {
   const form = new FormData();
@@ -70,25 +63,25 @@ describe("parseSignInForm", () => {
 
     expect(result.success).toBe(false);
     // Not a type complaint from the parser, and not a 500: a message the user can act on.
-    expect(result).toEqual({ success: false, message: EMAIL_REQUIRED_MESSAGE });
+    expect(result).toEqual({ success: false, code: "email_required" });
   });
 
   it("rejects an empty email", () => {
     const result = parseSignInForm(formOf({ email: "   ", password: VALID_PASSWORD }));
 
-    expect(result).toEqual({ success: false, message: EMAIL_REQUIRED_MESSAGE });
+    expect(result).toEqual({ success: false, code: "email_required" });
   });
 
   it("rejects a malformed email", () => {
     const result = parseSignInForm(formOf({ email: "not-an-address", password: VALID_PASSWORD }));
 
-    expect(result).toEqual({ success: false, message: EMAIL_INVALID_MESSAGE });
+    expect(result).toEqual({ success: false, code: "email_invalid" });
   });
 
   it("rejects an absent password", () => {
     const result = parseSignInForm(formOf({ email: "lifter@example.com" }));
 
-    expect(result).toEqual({ success: false, message: PASSWORD_REQUIRED_MESSAGE });
+    expect(result).toEqual({ success: false, code: "password_required" });
   });
 
   it("accepts a short password — sign-in must not re-impose the signup floor", () => {
@@ -109,14 +102,14 @@ describe("parseSignUpForm", () => {
   it("rejects a form with no fields at all", () => {
     const result = parseSignUpForm(new FormData());
 
-    expect(result).toEqual({ success: false, message: EMAIL_REQUIRED_MESSAGE });
+    expect(result).toEqual({ success: false, code: "email_required" });
   });
 
   it(`rejects a password one character below the floor (${String(MIN_PASSWORD_LENGTH - 1)})`, () => {
     const short = "a".repeat(MIN_PASSWORD_LENGTH - 1);
     const result = parseSignUpForm(formOf({ email: "lifter@example.com", password: short, confirmPassword: short }));
 
-    expect(result).toEqual({ success: false, message: PASSWORD_TOO_SHORT_MESSAGE });
+    expect(result).toEqual({ success: false, code: "password_too_short" });
   });
 
   it(`accepts a password of exactly ${String(MIN_PASSWORD_LENGTH)} characters`, () => {
@@ -132,13 +125,13 @@ describe("parseSignUpForm", () => {
       formOf({ email: "lifter@example.com", password: VALID_PASSWORD, confirmPassword: `${VALID_PASSWORD}x` }),
     );
 
-    expect(result).toEqual({ success: false, message: CONFIRM_MISMATCH_MESSAGE });
+    expect(result).toEqual({ success: false, code: "confirm_mismatch" });
   });
 
   it("rejects an absent confirmation", () => {
     const result = parseSignUpForm(formOf({ email: "lifter@example.com", password: VALID_PASSWORD }));
 
-    expect(result).toEqual({ success: false, message: CONFIRM_REQUIRED_MESSAGE });
+    expect(result).toEqual({ success: false, code: "confirm_required" });
   });
 
   it("does not hand confirmPassword's own value to the provider", () => {
@@ -154,43 +147,141 @@ describe("parseSignUpForm", () => {
   });
 });
 
-describe("neutralAuthMessage", () => {
-  it("collapses every sign-in identity failure to one message", () => {
-    // The whole anti-enumeration point: "no such user" and "wrong password" must be one string.
-    const messages = ["invalid_credentials", "user_not_found", "email_not_confirmed", "user_banned"].map((code) =>
-      neutralAuthMessage("signin", new AuthError("provider prose that must not reach a screen", 400, code)),
+describe("neutralAuthCode", () => {
+  it("collapses every sign-in identity failure to one code", () => {
+    // The whole anti-enumeration point: "no such user" and "wrong password" must be one answer.
+    const codes = ["invalid_credentials", "user_not_found", "email_not_confirmed", "user_banned"].map((code) =>
+      neutralAuthCode("signin", new AuthError("provider prose that must not reach a screen", 400, code)),
     );
 
-    expect(new Set(messages)).toEqual(new Set([SIGN_IN_FAILED_MESSAGE]));
+    expect(new Set(codes)).toEqual(new Set(["sign_in_failed"]));
   });
 
   it("does not let 'User already registered' through on signup", () => {
-    const message = neutralAuthMessage("signup", new AuthError("User already registered", 422, "user_already_exists"));
+    const code = neutralAuthCode("signup", new AuthError("User already registered", 422, "user_already_exists"));
 
-    expect(message).toBe(SIGN_UP_FAILED_MESSAGE);
-    expect(message).not.toContain("registered");
+    expect(code).toBe("sign_up_failed");
+    expect(AUTH_MESSAGES[code]).not.toContain("registered");
   });
 
   it("names rate limiting, which is neither an identity leak nor a mystery", () => {
-    expect(neutralAuthMessage("signin", new AuthError("too many", 429, "over_request_rate_limit"))).toBe(
-      RATE_LIMITED_MESSAGE,
-    );
+    expect(neutralAuthCode("signin", new AuthError("too many", 429, "over_request_rate_limit"))).toBe("rate_limited");
     // Falls back to the status when the code is one we have not seen.
-    expect(neutralAuthMessage("signup", new AuthError("too many", 429, "some_future_limit_code"))).toBe(
-      RATE_LIMITED_MESSAGE,
-    );
+    expect(neutralAuthCode("signup", new AuthError("too many", 429, "some_future_limit_code"))).toBe("rate_limited");
   });
 
   it("logs an unrecognised provider error rather than displaying it", () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
-      const message = neutralAuthMessage("signin", new AuthError("something nobody has mapped", 500, "brand_new_code"));
+      const code = neutralAuthCode("signin", new AuthError("something nobody has mapped", 500, "brand_new_code"));
 
-      expect(message).toBe(UNEXPECTED_ERROR_MESSAGE);
+      expect(code).toBe("unexpected");
       // Visible in the Worker log precisely because it is invisible to the caller.
       expect(logged).toHaveBeenCalledOnce();
     } finally {
       logged.mockRestore();
     }
+  });
+
+  it("only ever returns codes the catalogue can resolve", () => {
+    // A code with no entry would render as the generic message, silently swallowing a real outcome.
+    for (const action of ["signin", "signup"] as const) {
+      for (const provider of ["invalid_credentials", "user_already_exists", "over_request_rate_limit", "unknown_xyz"]) {
+        const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        try {
+          expect(AUTH_MESSAGES).toHaveProperty(neutralAuthCode(action, new AuthError("p", 400, provider)));
+        } finally {
+          logged.mockRestore();
+        }
+      }
+    }
+  });
+});
+
+describe("messageForCode", () => {
+  it("resolves a known code to this project's text", () => {
+    expect(messageForCode("sign_in_failed")).toBe(AUTH_MESSAGES.sign_in_failed);
+  });
+
+  it("renders nothing when there is no code", () => {
+    expect(messageForCode(null)).toBeNull();
+    expect(messageForCode("")).toBeNull();
+  });
+
+  it("refuses to put a crafted link's words in the application's mouth", () => {
+    // The finding this exists for: `?error=Account+locked.+Call+500-123-456` used to render
+    // verbatim, styled as a genuine system message on our own domain.
+    const crafted = "Account locked. Call 500-123-456 to restore access.";
+
+    expect(messageForCode(crafted)).toBe(AUTH_MESSAGES.unexpected);
+    expect(messageForCode("__proto__")).toBe(AUTH_MESSAGES.unexpected);
+    expect(messageForCode("constructor")).toBe(AUTH_MESSAGES.unexpected);
+  });
+});
+
+describe("signUpDestination", () => {
+  const SESSION = { access_token: "token" };
+  const USER = { id: "1a2b3c" };
+
+  it("sends an immediately usable account to the dashboard", () => {
+    // Email confirmation off: signUp returned a session, so the account works right now.
+    expect(signUpDestination({ user: USER, session: SESSION })).toBe("/dashboard");
+  });
+
+  it("sends an account with no session to the confirm-email page", () => {
+    // Email confirmation on: a link is on its way.
+    expect(signUpDestination({ user: USER, session: null })).toBe("/auth/confirm-email");
+  });
+
+  it("decides on the session, not on the user — the mutation no other test catches", () => {
+    // This is the whole point of extracting the function. With confirmation on, Supabase returns an
+    // obfuscated user and NO session; reading `user` here would send unconfirmed accounts to
+    // /dashboard, where the middleware bounces them back to /auth/signin — an endless loop, on
+    // production, that every test in this repository would still call green.
+    expect(signUpDestination({ user: USER, session: null })).not.toBe("/dashboard");
+  });
+
+  it("treats an already-registered address exactly like a new one", () => {
+    // Not a bug to fix later: it IS the anti-enumeration property, and it comes from the provider.
+    const newSignup = signUpDestination({ user: { id: "new" }, session: null });
+    const alreadyTaken = signUpDestination({ user: { id: "obfuscated" }, session: null });
+
+    expect(newSignup).toBe(alreadyTaken);
+  });
+
+  it("does not crash when the provider returns neither", () => {
+    expect(signUpDestination({ user: null, session: null })).toBe("/auth/confirm-email");
+  });
+});
+
+describe("upper bounds", () => {
+  it("rejects an email past RFC 5321's limit", () => {
+    const long = `${"a".repeat(MAX_EMAIL_LENGTH)}@example.com`;
+    const result = parseSignInForm(formOf({ email: long, password: VALID_PASSWORD }));
+
+    expect(result).toEqual({ success: false, code: "email_too_long" });
+  });
+
+  it("rejects a signup password past bcrypt's 72 bytes", () => {
+    // Accepting it would mean the tail the user typed never protected anything: bcrypt reads 72
+    // bytes and silently ignores the rest.
+    const long = "a".repeat(MAX_PASSWORD_LENGTH + 1);
+    const result = parseSignUpForm(formOf({ email: "lifter@example.com", password: long, confirmPassword: long }));
+
+    expect(result).toEqual({ success: false, code: "password_too_long" });
+  });
+
+  it("accepts a signup password of exactly the maximum", () => {
+    const exact = "a".repeat(MAX_PASSWORD_LENGTH);
+    const result = parseSignUpForm(formOf({ email: "lifter@example.com", password: exact, confirmPassword: exact }));
+
+    expect(result.success).toBe(true);
+  });
+
+  it("does not bound the sign-in password — older accounts must still get in", () => {
+    const long = "a".repeat(MAX_PASSWORD_LENGTH + 50);
+    const result = parseSignInForm(formOf({ email: "lifter@example.com", password: long }));
+
+    expect(result.success).toBe(true);
   });
 });

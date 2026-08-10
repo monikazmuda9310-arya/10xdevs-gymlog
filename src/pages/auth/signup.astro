@@ -1,8 +1,10 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import SignUpForm from "@/components/auth/SignUpForm";
+import { messageForCode } from "@/lib/validation/auth";
 
-const error = Astro.url.searchParams.get("error");
+// A code, not text — see signin.astro.
+const error = messageForCode(Astro.url.searchParams.get("error"));
 ---
 
 <Layout title="Sign up">

@@ -20,6 +20,16 @@
  */
 export const MIN_PASSWORD_LENGTH = 8;
 
+/** RFC 5321's maximum forward-path length. */
+export const MAX_EMAIL_LENGTH = 254;
+
+/**
+ * bcrypt — which is what Supabase hashes with — reads at most 72 bytes and silently ignores the
+ * rest. Rejecting a longer password is honest; accepting it would mean the tail the user typed
+ * never protected anything.
+ */
+export const MAX_PASSWORD_LENGTH = 72;
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
@@ -30,11 +40,53 @@ export function isValidEmail(value: string): boolean {
   return EMAIL_PATTERN.test(value.trim());
 }
 
-// User-facing text. The forms render these same strings, so a rule broken in the browser and the
-// same rule broken by a scripted POST read identically.
-export const EMAIL_REQUIRED_MESSAGE = "Email is required";
-export const EMAIL_INVALID_MESSAGE = "Enter a valid email address";
-export const PASSWORD_REQUIRED_MESSAGE = "Password is required";
-export const PASSWORD_TOO_SHORT_MESSAGE = `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
-export const CONFIRM_REQUIRED_MESSAGE = "Please confirm your password";
-export const CONFIRM_MISMATCH_MESSAGE = "Passwords do not match";
+/**
+ * Every message this product will ever show on an auth screen, and its code.
+ *
+ * **The redirect carries the code, never the text.** `/auth/signin?error=<code>` is resolved here,
+ * server-side, so a crafted link cannot put words in the application's mouth. Before this, the
+ * pages rendered `?error=` verbatim: `?error=Account+locked.+Call+500-123-456` displayed as a
+ * genuine system message in the real product — not XSS, since React escapes it, but a ready-made
+ * phishing page hosted on our own domain. Building a fixed set of project-owned messages (US-04)
+ * is pointless while the channel that delivers them accepts arbitrary text.
+ */
+export const AUTH_MESSAGES = {
+  // Caused by the user, and deliberately specific — a form that says "something went wrong" when
+  // you typed seven characters is unusable.
+  email_required: "Email is required",
+  email_invalid: "Enter a valid email address",
+  password_required: "Password is required",
+  password_too_short: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+  confirm_required: "Please confirm your password",
+  confirm_mismatch: "Passwords do not match",
+  email_too_long: `Email must be at most ${MAX_EMAIL_LENGTH} characters`,
+  password_too_long: `Password must be at most ${MAX_PASSWORD_LENGTH} characters`,
+  // Provider outcomes, deliberately uninformative about whether an address has an account.
+  sign_in_failed: "Invalid email or password",
+  sign_up_failed: "We could not create that account. Check your details and try again.",
+  rate_limited: "Too many attempts. Wait a moment and try again.",
+  unexpected: "Something went wrong. Please try again.",
+  not_configured: "Supabase is not configured",
+} as const;
+
+export type AuthMessageCode = keyof typeof AUTH_MESSAGES;
+
+/**
+ * Resolve a code from the query string. Absent → no message at all; unrecognised → the generic
+ * one, so a hand-edited URL yields our text rather than the visitor's.
+ */
+export function messageForCode(code: string | null | undefined): string | null {
+  if (!code) {
+    return null;
+  }
+  return Object.hasOwn(AUTH_MESSAGES, code) ? AUTH_MESSAGES[code as AuthMessageCode] : AUTH_MESSAGES.unexpected;
+}
+
+// The forms render these same strings, so a rule broken in the browser and the same rule broken by
+// a scripted POST read identically. Aliases of the catalogue above — still one definition each.
+export const EMAIL_REQUIRED_MESSAGE = AUTH_MESSAGES.email_required;
+export const EMAIL_INVALID_MESSAGE = AUTH_MESSAGES.email_invalid;
+export const PASSWORD_REQUIRED_MESSAGE = AUTH_MESSAGES.password_required;
+export const PASSWORD_TOO_SHORT_MESSAGE = AUTH_MESSAGES.password_too_short;
+export const CONFIRM_REQUIRED_MESSAGE = AUTH_MESSAGES.confirm_required;
+export const CONFIRM_MISMATCH_MESSAGE = AUTH_MESSAGES.confirm_mismatch;

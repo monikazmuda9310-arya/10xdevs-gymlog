@@ -1,13 +1,10 @@
 import { z } from "zod";
 import {
   MIN_PASSWORD_LENGTH,
+  MAX_EMAIL_LENGTH,
+  MAX_PASSWORD_LENGTH,
   isValidEmail,
-  EMAIL_REQUIRED_MESSAGE,
-  EMAIL_INVALID_MESSAGE,
-  PASSWORD_REQUIRED_MESSAGE,
-  PASSWORD_TOO_SHORT_MESSAGE,
-  CONFIRM_REQUIRED_MESSAGE,
-  CONFIRM_MISMATCH_MESSAGE,
+  type AuthMessageCode,
 } from "@/lib/validation/auth";
 
 // The server half of the credential rules. Every rule here is *built from* the zod-free ./auth
@@ -16,28 +13,44 @@ import {
 //
 // Server-only: nothing hydrated may import this module, or zod ships to the browser.
 
-const emailField = z.string().trim().min(1, EMAIL_REQUIRED_MESSAGE).refine(isValidEmail, EMAIL_INVALID_MESSAGE);
+// Each issue carries a MESSAGE CODE, not the sentence. The endpoints put it in the redirect and the
+// page resolves it — see AUTH_MESSAGES in ./auth for why the text must never travel through a URL.
+const code = (value: AuthMessageCode): string => value;
+
+const emailField = z
+  .string()
+  .trim()
+  .min(1, code("email_required"))
+  .max(MAX_EMAIL_LENGTH, code("email_too_long"))
+  .refine(isValidEmail, code("email_invalid"));
 
 export const signInSchema = z.object({
   email: emailField,
-  password: z.string().min(1, PASSWORD_REQUIRED_MESSAGE),
+  // No upper bound here, deliberately: an account created under any earlier rule must still be
+  // able to sign in. bcrypt ignores everything past 72 bytes anyway, so a longer value still
+  // matches the stored hash.
+  password: z.string().min(1, code("password_required")),
 });
 
 export const signUpSchema = z
   .object({
     email: emailField,
-    password: z.string().min(1, PASSWORD_REQUIRED_MESSAGE).min(MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE),
-    confirmPassword: z.string().min(1, CONFIRM_REQUIRED_MESSAGE),
+    password: z
+      .string()
+      .min(1, code("password_required"))
+      .min(MIN_PASSWORD_LENGTH, code("password_too_short"))
+      .max(MAX_PASSWORD_LENGTH, code("password_too_long")),
+    confirmPassword: z.string().min(1, code("confirm_required")),
   })
   .refine((value) => value.password === value.confirmPassword, {
-    message: CONFIRM_MISMATCH_MESSAGE,
+    message: code("confirm_mismatch"),
     path: ["confirmPassword"],
   });
 
 export type SignInCredentials = z.infer<typeof signInSchema>;
 export type SignUpCredentials = z.infer<typeof signUpSchema>;
 
-export type ParseResult<T> = { success: true; data: T } | { success: false; message: string };
+export type ParseResult<T> = { success: true; data: T } | { success: false; code: AuthMessageCode };
 
 // `FormData.get()` returns null for an absent field — the exact hole `form.get("email") as string`
 // used to paper over, sending null all the way to Supabase. Absent and non-text values become the
@@ -52,8 +65,9 @@ function toResult<T>(parsed: z.ZodSafeParseResult<T>): ParseResult<T> {
     return { success: true, data: parsed.data };
   }
   // The first issue is the one the user is shown: a redirect carries a single message, and a list
-  // of everything wrong at once is not what the form displays either.
-  return { success: false, message: parsed.error.issues[0].message };
+  // of everything wrong at once is not what the form displays either. Every issue's `message` is a
+  // code by construction — every check above was built with `code()`.
+  return { success: false, code: parsed.error.issues[0].message as AuthMessageCode };
 }
 
 export function parseSignInForm(form: FormData): ParseResult<SignInCredentials> {

@@ -149,18 +149,33 @@ export `const prerender = false`.
   guard would never fire on them — bouncing them off the page that explains what to do next would
   be actively unhelpful.
 - API endpoints: `src/pages/api/auth/{signin,signup,signout}.ts`. **Every one validates through the
-  shared schema before touching Supabase, and no provider error text ever reaches a response.**
+  shared schema before touching Supabase, and no provider error text ever reaches a response.** They
+  read `context.locals.supabase` — the client the middleware already built — rather than calling
+  `createClient` a second time.
   - `src/lib/validation/auth.ts` is the single definition of each credential rule
-    (`MIN_PASSWORD_LENGTH`, `isValidEmail`, the user-facing messages). It **imports nothing**, on
-    purpose: both auth forms are `client:load` islands, so everything reachable from it is bundled
-    for the browser. Measured — moving the zod schemas into it costs ~59 KB of client bundle.
+    (`MIN_PASSWORD_LENGTH`, `MAX_EMAIL_LENGTH`, `MAX_PASSWORD_LENGTH`, `isValidEmail`) **and of
+    `AUTH_MESSAGES`, the catalogue of every sentence an auth screen can show**. It **imports
+    nothing**, on purpose: both auth forms are `client:load` islands, so everything reachable from
+    it is bundled for the browser. Measured — moving the zod schemas into it costs ~59 KB.
+  - **The redirect carries a message CODE, never text.** `?error=sign_in_failed`, resolved by
+    `messageForCode()` on the page. Passing prose through the query string turns every auth page
+    into a phishing kit: `?error=Account+locked.+Call+500-123-456` rendered as a genuine system
+    message on our own domain. Not XSS — React escapes it — which is exactly why it was easy to
+    miss. An unrecognised code resolves to the generic message, never to the visitor's own words.
   - `src/lib/validation/auth-schemas.ts` builds the zod schemas _from_ those rules and turns
-    `FormData` into a parse result. **Server-only.** Nothing hydrated may import it.
-  - `src/lib/validation/auth-errors.ts` maps a Supabase `AuthError` onto a small fixed set of
-    project-owned messages, matching on `error.code` rather than on its prose (the prose changes
-    between releases; the codes are the contract). Sign-in collapses to one message regardless of
-    cause. **Validation failures are NOT routed through it** — "password is too short" is caused by
-    the user and must stay specific, or the form becomes unusable.
+    `FormData` into a parse result carrying a code. **Server-only.** Nothing hydrated may import it.
+  - `src/lib/validation/auth-errors.ts` maps a Supabase `AuthError` onto one of those codes,
+    matching on `error.code` rather than on its prose (the prose changes between releases; the codes
+    are the contract). Every sign-in _identity_ failure collapses to `sign_in_failed`; rate limiting
+    is reported honestly because Supabase throttles per IP, not per address, so it is not an
+    account-existence oracle. **Validation failures are NOT routed through it** — "password is too
+    short" is caused by the user and must stay specific, or the form becomes unusable.
+  - `src/lib/validation/auth-outcomes.ts` holds `signUpDestination()` — where a _successful_ signup
+    is sent. It is a separate, unit-tested function because the decision is load-bearing and one
+    line long: **it reads `session`, never `user`.** With confirmation on, Supabase returns an
+    obfuscated `user` and no session, so reading `user` sends unconfirmed accounts to `/dashboard`,
+    where the middleware bounces them back — an endless loop on production that a green pipeline
+    cannot see. There is a mutation test pinning exactly that.
 - **`signup.ts` branches on whether `signUp` returned a session**, which is the real outcome. Do not
   reintroduce a config flag, an env var or `import.meta.env.DEV` for this — all three can disagree
   with what the Supabase project is set to right now, and that is exactly the bug S-01 removed.

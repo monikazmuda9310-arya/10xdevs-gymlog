@@ -1,7 +1,7 @@
 ---
 change_id: account-access
 title: Account creation, sign-in, sign-out and the signed-out redirect
-status: implemented
+status: impl_reviewed
 created: 2026-08-10
 updated: 2026-08-10
 deviations:
@@ -13,6 +13,23 @@ deviations:
     browser — the exact cost the plan's §5 rationale exists to avoid. Measured over two builds:
     client chunk 96 746 B merged vs 36 135 B split. Success criterion 1.4 is unaffected — the
     definition is still in auth.ts. Approved by the owner on 2026-08-10."
+  - "Phase 1 §3: sign-in does not collapse to one message *regardless of cause*, as the plan's
+    wording requires. It returns `sign_in_failed` for every identity failure, but `rate_limited`
+    for HTTP 429 and `unexpected` for a provider error this project has never seen.
+    Reason: neither extra outcome is an account-existence oracle — Supabase rate-limits
+    `signInWithPassword` per IP, not per address — while telling a throttled user 'invalid email or
+    password' would send them off to reset a password that works. The anti-enumeration guarantee
+    US-04 asks for is intact; only the plan's absolute wording is not. Recorded during
+    /10x-impl-review on 2026-08-10 (finding F3)."
+  - "Post-review (F1): the redirect channel carries a message CODE, not text. `AUTH_MESSAGES` and
+    `messageForCode()` in `src/lib/validation/auth.ts` are the only source of on-screen wording;
+    `neutralAuthMessage` became `neutralAuthCode`. The plan specified project-owned messages but
+    left the delivery channel accepting arbitrary text, so `?error=<any sentence>` rendered as a
+    system message on our own domain — phishing, not XSS."
+  - "Post-review (F2): the signup redirect decision moved out of the endpoint into
+    `signUpDestination()` in `src/lib/validation/auth-outcomes.ts` so it can be unit-tested. The
+    plan called this branch 'the heart of this change' and nothing covered it: changing
+    `data.session` to `data.user` passed every test while breaking every production signup."
 archived_at: null
 ---
 
