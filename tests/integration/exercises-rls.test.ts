@@ -35,6 +35,14 @@ let ownerA: Owner;
 let ownerB: Owner;
 let anonymous: SupabaseClient<Database>;
 
+/** One row from the real seed, to assert the shared half against. */
+let seededId: string;
+let seededName: string;
+
+/** The catalogue the owner settled on: 38 rows, distributed like this. */
+const SEED_TOTAL = 38;
+const SEED_BY_GROUP: Record<string, number> = { legs: 9, back: 7, chest: 7, shoulders: 5, arms: 6, core: 4 };
+
 function required(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -81,10 +89,27 @@ beforeAll(async () => {
   });
 
   // Clear this suite's own rows from any previous run. Scoped by the name prefix so it can never
-  // touch the real seed (Phase 2) or a row somebody added by hand.
+  // touch the seed or a row somebody added by hand.
   for (const owner of [ownerA, ownerB]) {
     await owner.client.from("exercises").delete().like("name", "s02-%").eq("user_id", owner.userId);
   }
+
+  // Pick a seeded row for the shared-half assertions. Deadlift specifically: it is the one whose
+  // muscle group looks wrong until you read why, so a test naming it keeps the decision visible.
+  const seeded = await ownerA.client
+    .from("exercises")
+    .select("id, name")
+    .is("user_id", null)
+    .eq("name", "Deadlift")
+    .single();
+  if (seeded.error) {
+    throw new Error(
+      `the seeded catalogue is missing or unreadable — expected to find 'Deadlift' with user_id ` +
+        `is null. Has the seed migration been pushed? (${seeded.error.message})`,
+    );
+  }
+  seededId = seeded.data.id;
+  seededName = seeded.data.name;
 });
 
 describe("exercises: the private half", () => {
@@ -198,15 +223,89 @@ describe("exercises: the shared half", () => {
     expect(after.data?.length ?? 0).toBe(countBefore);
   });
 
-  // Assertions 3, 6 and 7 — that a seeded row is readable by both accounts and writable by
-  // neither — arrive in PHASE 2, with the seed they need.
-  //
-  // They were written here first and removed, deliberately, because the plan asked them to run
-  // against "a row inserted for the test with user_id = null" and **no client in this suite can
-  // create such a row** — which is precisely what assertion 4 above proves. Guarding them with
-  // `if (!seededId) return;` made three tests report green while asserting nothing, which is the
-  // failure this project already recorded as a lesson after F-03: a guard you have not mutated may
-  // not guard. An empty test is worse than a missing one, because it looks like coverage.
+  // Assertions 3, 6 and 7 below need a seeded row to exist, so they arrived with Phase 2 rather
+  // than Phase 1. They were briefly written in Phase 1 guarded by `if (!seededId) return;` and
+  // removed, because that made three tests report green while asserting nothing — the failure this
+  // project already recorded as a lesson after F-03. An empty test is worse than a missing one,
+  // because it looks like coverage.
+
+  it("3. a seeded row is readable by both accounts", async () => {
+    // The property the whole shared-catalogue design exists for.
+    const asA = await ownerA.client.from("exercises").select("id").eq("id", seededId);
+    const asB = await ownerB.client.from("exercises").select("id").eq("id", seededId);
+
+    expect(asA.error).toBeNull();
+    expect(asB.error).toBeNull();
+    expect(asA.data).toHaveLength(1);
+    expect(asB.data).toHaveLength(1);
+  });
+
+  it("6. no account can update a seeded row", async () => {
+    const attempt = await ownerA.client
+      .from("exercises")
+      .update({ name: `hijacked-${RUN_ID}` })
+      .eq("id", seededId)
+      .select();
+
+    // The update policy's `using` filters the row out rather than raising, so PostgREST reports
+    // success over zero rows. The re-read as a different account is what proves nothing moved.
+    expect(attempt.error).toBeNull();
+    expect(attempt.data ?? []).toHaveLength(0);
+
+    const after = await ownerB.client.from("exercises").select("name").eq("id", seededId).single();
+    expect(after.data?.name).toBe(seededName);
+  });
+
+  it("7. no account can delete a seeded row", async () => {
+    const attempt = await ownerA.client.from("exercises").delete().eq("id", seededId).select();
+
+    expect(attempt.error).toBeNull();
+    expect(attempt.data ?? []).toHaveLength(0);
+
+    const stillThere = await ownerB.client.from("exercises").select("id").eq("id", seededId);
+    expect(stillThere.data).toHaveLength(1);
+  });
+
+  it("10. the seed is complete and distributed as the owner decided", async () => {
+    const { data, error } = await ownerA.client.from("exercises").select("muscle_group").is("user_id", null);
+
+    expect(error).toBeNull();
+    expect(data).toHaveLength(SEED_TOTAL);
+
+    // Per-group counts, not just the total: a bare total passes happily when two exercises are
+    // swapped between groups in a copy-paste, which is the mistake this shape of data invites.
+    const counted: Record<string, number> = {};
+    for (const row of data ?? []) {
+      counted[row.muscle_group] = (counted[row.muscle_group] ?? 0) + 1;
+    }
+    expect(counted).toEqual(SEED_BY_GROUP);
+  });
+
+  it("11. the five deliberate assignments are what the owner chose", async () => {
+    // These five look like mistakes and are not. Pinning them here means a well-meaning
+    // "correction" fails a test instead of silently changing what the tonnage chart reports.
+    const { data, error } = await ownerA.client
+      .from("exercises")
+      .select("name, muscle_group, is_bodyweight")
+      .is("user_id", null)
+      .in("name", ["Deadlift", "Romanian Deadlift", "Hip Thrust", "Dip", "Face Pull", "Plank"]);
+
+    expect(error).toBeNull();
+    // A Map rather than an object: half these names carry a space, so the lookups would be a
+    // mixture of dot and bracket notation and the linter is right to dislike that.
+    const byName = new Map((data ?? []).map((row) => [row.name, row]));
+
+    // The conventional pull is programmed on pull day; the Romanian variant on leg day.
+    expect(byName.get("Deadlift")?.muscle_group).toBe("back");
+    expect(byName.get("Romanian Deadlift")?.muscle_group).toBe("legs");
+    // No `glutes` group exists — declined deliberately.
+    expect(byName.get("Hip Thrust")?.muscle_group).toBe("legs");
+    expect(byName.get("Dip")?.muscle_group).toBe("chest");
+    // Done on pull day, but it targets the rear delts.
+    expect(byName.get("Face Pull")?.muscle_group).toBe("shoulders");
+    // Nobody assists a plank; the flag is what permits a zero load.
+    expect(byName.get("Plank")?.is_bodyweight).toBe(true);
+  });
 });
 
 describe("exercises: the anonymous caller", () => {
