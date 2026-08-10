@@ -1,10 +1,33 @@
 ---
 change_id: exercise-catalogue
 title: Exercise catalogue with one primary muscle group and a bodyweight flag
-status: implemented
+status: impl_reviewed
 created: 2026-08-10
 updated: 2026-08-10
 archived_at: null
+deviations:
+  - "Phase 1 §4: assertions 3, 6 and 7 (a seeded row is readable by both accounts and writable by
+    neither) moved to Phase 2. The plan asked them to run against 'a row inserted for the test with
+    user_id = null', which no client in this suite can create — precisely what assertion 4 proves.
+    Guarded with `if (!seededId) return;` they reported green while asserting nothing. Approved by
+    the owner mid-phase, 2026-08-10."
+  - "Phase 3 criterion 3.4 (a scripted POST creates a row; a duplicate returns the duplicate code)
+    verified in Phase 4 through the browser form instead. The dev server points at production and no
+    password is available to a script. Approved by the owner, 2026-08-10."
+  - "Phase 4 §3: the form does NOT reuse `SubmitButton` from src/components/auth/, contrary to the
+    plan. `SubmitButton` derives its pending state from `useFormStatus()`, which only reports during
+    a form-action submission; this form posts with `fetch` and `preventDefault`, so the button would
+    have shown `pending: false` forever — a spinner that never spins. `FormField` could have been
+    reused and was not, which leaves the input's error styling defined in two files. Recorded during
+    /10x-impl-review on 2026-08-10 (finding F2)."
+  - "The plan had NO deployment phase (finding F4). S-01 deployed in its Phase 4; S-02's five phases
+    end at documentation, so closing the plan left the data on production — `db:push` writes to both
+    databases — and the code only on the developer machine. Deployed by hand afterwards as Worker
+    version 765846dd. Any later slice whose outcome is a screen needs a deployment phase."
+  - "`listExercises`'s `search` and `muscleGroup` options are currently uncalled (finding F3): the
+    plan specified server-side search in Phase 3 and client-side filtering in Phase 4 without
+    reconciling them. Kept for S-03's exercise picker, and now labelled as such in the source so the
+    escaping tests are not mistaken for proof of a live search path."
 ---
 
 ## Notes

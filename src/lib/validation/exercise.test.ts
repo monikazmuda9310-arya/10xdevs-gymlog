@@ -11,7 +11,7 @@ import {
   isMuscleGroup,
 } from "@/lib/validation/exercise";
 import { parseCreateExercise } from "@/lib/validation/exercise-schemas";
-import { escapeLikePattern } from "@/lib/services/exercises";
+import { escapeLikePattern, assertUserId } from "@/lib/services/exercises";
 
 const VALID = { name: "Zercher Squat", muscleGroup: "legs", isBodyweight: false };
 
@@ -138,5 +138,28 @@ describe("exerciseMessageForCode", () => {
   it("refuses to repeat a caller's own words back as a system message", () => {
     expect(exerciseMessageForCode("Your account is locked, call 500-123-456")).toBe(EXERCISE_MESSAGES.unexpected);
     expect(exerciseMessageForCode("__proto__")).toBe(EXERCISE_MESSAGES.unexpected);
+  });
+});
+
+describe("assertUserId", () => {
+  it("accepts a Supabase user id", () => {
+    const id = "0a1b2c3d-4e5f-6789-abcd-ef0123456789";
+
+    expect(assertUserId(id)).toBe(id);
+  });
+
+  it("refuses a value carrying PostgREST filter syntax", () => {
+    // The reason the guard exists. `.or()` takes an expression, where `,` separates terms — so a
+    // value containing one would stop being data and start being syntax.
+    expect(() => assertUserId("00000000-0000-0000-0000-000000000000,user_id.not.is.null")).toThrow();
+    expect(() => assertUserId("*")).toThrow();
+    expect(() => assertUserId("")).toThrow();
+  });
+
+  it("refuses a value that merely looks close", () => {
+    // Truncated, over-long, and non-hex all fail — the shape is checked, not just the punctuation.
+    expect(() => assertUserId("0a1b2c3d-4e5f-6789-abcd-ef012345678")).toThrow();
+    expect(() => assertUserId("0a1b2c3d4e5f6789abcdef0123456789")).toThrow();
+    expect(() => assertUserId("zzzzzzzz-4e5f-6789-abcd-ef0123456789")).toThrow();
   });
 });
