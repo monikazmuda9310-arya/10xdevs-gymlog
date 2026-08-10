@@ -1475,13 +1475,13 @@ to the implementer's file tools.
 
 #### Automated
 
-- [x] 6.1 README no longer denies the schema — `git grep -n "No database tables or migrations are required" -- README.md` returns nothing (exits 1 on success; do not `&&`-chain)
-- [x] 6.2 Roadmap Baseline updated — `git grep -n "no schema" -- context/foundation/roadmap.md` returns nothing (exits 1 on success; do not `&&`-chain)
-- [x] 6.3 New commands documented — `git grep -n "db:push" -- README.md AGENTS.md` returns matches in both
-- [x] 6.4 Both projects documented — `git grep -n "gymlog-test" -- README.md AGENTS.md` returns matches in both
-- [x] 6.5 Markdown Prettier-clean — `npx prettier --check README.md AGENTS.md context/foundation/roadmap.md context/deployment/deploy-plan.md` exits 0
-- [x] 6.6 Gate still green — `npm run lint && npm run typecheck && npm test && npm run build`
+- [x] 6.1 README no longer denies the schema — `git grep -n "No database tables or migrations are required" -- README.md` returns nothing (exits 1 on success; do not `&&`-chain) — 87f980c
+- [x] 6.2 Roadmap Baseline updated — `git grep -n "no schema" -- context/foundation/roadmap.md` returns nothing (exits 1 on success; do not `&&`-chain) — 87f980c
+- [x] 6.3 New commands documented — `git grep -n "db:push" -- README.md AGENTS.md` returns matches in both — 87f980c
+- [x] 6.4 Both projects documented — `git grep -n "gymlog-test" -- README.md AGENTS.md` returns matches in both — 87f980c
+- [x] 6.5 Markdown Prettier-clean — `npx prettier --check README.md AGENTS.md context/foundation/roadmap.md context/deployment/deploy-plan.md` exits 0 — 87f980c
+- [x] 6.6 Gate still green — `npm run lint && npm run typecheck && npm test && npm run build` — 87f980c
 
 #### Manual
 
-- [x] 6.7 `AGENTS.md` § Access control policy template is copy-pasteable onto a `workouts` table without further questions, including the `.eq("user_id", …)` index-path sentence
+- [x] 6.7 `AGENTS.md` § Access control policy template is copy-pasteable onto a `workouts` table without further questions, including the `.eq("user_id", …)` index-path sentence — 87f980c
