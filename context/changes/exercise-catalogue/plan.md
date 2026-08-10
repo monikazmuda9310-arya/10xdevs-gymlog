@@ -695,10 +695,10 @@ rather than re-argued.
 
 #### Automated
 
-- [x] 5.1 The shared-catalogue policy shape is documented in `AGENTS.md` § Access control
-- [x] 5.2 Markdown Prettier-clean across the three documents
-- [x] 5.3 Gate still green
+- [x] 5.1 The shared-catalogue policy shape is documented in `AGENTS.md` § Access control — 86b86cc
+- [x] 5.2 Markdown Prettier-clean across the three documents — 86b86cc
+- [x] 5.3 Gate still green — 86b86cc
 
 #### Manual
 
-- [x] 5.4 `AGENTS.md` § Access control makes clear when to use the plain template and when the shared variant
+- [x] 5.4 `AGENTS.md` § Access control makes clear when to use the plain template and when the shared variant — 86b86cc
