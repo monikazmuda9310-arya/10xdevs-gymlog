@@ -94,6 +94,37 @@ create policy "<t> are deletable by their owner" on public.<t>
   is honest, because it is a single-row primary-key lookup and the dashboard's demonstration is
   precisely that RLS returns one row.)
 
+### The shared-catalogue variant — when some rows belong to everybody
+
+`public.exercises` holds two kinds of row in one table: a **seeded catalogue** every signed-in
+account reads and none may write, and **custom rows** private to their owner. The difference is one
+nullable column, and **only the select policy changes**:
+
+```sql
+user_id uuid references auth.users (id) on delete cascade,  -- NULL = seeded, shared
+
+create policy "<t> are selectable when seeded or owned" on public.<t>
+  for select to authenticated
+  using (user_id is null or (select auth.uid()) = user_id);
+```
+
+The insert, update and delete policies stay **exactly** as the template above — and understanding
+why is the point of this section. On a seeded row `user_id` is null, so `(select auth.uid()) =
+user_id` evaluates to `NULL`, not `TRUE`, and **a policy admits a row only on `TRUE`**. The ordinary
+owner check therefore makes the shared rows unwritable by everyone without ever naming them.
+
+- **That protection is invisible in the policy text**, which is what makes it dangerous. Anyone
+  "simplifying" the insert policy with `coalesce(user_id, auth.uid())` or `is not distinct from`
+  hands every account write access to the catalogue every other account reads, and no other test
+  would notice. `tests/integration/exercises-rls.test.ts` assertion 4 exists solely to fail when
+  that happens. **Do not delete it as redundant.**
+- **`unique (user_id, name)` does not work on a nullable owner.** Postgres treats two `NULL`s as
+  distinct, so it would admit two seeded rows with the same name. Use two partial unique indexes —
+  one `where user_id is null`, one `where user_id is not null` — over `lower(name)`, since a name
+  differing only in case is the same exercise to somebody typing on a phone.
+- **Use this variant only when rows are genuinely shared.** `workouts` and `sets` are not: they take
+  the plain template, where `user_id` is `not null`.
+
 ## Commands
 
 Scripts, local Supabase setup, and deploy steps: @README.md
@@ -349,5 +380,12 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
   `gymlog-test`) and build, in that order, on every push and PR to `main`. It carries a
   `concurrency` group so two runs cannot race the shared fixture rows. The browser test is not
   wired yet.
-- **One table exists**: `public.profiles`, one row per account, created by a trigger on
-  `auth.users` and backfilled. Workouts, exercises and sets do not exist yet.
+- **Two tables exist.** `public.profiles` — one row per account, created by a trigger on
+  `auth.users` and backfilled. `public.exercises` — the catalogue: **38 seeded rows** with
+  `user_id is null`, readable by every account and writable by none, plus custom rows private to
+  their owner (see § Access control → the shared-catalogue variant). Workouts and sets do not exist
+  yet; they are S-03 and take the plain row-ownership template.
+- **Three enums**: `weight_unit`, `estimation_formula`, and `muscle_group` — the last with exactly
+  six values, pinned in both directions by `MUSCLE_GROUPS` in `src/types.ts` and a compile-time
+  assertion. Add a seventh to the database without adding it there and the build fails, rather than
+  the group existing in storage and silently missing from every filter on screen.

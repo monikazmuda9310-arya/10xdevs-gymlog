@@ -668,7 +668,7 @@ rather than re-argued.
 - [x] 3.1 Gate green — lint, typecheck, unit tests, build all exit 0 — 3ce603c
 - [x] 3.2 Unit tests cover the validation boundaries and the `%`/`_` search escaping — 3ce603c
 - [x] 3.3 No provider prose escapes — `git grep -n "error.message" -- src/pages/api/exercises/` returns nothing — 3ce603c
-- [x] 3.4 A scripted POST creates a row; a duplicate name returns the duplicate code, not a 500 — verified in Phase 4 through the browser form instead (201 on create, the duplicate message on retry, including a case-only difference)
+- [x] 3.4 A scripted POST creates a row; a duplicate name returns the duplicate code, not a 500 — verified in Phase 4 through the browser form instead (201 on create, the duplicate message on retry, including a case-only difference) — 8dab0a4
 
 #### Manual
 
@@ -678,27 +678,27 @@ rather than re-argued.
 
 #### Automated
 
-- [x] 4.1 Full five-command gate exits 0
-- [x] 4.2 `/exercises` is in `PROTECTED_ROUTES`
-- [x] 4.3 Signed out, `/exercises` returns 302 to `/auth/signin`
+- [x] 4.1 Full five-command gate exits 0 — 8dab0a4
+- [x] 4.2 `/exercises` is in `PROTECTED_ROUTES` — 8dab0a4
+- [x] 4.3 Signed out, `/exercises` returns 302 to `/auth/signin` — 8dab0a4
 
 #### Manual
 
-- [x] 4.4 Signed in, `/exercises` lists 38 and each group filter's count matches the seed
-- [x] 4.5 Search is case-insensitive; a nonsense term shows the empty state
-- [x] 4.6 A added exercise appears immediately and survives a reload
-- [x] 4.7 A duplicate name shows the duplicate message, not a crash
-- [x] 4.8 A second account sees the 38 but not the first account's custom exercise
-- [x] 4.9 The screen is usable one-handed at phone width
+- [x] 4.4 Signed in, `/exercises` lists 38 and each group filter's count matches the seed — 8dab0a4
+- [x] 4.5 Search is case-insensitive; a nonsense term shows the empty state — 8dab0a4
+- [x] 4.6 A added exercise appears immediately and survives a reload — 8dab0a4
+- [x] 4.7 A duplicate name shows the duplicate message, not a crash — 8dab0a4
+- [x] 4.8 A second account sees the 38 but not the first account's custom exercise — 8dab0a4
+- [x] 4.9 The screen is usable one-handed at phone width — 8dab0a4
 
 ### Phase 5: Truth up the documents
 
 #### Automated
 
-- [ ] 5.1 The shared-catalogue policy shape is documented in `AGENTS.md` § Access control
-- [ ] 5.2 Markdown Prettier-clean across the three documents
-- [ ] 5.3 Gate still green
+- [x] 5.1 The shared-catalogue policy shape is documented in `AGENTS.md` § Access control
+- [x] 5.2 Markdown Prettier-clean across the three documents
+- [x] 5.3 Gate still green
 
 #### Manual
 
-- [ ] 5.4 `AGENTS.md` § Access control makes clear when to use the plain template and when the shared variant
+- [x] 5.4 `AGENTS.md` § Access control makes clear when to use the plain template and when the shared variant

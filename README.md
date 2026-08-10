@@ -165,7 +165,9 @@ and `http://localhost:4321/**` for local work.
 | `/auth/signup`        | Email/password sign-up form. On success → `/dashboard`, or `/auth/confirm-email` when a confirmation email is on its way |
 | `/auth/confirm-email` | "Check your inbox" page — reached only when an email is genuinely coming                                                 |
 | `/dashboard`          | Protected page (redirects to `/auth/signin` when signed out)                                                             |
+| `/exercises`          | Protected. The catalogue: 38 seeded exercises plus the account's own, with search and a muscle-group filter              |
 | `/api/auth/signout`   | POST. Always → `/auth/signin`, so returning requires authenticating again                                                |
+| `/api/exercises`      | POST, **JSON** (not a form post — the caller is a hydrated island). Creates a custom exercise for the signed-in account  |
 
 Route protection is handled in `src/middleware.ts`, in **both** directions: `PROTECTED_ROUTES` keeps
 signed-out visitors out of the application, and `AUTH_ROUTES` sends a signed-in visitor away from
