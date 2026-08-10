@@ -3,7 +3,7 @@ project: "GymLog"
 version: 1
 status: draft
 created: 2026-08-09
-updated: 2026-08-09
+updated: 2026-08-10
 prd_version: 1
 main_goal: speed
 top_blocker: time
@@ -55,7 +55,7 @@ the primary success criterion, and it is placed as early as its prerequisites al
 | ---- | --------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------- |
 | F-01 | verification-harness              | (foundation) wrong derived numbers fail the pipeline instead of reaching a screen       | —                                                                                                                               | Business Logic §boundaries, NFR §determinism, US-04 AC §assert-against-stored-state | done     |
 | F-02 | smoke-deploy                      | (foundation) the product is reachable at a stable public address from a green pipeline  | —                                                                                                                               | NFR §browser support, NFR §2s p95 on mobile                                         | done     |
-| F-03 | owned-persistence-baseline        | (foundation) rows belong to accounts and the database enforces it                       | F-02, a provisioned hosted database project (URL + key set as pipeline secrets and as runtime secrets on the deployed instance) | US-04, Access Control §ownership enforced, NFR §no cross-account reach              | planning |
+| F-03 | owned-persistence-baseline        | (foundation) rows belong to accounts and the database enforces it                       | F-02, a provisioned hosted database project (URL + key set as pipeline secrets and as runtime secrets on the deployed instance) | US-04, Access Control §ownership enforced, NFR §no cross-account reach              | in-progress |
 | S-01 | account-access                    | create an account, sign in, sign out, and be sent to sign-in when signed out            | F-03                                                                                                                            | FR-001, FR-002, FR-003, US-04, Access Control                                       | proposed |
 | S-02 | exercise-catalogue                | browse and search exercises, and add their own with a muscle group and bodyweight flag  | S-01, F-03                                                                                                                      | FR-011, FR-012, FR-013, FR-014, Access Control §catalogue visibility                | proposed |
 | S-03 | log-workout-with-estimate         | log a workout and see the estimated one-rep max for the set they just entered           | S-02, F-01, F-03                                                                                                                | US-01, FR-004, FR-005, FR-008, FR-009, FR-015                                       | proposed |
@@ -140,7 +140,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Unknowns:**
   - There is no local database stack on the development machine and none is wanted, so development, migrations and integration checks all run against the hosted project. How migrations are applied, and how a check run avoids disturbing the data the owner is actually training with, needs deciding. — Owner: user. Block: no.
 - **Risk:** this is the deep-investment item and the only foundation that is not thin, because the product's hardest guardrail lives here: ownership is enforced in the database, not only in request code. From this point on the ownership policy is written in the same migration that creates each table — a table that lands without one is a defect, not a follow-up. Sequenced before every data-bearing slice because retrofitting ownership onto tables that already exist is precisely where isolation defects are born.
-- **Status:** planning
+- **Status:** in-progress
 
 ## Slices
 

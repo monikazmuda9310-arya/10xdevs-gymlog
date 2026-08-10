@@ -70,6 +70,8 @@ const astroConfig = tseslint.config({
 
 export default tseslint.config(
   includeIgnoreFile(gitignorePath),
+  // Ops scripts are plain Node, outside the TypeScript project this config type-checks against.
+  { ignores: ["scripts/**"] },
   baseConfig,
   reactConfig,
   eslintPluginAstro.configs["flat/recommended"],

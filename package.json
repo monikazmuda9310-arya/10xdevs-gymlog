@@ -12,7 +12,10 @@
     "format": "prettier --write .",
     "typecheck": "astro check",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:status": "node scripts/supabase-db.mjs status",
+    "db:push": "node scripts/supabase-db.mjs push",
+    "db:types": "node scripts/supabase-db.mjs types && prettier --write src/db/database.types.ts"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.8",

@@ -1,0 +1,171 @@
+#!/usr/bin/env node
+// Wrapper around the Supabase CLI for a project with no local database stack.
+//
+// Why this exists (see context/changes/owned-persistence-baseline/plan.md, Decision 13):
+//   * the CLI will not read SUPABASE_DB_URL from the environment — it must be a --db-url flag,
+//     and no shell-variable interpolation is portable across PowerShell, cmd.exe and sh;
+//   * Node refuses to spawn .cmd shims without a shell, so the CLI is spawned as a plain JS
+//     file through process.execPath instead;
+//   * it is the one place the "both databases, test first" rule can live;
+//   * it writes the generated types file itself, so the output is LF on Windows.
+//
+// Usage: node scripts/supabase-db.mjs <status|push|types>
+
+import { spawnSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const require = createRequire(import.meta.url);
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const TYPES_FILE = join(REPO_ROOT, "src", "db", "database.types.ts");
+
+// Ordered deliberately: the disposable database is always addressed first.
+const TARGETS = [
+  { key: "test", label: "gymlog-test", variable: "SUPABASE_TEST_DB_URL" },
+  { key: "production", label: "gymlog (production)", variable: "SUPABASE_DB_URL" },
+];
+
+function fail(message) {
+  console.error(`supabase-db: ${message}`);
+  process.exit(1);
+}
+
+function banner(label) {
+  console.log(`\n— ${label} —`);
+}
+
+// CI has no .env and must fall through to the real environment.
+function loadEnv() {
+  try {
+    process.loadEnvFile();
+  } catch {
+    /* no .env here — the real environment is the source */
+  }
+}
+
+// Resolved from the package's own bin field rather than hardcoded, so a hoisted
+// or workspace install still works.
+function resolveCli() {
+  let manifestPath;
+  try {
+    manifestPath = require.resolve("supabase/package.json");
+  } catch {
+    fail("cannot resolve the `supabase` package — run `npm install` first.");
+  }
+  const manifest = require("supabase/package.json");
+  const bin = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.supabase;
+  if (!bin) {
+    fail("the `supabase` package declares no `bin` entry — cannot locate its entry point.");
+  }
+  return join(dirname(manifestPath), bin);
+}
+
+// Never printed, never echoed: the URL carries a database password.
+function urlFor(target) {
+  const url = process.env[target.variable];
+  if (!url) {
+    fail(`${target.variable} is not set. It holds the ${target.label} session-pooler connection string; put it in .env.`);
+  }
+  return url;
+}
+
+// The CLI switches to JSON when it detects it is being driven by an agent, which would turn the
+// migration tables into one-line blobs and wrap generated TypeScript in a JSON envelope. Pin it.
+const OUTPUT_FORMAT = ["--output-format", "text"];
+
+function run(cli, args) {
+  const result = spawnSync(process.execPath, [cli, ...args, ...OUTPUT_FORMAT], { stdio: "inherit" });
+  if (result.error) {
+    fail(`failed to start the Supabase CLI: ${result.error.message}`);
+  }
+  return result.status ?? 1;
+}
+
+function capture(cli, args) {
+  const result = spawnSync(process.execPath, [cli, ...args, ...OUTPUT_FORMAT], {
+    stdio: ["inherit", "pipe", "inherit"],
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (result.error) {
+    fail(`failed to start the Supabase CLI: ${result.error.message}`);
+  }
+  return { status: result.status ?? 1, stdout: result.stdout ?? "" };
+}
+
+function status(cli) {
+  // Resolve every URL before touching the network, so a missing variable fails immediately.
+  const urls = TARGETS.map((target) => ({ target, url: urlFor(target) }));
+  let worst = 0;
+  // Both always run, even if the first fails: the point of `status` is to compare them.
+  for (const { target, url } of urls) {
+    banner(target.label);
+    const code = run(cli, ["migration", "list", "--db-url", url]);
+    if (code !== 0) worst = code;
+  }
+  return worst;
+}
+
+function push(cli) {
+  const urls = TARGETS.map((target) => ({ target, url: urlFor(target) }));
+  const [test, production] = urls;
+
+  banner(test.target.label);
+  const testCode = run(cli, ["db", "push", "--db-url", test.url, "--yes"]);
+  if (testCode !== 0) {
+    console.error(
+      `\nsupabase-db: the ${test.target.label} push failed, so ${production.target.label} was NOT touched.` +
+        `\nFix the migration and re-run \`npm run db:push\` — nothing has been applied anywhere.`
+    );
+    return testCode;
+  }
+
+  banner(production.target.label);
+  const productionCode = run(cli, ["db", "push", "--db-url", production.url, "--yes"]);
+  if (productionCode !== 0) {
+    console.error(
+      `\nsupabase-db: DIVERGENCE — ${test.target.label} is ahead of ${production.target.label}.` +
+        `\nThe migration applied to the test database and failed on production.` +
+        `\nRecovery: fix the cause and re-run \`npm run db:push\`. It is idempotent — the test push will` +
+        `\nreport "up to date" and the production push will apply what is missing.` +
+        `\nDo NOT apply the SQL by hand in the dashboard: that desynchronises the remote migration history.`
+    );
+    return productionCode;
+  }
+
+  return 0;
+}
+
+function types(cli) {
+  // Production is the schema of record; `npm run db:status` is what proves the test project matches.
+  const target = TARGETS.find((candidate) => candidate.key === "production");
+  const url = urlFor(target);
+  banner(`${target.label} → src/db/database.types.ts`);
+  const { status: code, stdout } = capture(cli, ["gen", "types", "typescript", "--db-url", url, "--schema", "public"]);
+  if (code !== 0) {
+    console.error("supabase-db: type generation failed; src/db/database.types.ts was left untouched.");
+    return code;
+  }
+  if (stdout.trim() === "") {
+    console.error("supabase-db: type generation produced no output; src/db/database.types.ts was left untouched.");
+    return 1;
+  }
+  mkdirSync(dirname(TYPES_FILE), { recursive: true });
+  // Explicit \n: a shell redirect would write CRLF on Windows and .gitattributes pins LF.
+  writeFileSync(TYPES_FILE, `${stdout.replace(/\r\n/g, "\n").trimEnd()}\n`, "utf8");
+  console.log("wrote src/db/database.types.ts");
+  return 0;
+}
+
+const VERBS = { status, push, types };
+
+const verb = process.argv[2];
+if (!verb || !(verb in VERBS)) {
+  fail(`unknown verb ${verb ? `"${verb}"` : "(none)"} — expected one of: ${Object.keys(VERBS).join(", ")}.`);
+}
+
+loadEnv();
+process.exit(VERBS[verb](resolveCli()));

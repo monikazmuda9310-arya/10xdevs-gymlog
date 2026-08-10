@@ -1391,16 +1391,16 @@ to the implementer's file tools.
 
 #### Automated
 
-- [ ] 1.1 Both connections work and both histories are empty — `npm run db:status` exits 0 and prints two labelled `Local | Remote | Time (UTC)` tables with no rows
-- [ ] 1.2 Wrapper fails loudly and names the right variable — with `SUPABASE_TEST_DB_URL` cleared, then with `SUPABASE_DB_URL` cleared, `npm run db:status` exits non-zero naming the missing one
-- [ ] 1.3 Neither secret is tracked — `git check-ignore -v .env` matches, `git status --porcelain` shows no `.env`
-- [ ] 1.4 `.env.example` documents the new keys and holds no values — `git grep -n "SUPABASE_TEST_DB_URL" -- .env.example` matches, `git grep -nE "pooler\.supabase\.com|sb_publishable_" -- .env.example` returns nothing
-- [ ] 1.5 Gate undisturbed — `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0
+- [x] 1.1 Both connections work and both histories are empty — `npm run db:status` exits 0 and prints two labelled `Local | Remote | Time (UTC)` tables with no rows
+- [x] 1.2 Wrapper fails loudly and names the right variable — with `SUPABASE_TEST_DB_URL` cleared, then with `SUPABASE_DB_URL` cleared, `npm run db:status` exits non-zero naming the missing one
+- [x] 1.3 Neither secret is tracked — `git check-ignore -v .env` matches, `git status --porcelain` shows no `.env`
+- [x] 1.4 `.env.example` documents the new keys and holds no values — `git grep -n "SUPABASE_TEST_DB_URL" -- .env.example` matches, `git grep -nE "pooler\.supabase\.com|sb_publishable_" -- .env.example` returns nothing
+- [x] 1.5 Gate undisturbed — `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0
 
 #### Manual
 
-- [ ] 1.6 The two `db:status` tables are visibly labelled and distinct, so divergence is readable at a glance
-- [ ] 1.7 No terminal output, commit message or plan file contains either database password
+- [x] 1.6 The two `db:status` tables are visibly labelled and distinct, so divergence is readable at a glance
+- [x] 1.7 No terminal output, commit message or plan file contains either database password
 
 ### Phase 2: The profiles migration — table, RLS, policies, trigger
 
