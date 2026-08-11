@@ -607,6 +607,26 @@ buffers)` on both queries against `gymlog-test` after Phase 1 and record the pla
   the `distinct on` subqueries do not receive the pushed-down `user_id` qual, the fallback is
   `left join lateral … limit 1` per record, which forces the filter but scales with the number of
   exercises rather than the number of sets.
+  - **RESOLVED, PARTLY — and the unresolved half is a standing constraint** (implementation review,
+    2026-08-11). The `explain` was skipped during Phase 1 and run during the review, as the
+    `authenticated` role with a JWT claim so the RLS predicates were live. It established two things
+    and failed to establish a third:
+    - **The qual pushdown holds.** `Filter: (user_id = '…')` appears on the base `sets` scan inside
+      the `distinct on` subqueries, so the lateral fallback above is not needed.
+    - **`security_invoker` is engaged, visibly.** The plan carries the RLS predicates of `exercises`
+      (`user_id IS NULL OR (InitPlan 1).col1 = user_id`), `sets`, `workouts` and `profiles` —
+      corroborating the black-box assertion from the opposite direction.
+    - **Index usage is UNVERIFIABLE here, and the check as written could never have shown it.**
+      `gymlog-test` holds 36 sets, 26 workouts and 25 exercise entries; at that size Postgres
+      correctly prefers sequential scans, so a green result would have been meaningless reassurance
+      rather than evidence. Verifying it needs a seeded volume fixture — roughly a year of training,
+      ~2,000 sets — which this project does not have and which would collide with the suites that
+      clean up by name prefix.
+  - **S-07 and S-08 inherit this unchanged.** Both are justified by the Workers Free 10 ms CPU cap,
+    and there is currently **no environment in this project where that justification can be
+    measured**. Aggregating in Postgres remains the right call on the architecture argument alone;
+    it is simply not a measured one, and neither slice should claim otherwise without seeding a
+    volume fixture first.
 
 ## Migration Notes
 

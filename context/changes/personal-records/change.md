@@ -1,7 +1,7 @@
 ---
 change_id: personal-records
 title: A record is announced when it happens, and listed afterwards
-status: implemented
+status: impl_reviewed
 created: 2026-08-11
 updated: 2026-08-11
 archived_at: null
@@ -107,6 +107,18 @@ a wrong number silently, and S-03 hit the identical situation — that is what p
 `set-display.ts` and the `lessons.md` entry about naming the module a unit-test criterion lives in.
 Written as a module so it is directly unit-testable, rather than as helpers buried in `.astro`
 frontmatter that no test can reach.
+
+### Phase 5 — two edits beyond the phase's stated file list
+
+Phase 5's Changes Required named `AGENTS.md`, `change.md` and `roadmap.md`. Two more files were
+touched, both consistent with this repository's conventions and neither planned:
+
+- **`context/foundation/lessons.md`** gained the entry "When a mutation does not break anything, fix
+  the claim — never the test", generalising the Phase 1 finding. The roadmap's § Done entries cite
+  `lessons.md` for exactly this kind of rule, so the convention called for it; the plan simply did
+  not say so.
+- **`README.md`** gained `/records` in the routes table and the `{ set, record }` contract under
+  `/api/sets`. README documents every route, so leaving it out would have made it wrong by omission.
 
 ### Phase 3 — the visual criteria are verified in Phase 4, once, on the public address
 
