@@ -1009,15 +1009,15 @@ planning session, and four by the planner. Each states what would have to be tru
 
 #### Automated
 
-- [x] 3.1 Gate green — lint, typecheck, unit tests, build all exit 0
-- [x] 3.2 Unit tests cover the input boundaries and `isWeightAllowed` across all four sign/flag combinations
-- [x] 3.3 No provider prose escapes — `git grep -n "error.message"` over the three endpoint folders returns nothing
-- [x] 3.4 No hydrated module imports `workout-schemas` — `git grep -rn "workout-schemas" -- src/components/`
-- [x] 3.5 Scripted create-workout → add-entry → add-set round trip; duplicate entry returns the first id; zero weight on a non-bodyweight exercise is refused with its own code
+- [x] 3.1 Gate green — lint, typecheck, unit tests, build all exit 0 — 2c11816
+- [x] 3.2 Unit tests cover the input boundaries and `isWeightAllowed` across all four sign/flag combinations — 2c11816
+- [x] 3.3 No provider prose escapes — `git grep -n "error.message"` over the three endpoint folders returns nothing — 2c11816
+- [x] 3.4 No hydrated module imports `workout-schemas` — `git grep -rn "workout-schemas" -- src/components/` — 2c11816
+- [x] 3.5 Scripted create-workout → add-entry → add-set round trip; duplicate entry returns the first id; zero weight on a non-bodyweight exercise is refused with its own code — 2c11816
 
 #### Manual
 
-- [x] 3.6 A POST to each endpoint from a signed-out session creates no row, verified by re-reading the tables
+- [x] 3.6 A POST to each endpoint from a signed-out session creates no row, verified by re-reading the tables — 2c11816
 
 ### Phase 4: The screens
 
