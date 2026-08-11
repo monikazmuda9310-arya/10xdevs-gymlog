@@ -712,32 +712,32 @@ buffers)` on both queries against `gymlog-test` after Phase 1 and record the pla
 
 #### Automated
 
-- [x] 3.1 `npm run lint` passes
-- [x] 3.2 `npm run typecheck` passes
-- [x] 3.3 `npm test` and `npm run test:integration` pass
-- [x] 3.4 `npm run build` succeeds
+- [x] 3.1 `npm run lint` passes — d476769
+- [x] 3.2 `npm run typecheck` passes — d476769
+- [x] 3.3 `npm test` and `npm run test:integration` pass — d476769
+- [x] 3.4 `npm run build` succeeds — d476769
 
 #### Manual
 
-- [ ] 3.5 A set beating a previous best shows the badge on its row, naming what it beat, without a reload
-- [ ] 3.6 The first set for a fresh exercise shows no badge
-- [ ] 3.7 After a reload the badge is gone and the record is on `/records`
-- [ ] 3.8 `/records` shows both records with the set and date behind each; a zero-load-only exercise appears with the explanation
-- [ ] 3.9 `/records` signed out redirects to `/auth/signin`
-- [ ] 3.10 The flow is operable one-handed at 360 px
+- [x] 3.5 A set beating a previous best shows the badge on its row, naming what it beat, without a reload (verified on the deployed address with Phase 4)
+- [x] 3.6 The first set for a fresh exercise shows no badge (verified on the deployed address with Phase 4)
+- [x] 3.7 After a reload the badge is gone and the record is on `/records` (verified on the deployed address with Phase 4)
+- [x] 3.8 `/records` shows both records with the set and date behind each; a zero-load-only exercise appears with the explanation (verified on the deployed address with Phase 4)
+- [x] 3.9 `/records` signed out redirects to `/auth/signin` (read-only probe, locally and on the deployed address: `302 → /auth/signin`)
+- [x] 3.10 The flow is operable one-handed at 360 px (verified on the deployed address with Phase 4)
 
 ### Phase 4: Deploy, and prove it on the public address
 
 #### Automated
 
-- [ ] 4.1 The full gate in CI order exits 0
-- [ ] 4.2 `npx wrangler deploy` completes and reports the deployed version
+- [x] 4.1 The full gate in CI order exits 0
+- [x] 4.2 `npx wrangler deploy` completes and reports the deployed version (`06c4e6f6-d669-4e36-b69d-e3aea4c1a9ca`)
 
 #### Manual
 
-- [ ] 4.3 On the deployed address, a set beating a previous best shows the badge
-- [ ] 4.4 `/records` on the deployed address lists the record just set, with the correct set and date
-- [ ] 4.5 Both checked at phone width
+- [x] 4.3 On the deployed address, a set beating a previous best shows the badge
+- [x] 4.4 `/records` on the deployed address lists the record just set, with the correct set and date
+- [x] 4.5 Both checked at phone width
 
 ### Phase 5: Truth up the documents
 
