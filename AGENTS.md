@@ -28,8 +28,28 @@ without changing the test and saying so.**
   UTC. A Sunday-evening session belongs to that week.
 - **Zero-weight sets contribute reps but no tonnage. Negative-weight (assisted) sets are excluded
   from 1RM and from record detection**, and contribute zero — never a negative amount — to tonnage.
+  - **A zero or negative load requires the exercise's `is_bodyweight` flag** (FR-014). A plank at 0
+    is honest; a squat at 0 is a typo that would silently zero out a week's tonnage. **This rule
+    cannot be a check constraint** — the answer lives in `exercises.is_bodyweight`, a different
+    table, and copying the flag onto the set would be the snapshot forbidden above. It is therefore
+    enforced in the endpoint, which already loads the entry to verify ownership, and pre-checked by
+    the form through the same `isWeightAllowed` in `src/lib/validation/workout.ts`. One definition,
+    two callers.
 - **Unit round-trip is exact.** A weight entered in lb and read back in lb must be the number the
   user typed. Rounding or conversion must never create or erase a record.
+  - **The storage shape is what makes that true, not a precision argument.** `sets` holds `weight`
+    exactly as typed, `weight_unit` as it was typed in, and a **generated** `weight_kg` derived from
+    both. Read `weight` for anything shown back to the user; read `weight_kg` for every comparison
+    and every total. **Never write `weight_kg`** — Postgres refuses a non-DEFAULT value for a
+    generated column, and the generated types cannot express that, so they list it as optional on
+    Insert.
+  - **The conversion factor `0.45359237` has exactly two copies and they must agree**: the
+    generated column in `20260811005248_create_workout_log_with_row_ownership.sql` and `KG_PER_LB`
+    in `src/lib/services/set-display.ts`. A third, rounder one written elsewhere makes two answers
+    possible for the same set.
+  - **The stored unit comes from `profiles.weight_unit` on the server, never from a request body.**
+    A client that could name the unit could store `100` marked as pounds while the user typed
+    kilograms, and every figure derived from `weight_kg` would be wrong afterwards.
 - **Every exercise has exactly one primary muscle group**, so per-group tonnage sums exactly to
   the week's total. Never invent weighted multi-group splits.
   - **The groups are exactly six: `legs`, `back`, `chest`, `shoulders`, `arms`, `core`** (owner,
@@ -122,8 +142,49 @@ owner check therefore makes the shared rows unwritable by everyone without ever 
   distinct, so it would admit two seeded rows with the same name. Use two partial unique indexes —
   one `where user_id is null`, one `where user_id is not null` — over `lower(name)`, since a name
   differing only in case is the same exercise to somebody typing on a phone.
-- **Use this variant only when rows are genuinely shared.** `workouts` and `sets` are not: they take
-  the plain template, where `user_id` is `not null`.
+- **Use this variant only when rows are genuinely shared.** `workouts`, `exercise_entries` and
+  `sets` are not: their `user_id` is `not null` and they take the plain template — plus the
+  composite key in the next section, because they hang off each other.
+
+### The nested-ownership variant — when a row hangs off another owned row
+
+**The four-policy template does not protect a nested record, and nothing in the policy text says
+so.** Every policy here reads `(select auth.uid()) = user_id` **on the row in front of it and
+nothing else**. So an account inserting an `exercise_entries` row with **its own** `user_id` and
+**somebody else's** `workout_id` passes the insert policy — the policy never looks at the parent —
+and the result is a row grafted onto another account's workout, invisible to both of them.
+
+That is not theoretical. Replacing the key below with a plain `references workouts (id)` in
+`gymlog-test` let account B attach a row to account A's workout, and **the row persisted**:
+restoring the key failed until it was deleted by hand.
+
+A trigger would close it. A **composite foreign key** closes it declaratively, and is what this
+repository uses:
+
+```sql
+-- parent: redundant against the primary key, and present solely as the child's FK target
+unique (id, user_id)
+
+-- child: carries its own user_id AND references the parent BY OWNER
+foreign key (workout_id, user_id) references public.workouts (id, user_id) on delete cascade
+```
+
+The graft now looks for a parent row owned by the grafter and does not find one. `sets` does the
+same against `exercise_entries (id, user_id)`. The duplicate index on the parent is the price and it
+is cheap.
+
+- **The composite key must be the ONLY foreign key between each pair of tables.** PostgREST builds
+  its embed from the foreign-key columns and handles composite keys natively, so
+  `select("*, exercise_entries(...)")` resolves with no hint syntax — **but only while exactly one
+  path exists.** A well-meant plain `workout_id references workouts (id)` added later "for clarity"
+  creates a second constraint between the same pair, and every nested read starts failing with
+  `PGRST201`, demanding `exercise_entries!<constraint_name>(…)` at each call site. The migration
+  says so in a comment; no test would catch it before the pages did.
+- **The tripwire is assertion 4 of `tests/integration/workout-log-rls.test.ts`** — account B, using
+  its own `user_id`, attempting to attach an entry to account A's workout. It is the only thing in
+  the repository that would notice a migration "simplifying" the composite key away. **Do not
+  delete it as redundant**, for the same reason as `exercises-rls` assertion 4.
+- **Copy this for every future nested table.** The plain template alone is a defect at depth 2.
 
 ## Commands
 
@@ -363,6 +424,12 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
 - **`astro dev` already runs the real workerd runtime** (adapter v13 bundles
   `@cloudflare/vite-plugin`). Do not add a `wrangler dev` step — it is legacy for this stack, and
   `platformProxy` was removed.
+  - **It reads its Supabase credentials from `.dev.vars`, which points at PRODUCTION, and a
+    process-env override does not displace them.** So the dev server cannot be aimed at
+    `gymlog-test`, and any scripted check that signs in and writes rows would be writing them into
+    the database the owner trains against. Verify write paths by calling the exported handlers from
+    an integration suite instead (`tests/integration/workout-endpoints.test.ts` is the pattern);
+    reserve the dev server for read-only probes and for a human clicking through.
 - Adapter v13 also removed `Astro.locals.runtime` and `cloudflareModules`, and flipped
   `imageService` to default `cloudflare-binding`. Guidance written for v12 or earlier is wrong.
 - **The Workers Free plan caps CPU at 10 ms per invocation** — a hard kill (Error 1102), not a
@@ -380,11 +447,19 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
   `gymlog-test`) and build, in that order, on every push and PR to `main`. It carries a
   `concurrency` group so two runs cannot race the shared fixture rows. The browser test is not
   wired yet.
-- **Two tables exist.** `public.profiles` — one row per account, created by a trigger on
-  `auth.users` and backfilled. `public.exercises` — the catalogue: **38 seeded rows** with
-  `user_id is null`, readable by every account and writable by none, plus custom rows private to
-  their owner (see § Access control → the shared-catalogue variant). Workouts and sets do not exist
-  yet; they are S-03 and take the plain row-ownership template.
+- **Five tables exist.**
+  - `public.profiles` — one row per account, created by a trigger on `auth.users` and backfilled.
+  - `public.exercises` — the catalogue: **38 seeded rows** with `user_id is null`, readable by every
+    account and writable by none, plus custom rows private to their owner (see § Access control →
+    the shared-catalogue variant).
+  - `public.workouts` → `public.exercise_entries` → `public.sets` — the training record, three
+    levels deep, added by S-03. Every one carries its own `user_id` **and** a composite foreign key
+    to its parent's `(id, user_id)` (see § Access control → the nested-ownership variant).
+    `performed_on` is a `date` the user states, not an instant; `exercise_id` carries
+    `on delete restrict`, so **an exercise with logged history can no longer be deleted at all** —
+    whoever builds catalogue editing will meet that.
+  - Reachable at `/workouts` and `/workouts/[id]`, written through `/api/workouts`,
+    `/api/exercise-entries` and `/api/sets`.
 - **Three enums**: `weight_unit`, `estimation_formula`, and `muscle_group` — the last with exactly
   six values, pinned in both directions by `MUSCLE_GROUPS` in `src/types.ts` and a compile-time
   assertion. Add a seventh to the database without adding it there and the build fails, rather than

@@ -157,17 +157,22 @@ invisible to every test: the account is confirmed correctly and the user still s
 unreachable". It must be the deployed sign-in page, with `uri_allow_list` covering the deployed host
 and `http://localhost:4321/**` for local work.
 
-### Auth routes
+### Routes
 
-| Route                 | Description                                                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `/auth/signin`        | Email/password sign-in form. On success → `/dashboard`                                                                   |
-| `/auth/signup`        | Email/password sign-up form. On success → `/dashboard`, or `/auth/confirm-email` when a confirmation email is on its way |
-| `/auth/confirm-email` | "Check your inbox" page — reached only when an email is genuinely coming                                                 |
-| `/dashboard`          | Protected page (redirects to `/auth/signin` when signed out)                                                             |
-| `/exercises`          | Protected. The catalogue: 38 seeded exercises plus the account's own, with search and a muscle-group filter              |
-| `/api/auth/signout`   | POST. Always → `/auth/signin`, so returning requires authenticating again                                                |
-| `/api/exercises`      | POST, **JSON** (not a form post — the caller is a hydrated island). Creates a custom exercise for the signed-in account  |
+| Route                   | Description                                                                                                              |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `/auth/signin`          | Email/password sign-in form. On success → `/dashboard`                                                                   |
+| `/auth/signup`          | Email/password sign-up form. On success → `/dashboard`, or `/auth/confirm-email` when a confirmation email is on its way |
+| `/auth/confirm-email`   | "Check your inbox" page — reached only when an email is genuinely coming                                                 |
+| `/dashboard`            | Protected page (redirects to `/auth/signin` when signed out)                                                             |
+| `/exercises`            | Protected. The catalogue: 38 seeded exercises plus the account's own, with search and a muscle-group filter              |
+| `/workouts`             | Protected. The account's own workouts, most recent first, and the form that starts one dated today in their timezone     |
+| `/workouts/[id]`        | Protected. One workout: add exercises, log sets, see each set's estimated 1RM. **404 for a workout that is not yours**   |
+| `/api/auth/signout`     | POST. Always → `/auth/signin`, so returning requires authenticating again                                                |
+| `/api/exercises`        | POST, **JSON** (not a form post — the caller is a hydrated island). Creates a custom exercise for the signed-in account  |
+| `/api/workouts`         | POST, JSON. Creates a workout from `{ performedOn, note? }`                                                              |
+| `/api/exercise-entries` | POST, JSON. Adds an exercise to a workout; choosing one already there returns the existing entry rather than an error    |
+| `/api/sets`             | POST, JSON. Logs a set. **The weight unit is not in the body** — it is read from the account's profile on the server     |
 
 Route protection is handled in `src/middleware.ts`, in **both** directions: `PROTECTED_ROUTES` keeps
 signed-out visitors out of the application, and `AUTH_ROUTES` sends a signed-in visitor away from

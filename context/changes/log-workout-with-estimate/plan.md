@@ -1043,24 +1043,24 @@ planning session, and four by the planner. Each states what would have to be tru
 
 #### Automated
 
-- [x] 5.1 The probe is gone — `git grep -n "tz-probe"` returns nothing and `src/pages/api/dev/` no longer exists
-- [x] 5.2 `npm run build` exits 0 and `npx wrangler deploy` reports a version id
-- [x] 5.3 `curl -I` on the deployed `/workouts` returns 302 to `/auth/signin` when unauthenticated
-- [x] 5.4 The deployed `/api/dev/tz-probe` returns 404
+- [x] 5.1 The probe is gone — `git grep -n "tz-probe"` returns nothing and `src/pages/api/dev/` no longer exists — 3ebf634
+- [x] 5.2 `npm run build` exits 0 and `npx wrangler deploy` reports a version id — 3ebf634
+- [x] 5.3 `curl -I` on the deployed `/workouts` returns 302 to `/auth/signin` when unauthenticated — 3ebf634
+- [x] 5.4 The deployed `/api/dev/tz-probe` returns 404 — 3ebf634
 
 #### Manual
 
-- [x] 5.5 The full log-and-see-the-estimate flow completes on the deployed URL and survives a reload
-- [x] 5.6 The new workout form's default date is today in the profile's timezone, not in UTC
+- [x] 5.5 The full log-and-see-the-estimate flow completes on the deployed URL and survives a reload — 3ebf634
+- [x] 5.6 The new workout form's default date is today in the profile's timezone, not in UTC — 3ebf634
 
 ### Phase 6: Truth up the documents
 
 #### Automated
 
-- [ ] 6.1 The nested-ownership pattern is documented in `AGENTS.md` § Access control
-- [ ] 6.2 Markdown Prettier-clean across the three documents
-- [ ] 6.3 Gate still green
+- [x] 6.1 The nested-ownership pattern is documented in `AGENTS.md` § Access control
+- [x] 6.2 Markdown Prettier-clean across the three documents
+- [x] 6.3 Gate still green
 
 #### Manual
 
-- [ ] 6.4 `AGENTS.md` § Access control makes clear why a nested table needs the composite key
+- [x] 6.4 `AGENTS.md` § Access control makes clear why a nested table needs the composite key

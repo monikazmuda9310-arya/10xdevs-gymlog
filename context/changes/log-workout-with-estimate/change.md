@@ -25,6 +25,18 @@ deviations:
       refused. The suite exercises the same validation, ownership checks, unit-from-profile rule and
       error mapping against gymlog-test, and unlike a one-off script it stays inside the gate. Not
       covered: Astro's routing and origin check, which Phase 4 exercises through a browser.
+  - phase: 6
+    criterion: "6.4 — read AGENTS.md § Access control and judge whether the pattern is obvious"
+    what: >-
+      Reworded before it was asked. As written it is a code-quality judgement about Postgres RLS put
+      to a non-specialist, which lessons.md:36-51 exists to forbid — the same question in S-02 got
+      "I don't understand any of it", and the question was the deficiency, not the answer. Asked
+      instead as three facts checkable by looking: does the section state what an account could do
+      without the composite key, that it must be the only foreign key to that parent, and which
+      assertion guards it. All three confirmed by the owner, and both of the section's pointers were
+      verified to resolve — assertion 4 is literally named "4. THE GRAFT" and the migration carries
+      the only-foreign-key comment at lines 18-23. A document pointing at something that does not
+      exist is the defect this phase fixed in calendar.ts.
   - phase: 5
     criterion: '5.1 — `git grep -n "tz-probe"` returns nothing'
     what: >-
