@@ -23,6 +23,22 @@ type Client = SupabaseClient<Database>;
 export const UNIQUE_VIOLATION = "23505";
 export const FOREIGN_KEY_VIOLATION = "23503";
 
+/**
+ * The composite ownership key on `exercise_entries`, by the name the migration gives it.
+ *
+ * Two different foreign keys raise `23503` when an entry is inserted — this one, when the workout is
+ * not the caller's, and the plain `exercise_id` key, when the exercise does not exist — and they are
+ * different mistakes deserving different words. The only thing that tells them apart is the
+ * constraint named in the error.
+ *
+ * **This is not the prose-matching that `auth-errors.ts` forbids.** That rule exists because a
+ * provider's wording changes between releases; this string is declared in our own migration, and
+ * `tests/integration/workout-endpoints.test.ts` asserts both branches, so renaming the constraint
+ * fails the gate rather than silently degrading a message. And if the match ever did misfire, both
+ * outcomes are a 404 saying "not found" — the failure is a wrong sentence, never a disclosure.
+ */
+export const WORKOUT_OWNER_CONSTRAINT = "exercise_entries_workout_owner_fkey";
+
 export interface CreateWorkoutFields {
   performedOn: string;
   note: string | null;
@@ -41,6 +57,18 @@ export interface AddSetFields {
  * The count is aggregated by Postgres through the embed rather than by fetching entries and
  * counting them here — the same discipline S-07's weekly tonnage will need, applied to the first
  * aggregate that exists. `created_at` breaks ties so two workouts on one day have a stable order.
+ *
+ * **Deliberately unbounded, and this one has a real expiry date.** `listExercises` is unbounded too,
+ * but a catalogue is bounded by curation — this is not: the caller for whom this product exists logs
+ * three or four sessions a week, so the list grows by roughly **200 rows a year and never shrinks**.
+ * The page renders every row it gets and each carries a nested count aggregate, against a 2 s p95
+ * mobile budget and a hard 10 ms CPU cap per invocation.
+ *
+ * The threshold worth knowing: **somewhere in the low hundreds — call it one to two years of real
+ * training — this stops being correct**, and it will degrade slowly enough that nobody notices until
+ * the data is real. Bounding it is deliberately NOT done here: a bare `.limit()` would hide the
+ * oldest sessions with nothing on screen saying so, in a product whose promise is that a logged
+ * session is never lost. Whichever slice adds history or pagination owns both halves at once.
  */
 export async function listWorkouts(supabase: Client, userId: string) {
   const { data, error } = await supabase

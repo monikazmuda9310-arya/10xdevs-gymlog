@@ -42,45 +42,49 @@ if (supabase && user) {
         <a href="/dashboard" class="text-sm text-purple-300 hover:underline">Back to dashboard</a>
       </header>
 
-      {
-        loadFailed ? (
-          <p class="rounded-lg border border-red-400/30 bg-red-900/30 px-4 py-6 text-center text-red-200">
-            Your workouts could not be loaded. Please refresh; if it keeps happening, the database may be unreachable.
-          </p>
-        ) : (
-          <div class="space-y-6">
-            <NewWorkoutForm defaultDate={today} client:load />
+      <div class="space-y-6">
+        {
+          /* The form sits ABOVE the failure branch on purpose: starting a workout does not depend on
+            the read that failed, and it is the one thing the user came here to do. Only the list is
+            replaced by the error. When the profile read is what failed, the date below falls back to
+            UTC — visible, and changeable, which beats offering no form at all. */
+        }
+        <NewWorkoutForm defaultDate={today} client:load />
 
-            {workouts.length === 0 ? (
-              <p class="rounded-lg border border-white/10 bg-white/5 px-4 py-8 text-center text-blue-100/60">
-                No workouts logged yet. Pick a date above and start one — you can add exercises and sets as you train.
-              </p>
-            ) : (
-              <ul class="divide-y divide-white/10 overflow-hidden rounded-lg border border-white/10 bg-white/5">
-                {workouts.map((workout) => (
-                  <li>
-                    <a
-                      href={`/workouts/${workout.id}`}
-                      class="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-white/10"
-                    >
-                      <span class="flex min-w-0 flex-col">
-                        {/* Rendered as the stored YYYY-MM-DD. Reformatting it through `new Date`
-                            would parse it as UTC midnight and could show the previous day to
-                            anybody west of it — the exact bug `performed_on` being a date avoids. */}
-                        <span class="text-white">{workout.performed_on}</span>
-                        {workout.note && <span class="truncate text-sm text-blue-100/60">{workout.note}</span>}
-                      </span>
-                      <span class="shrink-0 text-xs text-blue-100/50">
-                        {workout.exercise_entries[0]?.count ?? 0} exercises
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )
-      }
+        {
+          loadFailed ? (
+            <p class="rounded-lg border border-red-400/30 bg-red-900/30 px-4 py-6 text-center text-red-200">
+              Your workouts could not be loaded. Please refresh; if it keeps happening, the database may be unreachable.
+            </p>
+          ) : workouts.length === 0 ? (
+            <p class="rounded-lg border border-white/10 bg-white/5 px-4 py-8 text-center text-blue-100/60">
+              No workouts logged yet. Pick a date above and start one — you can add exercises and sets as you train.
+            </p>
+          ) : (
+            <ul class="divide-y divide-white/10 overflow-hidden rounded-lg border border-white/10 bg-white/5">
+              {workouts.map((workout) => (
+                <li>
+                  <a
+                    href={`/workouts/${workout.id}`}
+                    class="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-white/10"
+                  >
+                    <span class="flex min-w-0 flex-col">
+                      {/* Rendered as the stored YYYY-MM-DD. Reformatting it through `new Date`
+                          would parse it as UTC midnight and could show the previous day to
+                          anybody west of it — the exact bug `performed_on` being a date avoids. */}
+                      <span class="text-white">{workout.performed_on}</span>
+                      {workout.note && <span class="truncate text-sm text-blue-100/60">{workout.note}</span>}
+                    </span>
+                    <span class="shrink-0 text-xs text-blue-100/50">
+                      {workout.exercise_entries[0]?.count ?? 0} exercises
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )
+        }
+      </div>
     </div>
   </div>
 </Layout>

@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 
-import { FOREIGN_KEY_VIOLATION, addExerciseEntry } from "@/lib/services/workouts";
+import { FOREIGN_KEY_VIOLATION, WORKOUT_OWNER_CONSTRAINT, addExerciseEntry } from "@/lib/services/workouts";
 import { parseAddExerciseEntry } from "@/lib/validation/workout-schemas";
 import type { WorkoutMessageCode } from "@/lib/validation/workout";
 
@@ -43,10 +43,16 @@ export const POST: APIRoute = async (context) => {
     const code = (error as { code?: string }).code;
 
     // A workout belonging to another account is refused by the composite ownership key, and an
-    // exercise that does not exist by the plain one. Both answer "not found" — the same answer for
-    // "absent" and "somebody else's", so this endpoint is not an existence oracle.
+    // exercise that does not exist by the plain one. Both are 404 "not found" — the same answer for
+    // "absent" and "somebody else's", so this endpoint is not an existence oracle — but they are
+    // different mistakes and get different words. Hiding which ids exist protects the workout,
+    // whose id is guessable; it protects nothing on the exercise, whose catalogue every account
+    // can already read in full.
     if (code === FOREIGN_KEY_VIOLATION) {
-      return fail(404, "workout_not_found");
+      const raised = (error as { message?: string }).message ?? "";
+      return raised.includes(WORKOUT_OWNER_CONSTRAINT)
+        ? fail(404, "workout_not_found")
+        : fail(404, "exercise_not_found");
     }
 
     // eslint-disable-next-line no-console -- deliberate server-side diagnostic

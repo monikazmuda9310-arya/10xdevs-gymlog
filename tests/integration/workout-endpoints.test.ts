@@ -166,6 +166,30 @@ describe("the logging endpoints, end to end", () => {
     expect((await json(foreign)).code).toBe("workout_not_found");
   });
 
+  it("tells a missing exercise apart from a workout that is not the caller's", async () => {
+    // Both are 23503 from the same insert, and the only thing separating them is which constraint
+    // the database names. This assertion is what makes that match safe to rely on: rename
+    // `exercise_entries_workout_owner_fkey` and one of these two fails, rather than the endpoint
+    // quietly answering the wrong sentence forever.
+    const created = await createWorkoutRoute(
+      context({ performedOn: "2026-08-11", note: `${MARK}fk-${RUN_ID}` }, signedIn()),
+    );
+    const { workout } = (await json(created)) as { workout: { id: string } };
+
+    const missingExercise = await addEntryRoute(
+      context({ workoutId: workout.id, exerciseId: "00000000-0000-4000-8000-000000000000" }, signedIn()),
+    );
+    expect(missingExercise.status).toBe(404);
+    expect((await json(missingExercise)).code).toBe("exercise_not_found");
+
+    const missingWorkout = await addEntryRoute(
+      context({ workoutId: "00000000-0000-4000-8000-000000000000", exerciseId: barbellId }, signedIn()),
+    );
+    expect((await json(missingWorkout)).code).toBe("workout_not_found");
+
+    await client.from("workouts").delete().eq("id", workout.id);
+  });
+
   it("refuses an unauthenticated caller at every level, and writes nothing", async () => {
     // The manual criterion, automated: a POST with no session must not create a row, verified by
     // re-reading the table as the owner rather than by trusting the status code.

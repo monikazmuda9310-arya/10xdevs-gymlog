@@ -644,6 +644,24 @@ finding F2 and `ExerciseForm.tsx` is the pattern to copy instead.
   among an entry's sets (FR-015), computed from the same union, skipping the three non-numeric
   kinds.
 
+#### 6. The unit rule, as a module — added during implementation
+
+**File**: `src/lib/services/set-display.ts` (new; **not in the original plan — see the addendum
+below**)
+
+**Intent**: Hold the rule stated in prose below, where a unit test can reach it.
+
+**Contract**: imports `estimateForSet` and types only, so it stays browser-safe. Exports
+`weightInUnit`, `estimateForLoggedSet`, `bestEstimateOf` (FR-015) and `roundForDisplay`, plus
+`KG_PER_LB` — the second of the two copies of `0.45359237`, the first being the generated column.
+
+> **Addendum, 2026-08-11 (implementation review, F4).** The plan described this rule in prose that
+> read as though it lived inside `WorkoutDetail.tsx`, and separately required a unit test for both of
+> its branches (criterion 4.6). Those cannot both be true: the unit suite is hermetic and renders no
+> components, so a rule inside an island is a rule 4.6 cannot reach. The module was created during
+> Phase 4 to make the criterion satisfiable. Recorded here so the archived plan matches the code, and
+> generalised in `context/foundation/lessons.md`.
+
 **Which number feeds `estimateForSet`, precisely.** The estimate is always expressed in the unit the
 user is currently reading, so it is computed from the value on screen: `set.weight` when
 `set.weight_unit === profile.weight_unit`, and otherwise `set.weight_kg` converted into the profile's

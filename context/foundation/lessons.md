@@ -49,3 +49,22 @@
   screen is usable, whether an email arrives, whether a link leads somewhere real.
 - **Applies to**: every `#### Manual Verification` block. If the item can be demonstrated by a
   script, it belongs in the automated list with a script that demonstrates it.
+
+## A criterion that demands a unit test must name the module that will hold it
+
+- **Context**: `src/lib/services/set-display.ts`, created during S-03 Phase 4 and named nowhere in
+  the plan. Found during /10x-impl-review on 2026-08-11 (finding F4).
+- **Problem**: Phase 4 stated the "which weight column feeds the estimate" rule in prose that read
+  as though it lived inside the `WorkoutDetail` island, and separately required a unit test covering
+  both of its branches (criterion 4.6). Those two instructions contradict each other: the unit suite
+  is hermetic and renders no components, so a rule living in an island is a rule that criterion
+  cannot reach. The implementer had to invent a module mid-phase to make the criterion satisfiable.
+  It worked — but the plan's file list and the plan's success criteria disagreed, and only one of
+  the two was checkable.
+- **Rule**: **When a success criterion says "a unit test covers X", the plan must name the module
+  that will export X.** If no module can be named, X is not unit-testable as designed and the
+  criterion describes a test that cannot be written. Prose describing a rule is not a location
+  for it.
+- **Applies to**: every `/10x-plan` phase whose Success Criteria mention unit tests — especially
+  rules that read as belonging to a UI component, because components are where untestable logic
+  accumulates.
