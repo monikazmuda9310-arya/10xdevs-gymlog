@@ -764,17 +764,17 @@ need nothing done to them: records are derived, so the first read after a deleti
 
 #### Automated
 
-- [ ] 1.1 Lint passes
-- [ ] 1.2 Type checking passes
-- [ ] 1.3 Unit tests pass
-- [ ] 1.4 `record-impact.test.ts` covers `affectedRecords` and `fallingRecords` by name, including the heaviest-only removal and the two no-successor outcomes
-- [ ] 1.5 Integration check passes
-- [ ] 1.6 Build passes
-- [ ] 1.7 The three copies of the estimate ordering agree, verified by grep
-- [ ] 1.8 Mutation (a): `.gt` → `.gte` on `weight_kg` fails the zero-load assertion
-- [ ] 1.9 Mutation (b): dropping `created_at asc` fails the tie assertion
-- [ ] 1.10 Mutation (c): removing the exclusion fails the "successor is not the holder" assertion
-- [ ] 1.11 Date-change assertion proves no stored figure needs recomputing
+- [x] 1.1 Lint passes
+- [x] 1.2 Type checking passes
+- [x] 1.3 Unit tests pass
+- [x] 1.4 `record-impact.test.ts` covers `affectedRecords` and `fallingRecords` by name, including the heaviest-only removal and the two no-successor outcomes
+- [x] 1.5 Integration check passes
+- [x] 1.6 Build passes
+- [x] 1.7 The three copies of the estimate ordering agree, verified by grep
+- [x] 1.8 Mutation (a): `.gt` → `.gte` on `weight_kg` fails the zero-load assertion
+- [x] 1.9 Mutation (b): dropping `created_at asc` fails the tie assertion
+- [x] 1.10 Mutation (c): removing the exclusion fails the "successor is not the holder" assertion
+- [x] 1.11 Date-change assertion proves no stored figure needs recomputing
 
 ### Phase 2: The writes — validation, services, six handlers
 

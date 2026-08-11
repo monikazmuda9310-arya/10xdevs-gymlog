@@ -1,9 +1,9 @@
 ---
 change_id: edit-and-delete-log
 title: Edit and delete workouts and sets, warned first about which record will fall
-status: plan_reviewed
+status: implementing
 created: 2026-08-11
-updated: 2026-08-11
+updated: 2026-08-12
 archived_at: null
 ---
 
@@ -40,6 +40,20 @@ The deploy phase must carry an **automatic** criterion "pushed to `origin/main` 
 with the run number written into Progress. In session 8 work was twice finished and verified
 locally but left unpushed — once while the Worker was already serving it on production. No local
 gate can see that state.
+
+### Deviations from the plan
+
+- **Phase 1 — `no_estimable_set` renamed to `no_qualifying_set`.** The plan named the "sets remain
+  but none can hold this record" outcome `no_estimable_set`. That word is estimate-flavoured and the
+  same outcome applies to the heaviest-weight record, where nothing is being estimated — so the name
+  would have been a small lie in a module whose whole job is to avoid those. Behaviour, the two
+  distinct outcomes and criterion 1.4 are unchanged.
+- **Phase 1 — criterion 1.7 verified by comparison, not by the literal grep the plan wrote.** The
+  plan specified `git grep "estimate_kg desc"`, but the service expresses the ordering as
+  `.order("estimate_kg", { ascending: false })`, so that grep would have matched the SQL only and
+  reported success while checking nothing in `src`. Replaced with a script that extracts every
+  `.order()` chain from `records.ts` and every `distinct on` ordering from the migration and prints
+  them side by side. Same criterion, a check that can actually fail.
 
 ### Working mode
 

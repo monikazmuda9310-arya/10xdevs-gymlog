@@ -15,6 +15,7 @@
  */
 
 import type { EstimationFormula, PersonalRecordRow, WeightUnit } from "@/types";
+import type { FallingRecord } from "./record-impact";
 import { estimateForLoggedSet, roundForDisplay, weightInUnit } from "./set-display";
 
 /** One record, ready to print: the figure, and the set that still backs it (US-02). */
@@ -70,6 +71,47 @@ export function bestEstimateFigure(
  * the load, not an estimate, so a twenty-repetition set counts here while carrying no estimate
  * above. The two records may therefore belong to different sets, which US-02 requires.
  */
+/**
+ * What the confirmation dialog prints for a record that is about to fall (S-05).
+ *
+ * Three outcomes, because there are three: a value it falls to, or one of the two ways of having no
+ * successor — which are **different futures for the user** and must not share a sentence.
+ * `no_qualifying_set` leaves the exercise on `/records` with nothing shown for this record;
+ * `no_sets_left` removes the exercise from that screen entirely, because `personal_records` is
+ * anchored on the exercises the account has logged.
+ *
+ * The figure is re-derived here from the surviving set's own typed `weight` and `weight_unit`,
+ * exactly as the two functions above do — **no number Postgres computed is ever displayed**, so the
+ * value promised in the dialog is the same value `/records` will show afterwards.
+ */
+export type FallTo =
+  | { kind: "figure"; figure: RecordFigure }
+  | { kind: "no_qualifying_set" }
+  | { kind: "no_sets_left" };
+
+export function fallToFigure(record: FallingRecord, unit: WeightUnit, formula: EstimationFormula): FallTo {
+  if (record.successor.kind !== "candidate") {
+    return { kind: record.successor.kind };
+  }
+
+  const { set_id: _ignored, performed_on: performedOn, ...set } = record.successor.candidate;
+  const shared = { reps: set.reps, weight: set.weight, weightUnit: set.weight_unit, performedOn };
+
+  if (record.kind === "heaviest") {
+    return { kind: "figure", figure: { value: roundForDisplay(weightInUnit(set, unit)), ...shared } };
+  }
+
+  const estimate = estimateForLoggedSet(set, unit, formula);
+  if (estimate.kind !== "estimate") {
+    // Unreachable in practice — the successor came out of a ranking that excludes everything
+    // unestimable. Written rather than asserted because the alternative is a non-null assertion that
+    // would be wrong exactly once, and "sets remain but none qualifies" is the honest answer if it
+    // ever were.
+    return { kind: "no_qualifying_set" };
+  }
+  return { kind: "figure", figure: { value: roundForDisplay(estimate.oneRepMax), ...shared } };
+}
+
 export function heaviestFigure(row: PersonalRecordRow, unit: WeightUnit): RecordFigure | null {
   const reps = row.heaviest_reps;
   const weight = row.heaviest_weight;

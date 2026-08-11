@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { bestEstimateFigure, heaviestFigure } from "@/lib/services/record-display";
+import { bestEstimateFigure, fallToFigure, heaviestFigure } from "@/lib/services/record-display";
+import type { FallingRecord, RecordCandidate } from "@/lib/services/record-impact";
 import type { PersonalRecordRow } from "@/types";
 
 /** A records row with nothing in it — the plank case — overridden per test. */
@@ -100,5 +101,69 @@ describe("heaviestFigure", () => {
 
   it("answers null when every set was at zero or assisted load", () => {
     expect(heaviestFigure(row(), "kg")).toBeNull();
+  });
+});
+
+describe("fallToFigure", () => {
+  function falling(kind: "estimate" | "heaviest", successor: FallingRecord["successor"]): FallingRecord {
+    return { kind, exerciseId: "exercise", exerciseName: "Bench Press", holderSetId: "holder", successor };
+  }
+
+  function successorSet(overrides: Partial<RecordCandidate> = {}): RecordCandidate {
+    return {
+      set_id: "successor",
+      reps: 5,
+      weight: 90,
+      weight_unit: "kg",
+      weight_kg: 90,
+      performed_on: "2026-08-01",
+      ...overrides,
+    };
+  }
+
+  it("re-derives the estimate the record falls to from the surviving set's typed weight", () => {
+    // Brzycki at 5 x 90 is 90 * 36 / 32 = 101.25, rounded to one decimal for the screen. Nothing
+    // here reads a number Postgres computed — that is what keeps the dialog's promise identical to
+    // what /records shows once the deletion lands.
+    const result = fallToFigure(falling("estimate", { kind: "candidate", candidate: successorSet() }), "kg", "brzycki");
+
+    expect(result.kind).toBe("figure");
+    expect(result.kind === "figure" && result.figure.value).toBe(101.3);
+    expect(result.kind === "figure" && result.figure.reps).toBe(5);
+    expect(result.kind === "figure" && result.figure.performedOn).toBe("2026-08-01");
+  });
+
+  it("prints the load itself for the heaviest record, at any repetition count", () => {
+    const result = fallToFigure(
+      falling("heaviest", { kind: "candidate", candidate: successorSet({ reps: 20, weight: 150, weight_kg: 150 }) }),
+      "kg",
+      "brzycki",
+    );
+
+    expect(result.kind === "figure" && result.figure.value).toBe(150);
+    expect(result.kind === "figure" && result.figure.reps).toBe(20);
+  });
+
+  it("expresses the fall value in the unit the reader is reading", () => {
+    // Stored in kilograms, read in pounds: the successor's canonical weight_kg is converted, and
+    // the dialog therefore cannot quote a number in a unit the user is not looking at.
+    const result = fallToFigure(
+      falling("heaviest", { kind: "candidate", candidate: successorSet({ weight: 100, weight_kg: 100 }) }),
+      "lb",
+      "brzycki",
+    );
+
+    expect(result.kind === "figure" && result.figure.value).toBeCloseTo(220.5, 1);
+    // The set is still described as it was typed, so the evidence line does not lie about it.
+    expect(result.kind === "figure" && result.figure.weightUnit).toBe("kg");
+  });
+
+  it("passes the two empty outcomes through as themselves", () => {
+    expect(fallToFigure(falling("estimate", { kind: "no_qualifying_set" }), "kg", "brzycki")).toEqual({
+      kind: "no_qualifying_set",
+    });
+    expect(fallToFigure(falling("estimate", { kind: "no_sets_left" }), "kg", "brzycki")).toEqual({
+      kind: "no_sets_left",
+    });
   });
 });
