@@ -1,0 +1,80 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import WorkoutDetail from "@/components/workouts/WorkoutDetail";
+import { getWorkout } from "@/lib/services/workouts";
+import { listExercises } from "@/lib/services/exercises";
+import { getProfile } from "@/lib/services/profiles";
+import { UUID_PATTERN } from "@/lib/validation/workout";
+import type { Exercise, Profile } from "@/types";
+
+const { user, supabase } = Astro.locals;
+const id = Astro.params.id ?? "";
+
+let workout: Awaited<ReturnType<typeof getWorkout>> = null;
+let catalogue: Exercise[] = [];
+let profile: Profile | null = null;
+let loadFailed = false;
+
+// A malformed id never reaches a query: Postgres answers `22P02` for a uuid column given something
+// that is not one, which would surface as a 500 for what is really "no such workout".
+if (supabase && user && UUID_PATTERN.test(id)) {
+  try {
+    workout = await getWorkout(supabase, user.id, id);
+    if (workout) {
+      [catalogue, profile] = await Promise.all([listExercises(supabase, user.id), getProfile(supabase, user.id)]);
+    }
+  } catch (error) {
+    loadFailed = true;
+    // eslint-disable-next-line no-console -- deliberate server-side diagnostic
+    console.error("workouts/[id]: read failed", error);
+  }
+}
+
+// `getWorkout` returns null for a workout that does not exist AND for one belonging to somebody
+// else — the same answer on purpose, so this page cannot be used to learn which ids are real.
+if (!loadFailed && !workout) {
+  Astro.response.status = 404;
+}
+
+// The profile carries the defaults; if the row were somehow missing, the schema's own defaults are
+// the honest fallback rather than a blank screen.
+const weightUnit = profile?.weight_unit ?? "kg";
+const estimationFormula = profile?.estimation_formula ?? "brzycki";
+---
+
+<Layout title={workout ? `Workout ${workout.performed_on}` : "Workout not found"}>
+  <div class="bg-cosmic min-h-screen p-4">
+    <div class="mx-auto w-full max-w-2xl py-8">
+      <header class="mb-6 flex items-baseline justify-between gap-4">
+        <h1 class="bg-gradient-to-r from-blue-200 to-purple-200 bg-clip-text text-2xl font-bold text-transparent">
+          {workout ? workout.performed_on : "Workout"}
+        </h1>
+        <a href="/workouts" class="text-sm text-purple-300 hover:underline">All workouts</a>
+      </header>
+
+      {
+        loadFailed ? (
+          <p class="rounded-lg border border-red-400/30 bg-red-900/30 px-4 py-6 text-center text-red-200">
+            This workout could not be loaded. Please refresh; if it keeps happening, the database may be unreachable.
+          </p>
+        ) : !workout ? (
+          <p class="rounded-lg border border-white/10 bg-white/5 px-4 py-8 text-center text-blue-100/60">
+            That workout could not be found.
+          </p>
+        ) : (
+          <div class="space-y-6">
+            {workout.note && <p class="text-sm text-blue-100/70">{workout.note}</p>}
+            <WorkoutDetail
+              workoutId={workout.id}
+              initialEntries={workout.exercise_entries}
+              catalogue={catalogue}
+              weightUnit={weightUnit}
+              estimationFormula={estimationFormula}
+              client:load
+            />
+          </div>
+        )
+      }
+    </div>
+  </div>
+</Layout>

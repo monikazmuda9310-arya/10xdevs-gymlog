@@ -25,6 +25,17 @@ deviations:
       refused. The suite exercises the same validation, ownership checks, unit-from-profile rule and
       error mapping against gymlog-test, and unlike a one-off script it stays inside the gate. Not
       covered: Astro's routing and origin check, which Phase 4 exercises through a browser.
+  - phase: 4
+    criterion: "4.4 — account B gets 404 on account A's workout URL, scripted"
+    what: >-
+      The HTTP half cannot be scripted from this machine for the reason recorded against 3.5:
+      `astro dev` takes its Supabase credentials from `.dev.vars`, which points at production, so a
+      two-account scripted run would have to create both accounts and the workout in the database
+      the owner trains against. Verified instead at the exact value the page branches on:
+      `tests/integration/workout-page-access.test.ts` calls `getWorkout` against gymlog-test as the
+      owner (row returned, with its entries and sets) and as a second account (null), plus a
+      non-existent id (also null, so absent and somebody-else's are indistinguishable). The page
+      answers 404 on precisely that null. The browser half stays with manual criterion 4.12.
   - phase: 3
     criterion: "3.6 — a signed-out POST creates no row (was manual)"
     what: >-
@@ -42,6 +53,17 @@ plain `references workouts (id)` in `gymlog-test` let account B attach an exerci
 A's workout, and the row **persisted** — restoring the key failed until that row was deleted by
 hand. Whatever else changes in this schema, the composite keys stay, and assertion 4 of
 `tests/integration/workout-log-rls.test.ts` stays with them.
+
+### Phase 4 — a placeholder that shows a valid value is a broken field
+
+Manual verification caught the one defect of this phase, and no automated check could have. The set
+form's weight field carried `placeholder="0"` on a bodyweight exercise — the exact value such a set
+needs. Greyed out at 360 px it is indistinguishable from a filled field, so submitting it answered
+"Weight is required": a correct message about a field the owner believed they had completed.
+
+Fixed by seeding the field with a real `0` for bodyweight exercises. The rule the code comment now
+carries: **a placeholder must never display a value that is valid for the thing being logged.**
+Every gate was green while this was on screen, which is the same shape as S-01's `site_url`.
 
 ### Phase 2 — Workers really does carry full ICU data
 

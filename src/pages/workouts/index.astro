@@ -1,0 +1,86 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import NewWorkoutForm from "@/components/workouts/NewWorkoutForm";
+import { listWorkouts, type WorkoutListItem } from "@/lib/services/workouts";
+import { getProfile } from "@/lib/services/profiles";
+import { todayIn } from "@/lib/services/calendar";
+
+const { user, supabase } = Astro.locals;
+
+// The middleware guarantees a user here — /workouts is in PROTECTED_ROUTES — but the types do not
+// know that, and a page that assumed it would break silently if the route left the list.
+let workouts: WorkoutListItem[] = [];
+let today = todayIn("UTC");
+let loadFailed = false;
+
+if (supabase && user) {
+  try {
+    const [profile, rows] = await Promise.all([getProfile(supabase, user.id), listWorkouts(supabase, user.id)]);
+    workouts = rows;
+    // The one place this slice needs the profile timezone. At 01:00 in Warsaw, UTC still reads
+    // yesterday — a session logged just after midnight would default to the wrong day, and the
+    // user would have no reason to look.
+    today = todayIn(profile?.timezone ?? "UTC");
+  } catch (error) {
+    // Without this branch a failed read renders as "no workouts yet" — indistinguishable from an
+    // account that has never logged one. That is the silent-failure class AGENTS.md § Cloudflare
+    // traps warns about, arriving through a second door.
+    loadFailed = true;
+    // eslint-disable-next-line no-console -- deliberate server-side diagnostic
+    console.error("workouts: list read failed", error);
+  }
+}
+---
+
+<Layout title="Workouts">
+  <div class="bg-cosmic min-h-screen p-4">
+    <div class="mx-auto w-full max-w-2xl py-8">
+      <header class="mb-6 flex items-baseline justify-between gap-4">
+        <h1 class="bg-gradient-to-r from-blue-200 to-purple-200 bg-clip-text text-2xl font-bold text-transparent">
+          Workouts
+        </h1>
+        <a href="/dashboard" class="text-sm text-purple-300 hover:underline">Back to dashboard</a>
+      </header>
+
+      {
+        loadFailed ? (
+          <p class="rounded-lg border border-red-400/30 bg-red-900/30 px-4 py-6 text-center text-red-200">
+            Your workouts could not be loaded. Please refresh; if it keeps happening, the database may be unreachable.
+          </p>
+        ) : (
+          <div class="space-y-6">
+            <NewWorkoutForm defaultDate={today} client:load />
+
+            {workouts.length === 0 ? (
+              <p class="rounded-lg border border-white/10 bg-white/5 px-4 py-8 text-center text-blue-100/60">
+                No workouts logged yet. Pick a date above and start one — you can add exercises and sets as you train.
+              </p>
+            ) : (
+              <ul class="divide-y divide-white/10 overflow-hidden rounded-lg border border-white/10 bg-white/5">
+                {workouts.map((workout) => (
+                  <li>
+                    <a
+                      href={`/workouts/${workout.id}`}
+                      class="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-white/10"
+                    >
+                      <span class="flex min-w-0 flex-col">
+                        {/* Rendered as the stored YYYY-MM-DD. Reformatting it through `new Date`
+                            would parse it as UTC midnight and could show the previous day to
+                            anybody west of it — the exact bug `performed_on` being a date avoids. */}
+                        <span class="text-white">{workout.performed_on}</span>
+                        {workout.note && <span class="truncate text-sm text-blue-100/60">{workout.note}</span>}
+                      </span>
+                      <span class="shrink-0 text-xs text-blue-100/50">
+                        {workout.exercise_entries[0]?.count ?? 0} exercises
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )
+      }
+    </div>
+  </div>
+</Layout>

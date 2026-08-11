@@ -63,6 +63,23 @@ export type WorkoutSet = Database["public"]["Tables"]["sets"]["Row"];
 export type WorkoutSetInsert = Database["public"]["Tables"]["sets"]["Insert"];
 export type WorkoutSetUpdate = Database["public"]["Tables"]["sets"]["Update"];
 
+// The shapes the workout screens are handed. They exist because a hydrated island may not import
+// `@/lib/services/workouts` — that module pulls in the Supabase client, and everything reachable
+// from a `client:load` component ships to the browser. Each is PICKED from the row type rather than
+// restated, so a column that changes shape breaks the page instead of drifting from it.
+
+/** One set as the workout screen reads it: what was typed, its unit, and the canonical value. */
+export type LoggedSetView = Pick<WorkoutSet, "id" | "reps" | "weight" | "weight_unit" | "weight_kg" | "rpe">;
+
+/** The little the screen needs about the exercise an entry points at. */
+export type EntryExerciseView = Pick<Exercise, "id" | "name" | "muscle_group" | "is_bodyweight">;
+
+/** One exercise within one workout, with its sets in the order they were logged. */
+export type ExerciseEntryView = Pick<ExerciseEntry, "id" | "exercise_id"> & {
+  exercises: EntryExerciseView;
+  sets: LoggedSetView[];
+};
+
 /**
  * Unit weights are entered and displayed in. Storage keeps both: the value as entered alongside the
  * unit it was entered in, plus a generated canonical `sets.weight_kg` — which is what makes a

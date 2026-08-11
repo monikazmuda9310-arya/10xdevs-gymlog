@@ -1023,21 +1023,21 @@ planning session, and four by the planner. Each states what would have to be tru
 
 #### Automated
 
-- [ ] 4.1 Full five-command gate exits 0
-- [ ] 4.2 `/workouts` is in `PROTECTED_ROUTES`
-- [ ] 4.3 Signed out, `/workouts` and `/workouts/<uuid>` both return 302 to `/auth/signin`
-- [ ] 4.4 Account B gets 404 on account A's workout URL; A gets 200 on the same URL
-- [ ] 4.5 No component under `src/components/workouts/` imports a server-only module
-- [ ] 4.6 A unit test covers both branches of the estimate's input rule — unit matching the profile, and unit differing
+- [x] 4.1 Full five-command gate exits 0
+- [x] 4.2 `/workouts` is in `PROTECTED_ROUTES`
+- [x] 4.3 Signed out, `/workouts` and `/workouts/<uuid>` both return 302 to `/auth/signin`
+- [x] 4.4 Account B gets 404 on account A's workout URL; A gets 200 on the same URL
+- [x] 4.5 No component under `src/components/workouts/` imports a server-only module
+- [x] 4.6 A unit test covers both branches of the estimate's input rule — unit matching the profile, and unit differing
 
 #### Manual
 
-- [ ] 4.7 The whole flow works one-handed at 360 px without a page reload between sets
-- [ ] 4.8 A 1-repetition set shows an estimate equal to the weight typed
-- [ ] 4.9 A 15-repetition set shows the out-of-range phrase, not a number
-- [ ] 4.10 Weight 0 says "bodyweight" on a flagged exercise and is refused legibly on a barbell lift
-- [ ] 4.11 Everything survives a reload and the workout appears at the top of the list
-- [ ] 4.12 A second account sees the not-found page on the first account's workout URL
+- [x] 4.7 The whole flow works one-handed at 360 px without a page reload between sets
+- [x] 4.8 A 1-repetition set shows an estimate equal to the weight typed
+- [x] 4.9 A 15-repetition set shows the out-of-range phrase, not a number
+- [x] 4.10 Weight 0 says "bodyweight" on a flagged exercise and is refused legibly on a barbell lift
+- [x] 4.11 Everything survives a reload and the workout appears at the top of the list
+- [x] 4.12 A second account sees the not-found page on the first account's workout URL
 
 ### Phase 5: Deploy, and prove it on the public address
 
