@@ -1,10 +1,10 @@
 ---
 change_id: log-workout-with-estimate
 title: Log workout with estimate
-status: impl_reviewed
+status: archived
 created: 2026-08-10
 updated: 2026-08-11
-archived_at: null
+archived_at: 2026-08-11T09:45:13Z
 deviations:
   - phase: 2
     criterion: "2.3 — no `astro:` import in set-estimate.ts or calendar.ts"
