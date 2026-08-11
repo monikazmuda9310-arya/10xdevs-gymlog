@@ -33,6 +33,28 @@
 - **Applies to**: type-level assertions, integration assertions with setup preconditions, and any
   test whose body is reachable only under a runtime condition.
 
+## When a mutation does not break anything, fix the claim — never the test
+
+- **Context**: `supabase/migrations/20260811143000_derive_personal_records_from_surviving_sets.sql`
+  and `tests/integration/personal-records.test.ts`. Found during S-04 Phase 1's mutation protocol on
+  2026-08-11.
+- **Problem**: both new views were marked `security_invoker = true`, and the migration's comment
+  claimed the suite would fail if **either** were unmarked. Mutating them one at a time showed that
+  only the inner view's flag is load-bearing: every row the outer view emits is drawn through the
+  inner one, whose own flag hands the permission decision back to the real caller. The outer flag
+  protects nothing today, and no assertion writable from the integration suite could catch its
+  removal. The comment was describing coverage that did not exist.
+- **Rule**: **a mutation that breaks nothing is a finding, not a nuisance.** It means either the
+  guard is unnecessary or the claim about it is false — and the response is to say which, in the
+  place the claim lives. Do not delete the guard to make the docs true (defence in depth is cheap,
+  and the edit that makes it matter is usually one somebody will plausibly make). Do not restructure
+  the code so the mutation bites, if that costs more than the guard is worth. And never write an
+  assertion that merely appears to cover it. Name the untested guarantee explicitly, and name the
+  future edit that would make it load-bearing, so the next reader gets a tripwire instead of false
+  confidence.
+- **Applies to**: every mutation-testing step, and any comment that asserts "test X fails if Y
+  changes" — that sentence is itself a claim, and it is checkable.
+
 ## Verify with a script that attacks, not by asking the owner to read code
 
 - **Context**: S-02 Phase 1 manual verification asked the owner to judge whether the migration's

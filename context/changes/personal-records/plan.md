@@ -719,33 +719,33 @@ buffers)` on both queries against `gymlog-test` after Phase 1 and record the pla
 
 #### Manual
 
-- [x] 3.5 A set beating a previous best shows the badge on its row, naming what it beat, without a reload (verified on the deployed address with Phase 4)
-- [x] 3.6 The first set for a fresh exercise shows no badge (verified on the deployed address with Phase 4)
-- [x] 3.7 After a reload the badge is gone and the record is on `/records` (verified on the deployed address with Phase 4)
-- [x] 3.8 `/records` shows both records with the set and date behind each; a zero-load-only exercise appears with the explanation (verified on the deployed address with Phase 4)
-- [x] 3.9 `/records` signed out redirects to `/auth/signin` (read-only probe, locally and on the deployed address: `302 → /auth/signin`)
-- [x] 3.10 The flow is operable one-handed at 360 px (verified on the deployed address with Phase 4)
+- [x] 3.5 A set beating a previous best shows the badge on its row, naming what it beat, without a reload (verified on the deployed address with Phase 4) — 2bad2ca
+- [x] 3.6 The first set for a fresh exercise shows no badge (verified on the deployed address with Phase 4) — 2bad2ca
+- [x] 3.7 After a reload the badge is gone and the record is on `/records` (verified on the deployed address with Phase 4) — 2bad2ca
+- [x] 3.8 `/records` shows both records with the set and date behind each; a zero-load-only exercise appears with the explanation (verified on the deployed address with Phase 4) — 2bad2ca
+- [x] 3.9 `/records` signed out redirects to `/auth/signin` (read-only probe, locally and on the deployed address: `302 → /auth/signin`) — 2bad2ca
+- [x] 3.10 The flow is operable one-handed at 360 px (verified on the deployed address with Phase 4) — 2bad2ca
 
 ### Phase 4: Deploy, and prove it on the public address
 
 #### Automated
 
-- [x] 4.1 The full gate in CI order exits 0
-- [x] 4.2 `npx wrangler deploy` completes and reports the deployed version (`06c4e6f6-d669-4e36-b69d-e3aea4c1a9ca`)
+- [x] 4.1 The full gate in CI order exits 0 — 2bad2ca
+- [x] 4.2 `npx wrangler deploy` completes and reports the deployed version (`06c4e6f6-d669-4e36-b69d-e3aea4c1a9ca`) — 2bad2ca
 
 #### Manual
 
-- [x] 4.3 On the deployed address, a set beating a previous best shows the badge
-- [x] 4.4 `/records` on the deployed address lists the record just set, with the correct set and date
-- [x] 4.5 Both checked at phone width
+- [x] 4.3 On the deployed address, a set beating a previous best shows the badge — 2bad2ca
+- [x] 4.4 `/records` on the deployed address lists the record just set, with the correct set and date — 2bad2ca
+- [x] 4.5 Both checked at phone width — 2bad2ca
 
 ### Phase 5: Truth up the documents
 
 #### Automated
 
-- [ ] 5.1 `npm run lint` passes
+- [x] 5.1 `npm run lint` passes
 
 #### Manual
 
-- [ ] 5.2 `AGENTS.md` § Access control makes the view variant obvious to the agent planning S-05
-- [ ] 5.3 The roadmap's S-04 entry reads as done and names what should not be re-opened
+- [x] 5.2 `AGENTS.md` § Access control makes the view variant obvious to the agent planning S-05 (re-read against the criterion; the "never stored" half was missing from that section and was added there rather than left in § Domain rules)
+- [x] 5.3 The roadmap's S-04 entry reads as done and names what should not be re-opened

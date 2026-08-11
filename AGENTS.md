@@ -18,10 +18,33 @@ without changing the test and saying so.**
 - **At exactly 1 repetition the estimate equals the weight lifted.** Brzycki yields this
   naturally; Epley (`w × (1 + r/30)`) does not — it returns `1.033 × w` — so Epley must be pinned
   at `r == 1`.
+- **The 1RM formula has exactly TWO implementations and they must agree.** `estimateOneRepMax` in
+  `src/lib/services/one-rep-max.ts`, and the `case` expression inside `public.set_estimates`
+  (`20260811143000_derive_personal_records_from_surviving_sets.sql`). The SQL copy exists because the
+  records list walks every set the account has ever logged, which cannot run in the Worker under the
+  10 ms CPU cap. This is the same hazard as `0.45359237` below and **weaker**, because a constant can
+  be grepped and a `case` expression cannot: assertion 4 of `tests/integration/personal-records.test.ts`
+  is the only thing that would notice them drifting apart. Do not delete it as redundant.
+  - **In SQL, `reps::numeric / 30` needs the cast.** `reps` is `smallint`, so `reps / 30` is integer
+    division and evaluates to `0` across the entire 1–12 range — Epley silently degenerates to
+    `estimate = weight`, with plausible numbers and a green pipeline. Brzycki is safe only by
+    accident, which is worse: the defect would surface only for accounts that switch formula.
+  - **The two formulas cross at exactly 10 repetitions** (`36/27` and `1 + 10/30` are both `4/3`).
+    A set of ten reads identically under either, so it proves nothing about the formula toggle —
+    and it is the first thing to suspect when somebody reports that switching does nothing.
 - **Records are derived, never stored as trophies.** A record is always the best _surviving_ set,
   recomputed when the underlying sets change. A record may therefore go _down_ after an edit or
   delete, and the user is warned by how much before confirming. Never write a record row that can
   outlive the set that justifies it.
+  - Since S-04 they are derived by two views — `public.set_estimates` and
+    `public.personal_records` — and **nothing is stored**, which is what keeps S-06's formula change
+    a re-derivation instead of a contradiction. See § Access control → the derived-view variant.
+  - **The two records have different exclusion rules, deliberately** (owner, 2026-08-10). The
+    estimate record takes sets of 1–12 repetitions with `weight_kg > 0`; the heaviest-weight record
+    takes **every** set with `weight_kg > 0`, at any repetition count, because "heaviest ever
+    handled" is a fact about the load rather than an estimate. US-02's "sets outside the range never
+    trigger a record" governs the save-time **announcement**, of which there is exactly one, on the
+    estimate record.
 - **A personal record is decided on estimated 1RM**, not raw weight. The heaviest absolute weight
   is tracked separately as a second, distinct record.
 - **A training week is Monday–Sunday in the user's own timezone** (stored on their profile), not
@@ -186,6 +209,49 @@ is cheap.
   delete it as redundant**, for the same reason as `exercises-rls` assertion 4.
 - **Copy this for every future nested table.** The plain template alone is a defect at depth 2.
 
+### The derived-view variant — when the read is a view rather than a table
+
+`public.set_estimates` and `public.personal_records` (S-04) derive personal records from the sets
+that survive. A view has **no RLS of its own**: it is protected — or not — by which role its
+underlying relations are checked as.
+
+```sql
+create view public.<v> with (security_invoker = true) as select ...;
+
+-- Same order as a table: revoke before granting. PostgreSQL's TABLES default privileges cover
+-- VIEWS, so Supabase's implicit grant reaches them too.
+revoke all on public.<v> from anon, authenticated;
+grant select on public.<v> to authenticated;
+```
+
+- **Without `security_invoker = true` a view executes as its OWNER.** Migrations run as `postgres`,
+  which owns every table here, and a table owner is not subject to its own RLS. So an unmarked view
+  hands **every account's training to every account**, through a route that reads exactly like the
+  safe ones. There is no error and no warning; the rows simply arrive.
+- **Only `select` is granted.** A view over aggregates is not writable and nothing should imply it is.
+- **The flag is per view and is NOT inherited — but the two views here are not equally protected by
+  it, and that was measured rather than assumed.** Removing it from `set_estimates` leaks
+  immediately and assertion 2 of `tests/integration/personal-records.test.ts` fails. Removing it
+  from `personal_records` alone changes nothing observable, because every row that view emits is
+  drawn through `set_estimates`, whose own flag hands the decision back to the real caller partway
+  down the chain. **No assertion can catch that second case** — `authenticated` has no `pg_class`
+  access through PostgREST. The flag stays anyway: point `personal_records` at `public.sets`
+  directly — an edit somebody will plausibly make "for performance" — and it becomes the only thing
+  standing between one account and another's log. Treat it as a tripwire for a human reviewer.
+- **The explicit `.eq("user_id", …)` still belongs on every read of a view**, for the reason it
+  belongs on a table: the policy is the guarantee, the filter is the index path.
+- **Generated types make every view column nullable.** `supabase gen types` cannot prove not-null
+  through a view. Narrow once, in the service (`src/lib/services/records.ts`), so the accident stays
+  out of the endpoints and the pages.
+- **A view is the shape that keeps a derived number from being stored, and that is the point.**
+  There is no record column, no record row and no cache anywhere: delete the set behind a record and
+  the next read simply returns a different one, with no write and nothing to invalidate. So whoever
+  builds editing and deleting **recomputes by re-reading, never by patching a stored figure** — and
+  the warning US-02 requires ("what will this record fall to") is the runner-up of the same ranking
+  `/api/sets` already asks for, not a new number to keep. Adding an `estimated_1rm` or a
+  `personal_records` table would undo this and turn S-06's formula change from a re-derivation into
+  a lie. See § Domain rules → "Records are derived, never stored as trophies".
+
 ## Commands
 
 Scripts, local Supabase setup, and deploy steps: @README.md
@@ -223,6 +289,9 @@ check write to.
   generated from anything but production.
 - `src/db/database.types.ts` is **generated and exempt from ESLint**. Never hand-edit it — not even
   to satisfy a lint rule. Change the schema and regenerate.
+- **Since S-04 `db:types` also emits the `Views` block, and every view column comes back `T | null`**
+  — Postgres cannot guarantee not-null through a view and the generator will not guess. That is not
+  a defect to work around with assertions; narrow it once in the service that reads the view.
 
 Two things README does not cover:
 
@@ -460,6 +529,14 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
     whoever builds catalogue editing will meet that.
   - Reachable at `/workouts` and `/workouts/[id]`, written through `/api/workouts`,
     `/api/exercise-entries` and `/api/sets`.
+- **Two views, added by S-04** — the first database objects here that are not tables.
+  `public.set_estimates` is one row per set with its estimated 1RM under the row owner's own
+  formula; `public.personal_records` is one row per exercise the account has logged, with the best
+  estimate and the heaviest weight, each backed by the set that still holds it. Both
+  `security_invoker = true` (see § Access control → the derived-view variant), both read-only, and
+  **neither stores anything**. Read at `/records` and by `/api/sets`, which returns the record
+  verdict beside the set it just saved. An exercise logged only at zero load still gets a row, with
+  both records null, so the screen can say why rather than omitting a lift the user logged.
 - **Three enums**: `weight_unit`, `estimation_formula`, and `muscle_group` — the last with exactly
   six values, pinned in both directions by `MUSCLE_GROUPS` in `src/types.ts` and a compile-time
   assertion. Add a seventh to the database without adding it there and the build fails, rather than
