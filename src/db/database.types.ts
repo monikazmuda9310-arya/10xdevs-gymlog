@@ -183,7 +183,72 @@ export type Database = {
       };
     };
     Views: {
-      [_ in never]: never;
+      personal_records: {
+        Row: {
+          best_estimate_kg: number | null;
+          best_estimate_performed_on: string | null;
+          best_estimate_reps: number | null;
+          best_estimate_set_id: string | null;
+          best_estimate_weight: number | null;
+          best_estimate_weight_kg: number | null;
+          best_estimate_weight_unit: Database["public"]["Enums"]["weight_unit"] | null;
+          best_estimate_workout_id: string | null;
+          exercise_id: string | null;
+          exercise_name: string | null;
+          heaviest_performed_on: string | null;
+          heaviest_reps: number | null;
+          heaviest_set_id: string | null;
+          heaviest_weight: number | null;
+          heaviest_weight_kg: number | null;
+          heaviest_weight_unit: Database["public"]["Enums"]["weight_unit"] | null;
+          heaviest_workout_id: string | null;
+          is_bodyweight: boolean | null;
+          last_record_on: string | null;
+          muscle_group: Database["public"]["Enums"]["muscle_group"] | null;
+          user_id: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "exercise_entries_exercise_id_fkey";
+            columns: ["exercise_id"];
+            isOneToOne: false;
+            referencedRelation: "exercises";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      set_estimates: {
+        Row: {
+          created_at: string | null;
+          estimate_kg: number | null;
+          exercise_entry_id: string | null;
+          exercise_id: string | null;
+          performed_on: string | null;
+          reps: number | null;
+          set_id: string | null;
+          user_id: string | null;
+          weight: number | null;
+          weight_kg: number | null;
+          weight_unit: Database["public"]["Enums"]["weight_unit"] | null;
+          workout_id: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "exercise_entries_exercise_id_fkey";
+            columns: ["exercise_id"];
+            isOneToOne: false;
+            referencedRelation: "exercises";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sets_entry_owner_fkey";
+            columns: ["exercise_entry_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "exercise_entries";
+            referencedColumns: ["id", "user_id"];
+          },
+        ];
+      };
     };
     Functions: {
       [_ in never]: never;
