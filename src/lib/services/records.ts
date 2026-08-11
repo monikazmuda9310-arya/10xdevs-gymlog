@@ -19,7 +19,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/db/database.types";
 import type { RankedSet } from "./records-verdict";
-import type { RecordCandidate, Removal } from "./record-impact";
+import {
+  affectedRecords,
+  fallingRecords,
+  type FallingRecord,
+  type RecordCandidate,
+  type Removal,
+  type SurvivingFor,
+} from "./record-impact";
 
 type Client = SupabaseClient<Database>;
 
@@ -274,6 +281,42 @@ export async function bestSurvivingHeaviest(
  * record" from "the exercise disappears from `/records` altogether", and those are two different
  * sentences to show somebody before they confirm.
  */
+/**
+ * What this removal costs, end to end — the one call the three impact endpoints make.
+ *
+ * The order is what keeps it cheap: read the holders once, decide from **ids alone** which records
+ * are actually lost, and only then ask what survives — for those exercises and no others. On the
+ * common case, where the sets being removed hold no record, the successor queries never run at all.
+ *
+ * An empty array means "no record is at stake", which is a positive claim. It must never be produced
+ * by a failure: this function throws, and the endpoint answers `impact_unavailable` rather than
+ * degrading to an empty list that reads as reassurance.
+ */
+export async function impactOf(
+  supabase: Client,
+  userId: string,
+  exerciseIds: readonly string[],
+  removal: Removal,
+): Promise<FallingRecord[]> {
+  const holders = await recordHoldersForExercises(supabase, userId, exerciseIds);
+  const affected = affectedRecords(holders, removal);
+  if (affected.length === 0) {
+    return [];
+  }
+
+  const surviving = new Map<string, SurvivingFor>();
+  for (const exerciseId of new Set(affected.map((record) => record.exerciseId))) {
+    const [estimate, heaviest, anySurvives] = await Promise.all([
+      bestSurvivingEstimate(supabase, userId, exerciseId, removal),
+      bestSurvivingHeaviest(supabase, userId, exerciseId, removal),
+      anySetSurvives(supabase, userId, exerciseId, removal),
+    ]);
+    surviving.set(exerciseId, { estimate, heaviest, anySetSurvives: anySurvives });
+  }
+
+  return fallingRecords(affected, surviving);
+}
+
 export async function anySetSurvives(
   supabase: Client,
   userId: string,

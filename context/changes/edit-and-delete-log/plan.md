@@ -420,8 +420,14 @@ that its entries and sets are gone; and deleting the set behind a record leaves
 - `git grep -n "weight_kg" -- src/lib/services/workouts.ts` returns no write
 - An assertion forces the ranking query to fail and confirms the impact endpoint answers a non-2xx
   with `impact_unavailable` rather than `{ impact: [] }`
-- Mutation (a): dropping `.eq("user_id", …)` from `deleteSet` fails a cross-account assertion, then
-  reverted
+- Mutation (a): dropping `.eq("user_id", …)` from `deleteSet` **breaks nothing — and that is the
+  recorded result, not a gap to paper over.** The DELETE policy's predicate is
+  `(select auth.uid()) = user_id`, read from `pg_policies` rather than assumed, so account B's delete
+  matches zero rows through the policy alone. The application filter is the index path, exactly as
+  AGENTS.md § Access control says, and **no assertion writable from this suite can catch its
+  removal**. The edit that would make it load-bearing is RLS being disabled on `sets` — which
+  `workout-log-rls.test.ts` covers from the other side. The filter stays (`lessons.md`: a mutation
+  that breaks nothing is a finding; fix the claim, never the test)
 - Mutation (b): making `DELETE` answer `204` on zero rows fails the `404` assertion, then reverted
 - Mutation (c): removing the `isWeightAllowed` re-check from the set `PATCH` fails an assertion
   editing a barbell set to `0`, then reverted. A mutation that breaks nothing is recorded as a finding
@@ -764,35 +770,35 @@ need nothing done to them: records are derived, so the first read after a deleti
 
 #### Automated
 
-- [x] 1.1 Lint passes
-- [x] 1.2 Type checking passes
-- [x] 1.3 Unit tests pass
-- [x] 1.4 `record-impact.test.ts` covers `affectedRecords` and `fallingRecords` by name, including the heaviest-only removal and the two no-successor outcomes
-- [x] 1.5 Integration check passes
-- [x] 1.6 Build passes
-- [x] 1.7 The three copies of the estimate ordering agree, verified by grep
-- [x] 1.8 Mutation (a): `.gt` → `.gte` on `weight_kg` fails the zero-load assertion
-- [x] 1.9 Mutation (b): dropping `created_at asc` fails the tie assertion
-- [x] 1.10 Mutation (c): removing the exclusion fails the "successor is not the holder" assertion
-- [x] 1.11 Date-change assertion proves no stored figure needs recomputing
+- [x] 1.1 Lint passes — 02379ba
+- [x] 1.2 Type checking passes — 02379ba
+- [x] 1.3 Unit tests pass — 02379ba
+- [x] 1.4 `record-impact.test.ts` covers `affectedRecords` and `fallingRecords` by name, including the heaviest-only removal and the two no-successor outcomes — 02379ba
+- [x] 1.5 Integration check passes — 02379ba
+- [x] 1.6 Build passes — 02379ba
+- [x] 1.7 The three copies of the estimate ordering agree, verified by grep — 02379ba
+- [x] 1.8 Mutation (a): `.gt` → `.gte` on `weight_kg` fails the zero-load assertion — 02379ba
+- [x] 1.9 Mutation (b): dropping `created_at asc` fails the tie assertion — 02379ba
+- [x] 1.10 Mutation (c): removing the exclusion fails the "successor is not the holder" assertion — 02379ba
+- [x] 1.11 Date-change assertion proves no stored figure needs recomputing — 02379ba
 
 ### Phase 2: The writes — validation, services, six handlers
 
 #### Automated
 
-- [ ] 2.1 Lint, typecheck, unit, integration and build all pass
-- [ ] 2.2 `workout-mutations-rls.test.ts` passes, including the `404`-not-`204` assertion
-- [ ] 2.3 The three existing POST endpoint files are unchanged
-- [ ] 2.4 `weight_unit` appears in the insert path only, never in an update
-- [ ] 2.5 `weight_kg` is never written
-- [ ] 2.6 A failed ranking query yields `impact_unavailable`, never `{ impact: [] }`
-- [ ] 2.7 Mutation (a): dropping `.eq("user_id", …)` from `deleteSet` fails a cross-account assertion
-- [ ] 2.8 Mutation (b): `204` on zero rows fails the `404` assertion
-- [ ] 2.9 Mutation (c): removing the `isWeightAllowed` re-check fails the barbell-at-zero assertion
+- [x] 2.1 Lint, typecheck, unit, integration and build all pass
+- [x] 2.2 `workout-mutations-rls.test.ts` passes, including the `404`-not-`204` assertion
+- [x] 2.3 The three existing POST endpoint files are unchanged
+- [x] 2.4 `weight_unit` appears in the insert path only, never in an update
+- [x] 2.5 `weight_kg` is never written
+- [x] 2.6 A failed ranking query yields `impact_unavailable`, never `{ impact: [] }`
+- [x] 2.7 Mutation (a): dropping `.eq("user_id", …)` from `deleteSet` breaks nothing — the policy is the guarantee, recorded as a finding
+- [x] 2.8 Mutation (b): `204` on zero rows fails the `404` assertion
+- [x] 2.9 Mutation (c): removing the `isWeightAllowed` re-check fails the barbell-at-zero assertion
 
 #### Manual
 
-- [ ] 2.10 Owner has seen the mutation-boundary suite's output
+- [x] 2.10 Owner has seen the mutation-boundary suite's output
 
 ### Phase 3: The screens — correcting, and being warned first
 

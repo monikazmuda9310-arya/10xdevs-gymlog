@@ -55,6 +55,26 @@ gate can see that state.
   `.order()` chain from `records.ts` and every `distinct on` ordering from the migration and prints
   them side by side. Same criterion, a check that can actually fail.
 
+- **Phase 2 — mutation (a) broke nothing, and the plan's claim was corrected rather than the code.**
+  The plan asserted that dropping `.eq("user_id", …)` from `deleteSet` would fail a cross-account
+  assertion. It does not: all 14 assertions stayed green. The DELETE policy's predicate is
+  `(select auth.uid()) = user_id` — read from `pg_policies` through the Management API, not assumed —
+  so account B's delete matches zero rows through the policy alone. The application filter is the
+  index path, exactly as AGENTS.md § Access control states. The filter stays (AGENTS.md requires it,
+  and the cost of the unfiltered read on `sets` is the 10 ms CPU trap), the criterion now records the
+  measurement, and the edit that would make the filter load-bearing — RLS disabled on `sets` — is
+  named. Per `lessons.md`: a mutation that breaks nothing is a finding; fix the claim, never the test.
+- **Phase 2 — two defensive guards deleted because the type system proved them dead.** The
+  `set.exercise_entries?.exercises` optional chains and their `if (!…) return 404` branches were
+  flagged by `@typescript-eslint/no-unnecessary-condition`: the embed resolves through the composite
+  ownership key, whose columns are both `not null`, so it cannot be absent. Kept as a comment saying
+  why there is no guard, rather than as dead code that reads as diligence.
+- **Phase 2 — a shared `src/pages/api/_shared/mutation-route.ts` was added, which the plan did not
+  name.** Six handlers otherwise repeat the same twelve-line preamble (configured, authenticated,
+  well-formed id). The three S-03 POST endpoints were deliberately NOT refactored onto it: they are
+  pinned by assertions that would have to move with them, and this slice adds operations rather than
+  churning the ones that work.
+
 ### Working mode
 
 No subagents unless the owner asks — including for skills that spawn them by default

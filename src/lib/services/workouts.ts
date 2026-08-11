@@ -215,3 +215,182 @@ export async function addSet(
 }
 
 export type LoggedSet = Awaited<ReturnType<typeof addSet>>;
+
+// ---------------------------------------------------------------------------------------------
+// Correcting what was logged (S-05).
+//
+// **Every mutation below carries `.eq("user_id", userId)` AND `.select()`s what it touched, and the
+// second half is not decoration.** Under RLS an update or a delete naming another account's row does
+// not raise: it matches ZERO ROWS and reports success. A handler that answered 204 to that would be
+// telling one account it had just deleted another's data — a lie, and an existence oracle at the
+// same time. Returning the affected rows is what lets the endpoint answer 404 instead.
+//
+// Nothing here recomputes a record. Records are derived by two views over the surviving sets, so the
+// next read simply returns a different row — there is no stored figure to patch and nothing to
+// invalidate (AGENTS.md § Access control → the derived-view variant).
+// ---------------------------------------------------------------------------------------------
+
+export interface UpdateWorkoutFields {
+  performedOn: string;
+  note: string | null;
+}
+
+export interface UpdateSetFields {
+  reps: number;
+  weight: number;
+  rpe: number | null;
+}
+
+/**
+ * The set an edit is about to touch, with the two facts the edit needs beyond its own columns: the
+ * exercise's bodyweight flag, and the ids the impact query excludes on.
+ *
+ * Scoped by `user_id`, so another account's set reads as absent — and the caller answers "not found"
+ * for both, which is what keeps it from being an existence oracle.
+ */
+export async function getSetForEdit(supabase: Client, userId: string, setId: string) {
+  const { data, error } = await supabase
+    .from("sets")
+    .select(
+      `id, reps, weight, weight_unit, weight_kg, rpe, exercise_entry_id,
+       exercise_entries ( id, workout_id, exercise_id, exercises ( id, is_bodyweight ) )`,
+    )
+    .eq("user_id", userId)
+    .eq("id", setId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  return data;
+}
+
+/**
+ * Change a set's repetitions, weight and RPE.
+ *
+ * **`weight_unit` is deliberately absent from the payload.** It stays whatever the row already
+ * holds, because the unit belongs to the set rather than to the account: re-reading it from the
+ * profile would restamp a set typed in pounds as kilograms the first time somebody corrected it
+ * after changing that preference, and every figure built on `weight_kg` would be wrong afterwards.
+ * `weight_kg` is generated and is never written.
+ *
+ * Answers `null` when nothing was updated — absent, or not this account's.
+ */
+export async function updateSet(supabase: Client, userId: string, setId: string, fields: UpdateSetFields) {
+  const { data, error } = await supabase
+    .from("sets")
+    .update({ reps: fields.reps, weight: fields.weight, rpe: fields.rpe })
+    .eq("user_id", userId)
+    .eq("id", setId)
+    .select("id, reps, weight, weight_unit, weight_kg, rpe, created_at");
+
+  if (error) {
+    throw error;
+  }
+  return data.length > 0 ? data[0] : null;
+}
+
+/** Answers `false` when nothing was deleted — absent, or not this account's. */
+export async function deleteSet(supabase: Client, userId: string, setId: string): Promise<boolean> {
+  const { data, error } = await supabase.from("sets").delete().eq("user_id", userId).eq("id", setId).select("id");
+
+  if (error) {
+    throw error;
+  }
+  return data.length > 0;
+}
+
+/** Change a workout's date and note (FR-006). Answers `null` when nothing was updated. */
+export async function updateWorkout(
+  supabase: Client,
+  userId: string,
+  workoutId: string,
+  { performedOn, note }: UpdateWorkoutFields,
+) {
+  const { data, error } = await supabase
+    .from("workouts")
+    .update({ performed_on: performedOn, note })
+    .eq("user_id", userId)
+    .eq("id", workoutId)
+    .select("id, performed_on, note, created_at");
+
+  if (error) {
+    throw error;
+  }
+  return data.length > 0 ? data[0] : null;
+}
+
+/**
+ * Delete a workout with everything under it (FR-007).
+ *
+ * The cascade is declarative — `exercise_entries` and `sets` reference their parent's `(id, user_id)`
+ * `on delete cascade` — so one statement removes all three levels and no orphan is possible.
+ */
+export async function deleteWorkout(supabase: Client, userId: string, workoutId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("workouts")
+    .delete()
+    .eq("user_id", userId)
+    .eq("id", workoutId)
+    .select("id");
+
+  if (error) {
+    throw error;
+  }
+  return data.length > 0;
+}
+
+/**
+ * Remove one exercise from a workout, with its sets.
+ *
+ * Not named by any FR — added because deleting an entry's last set otherwise leaves a row on screen
+ * that only deleting the whole workout could clear (owner decision, 2026-08-11).
+ */
+export async function deleteExerciseEntry(supabase: Client, userId: string, entryId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("exercise_entries")
+    .delete()
+    .eq("user_id", userId)
+    .eq("id", entryId)
+    .select("id");
+
+  if (error) {
+    throw error;
+  }
+  return data.length > 0;
+}
+
+/**
+ * One exercise entry, with the two ids an entry-level removal is expressed in.
+ *
+ * `personal_records` does not report which entry a record's set belongs to, and does not need to:
+ * `unique (workout_id, exercise_id)` means an exercise appears at most once per workout, so the pair
+ * identifies the entry exactly.
+ */
+export async function getEntry(supabase: Client, userId: string, entryId: string) {
+  const { data, error } = await supabase
+    .from("exercise_entries")
+    .select("id, workout_id, exercise_id")
+    .eq("user_id", userId)
+    .eq("id", entryId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  return data;
+}
+
+/** The exercise ids logged in one workout — what a workout-level impact read has to cover. */
+export async function exerciseIdsInWorkout(supabase: Client, userId: string, workoutId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("exercise_entries")
+    .select("exercise_id")
+    .eq("user_id", userId)
+    .eq("workout_id", workoutId);
+
+  if (error) {
+    throw error;
+  }
+  return [...new Set(data.map((row) => row.exercise_id))];
+}

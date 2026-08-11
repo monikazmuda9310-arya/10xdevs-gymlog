@@ -104,6 +104,25 @@ export const addSetSchema = z.object({
   rpe,
 });
 
+/**
+ * The editable fields of a workout and of a set (S-05), as FULL replacements rather than patches.
+ *
+ * A partial patch would need "absent" and "explicitly null" to mean different things — and `note` is
+ * exactly the field where that distinction is invisible in JSON and easy to get backwards. Sending
+ * both fields every time keeps one meaning per value.
+ *
+ * **`updateSetSchema` carries no weight unit, and that is the point.** The unit is a property of the
+ * row being edited, not of the account editing it: re-stamping a set with the profile's current unit
+ * would turn 100 lb into 100 kg the first time somebody fixes a typo after changing that preference
+ * in S-06, silently corrupting `weight_kg` and every figure derived from it. The service reads the
+ * stored unit instead.
+ */
+export const updateWorkoutSchema = z.object({ performedOn, note });
+export const updateSetSchema = z.object({ reps, weight, rpe });
+
+export type UpdateWorkoutInput = z.infer<typeof updateWorkoutSchema>;
+export type UpdateSetInput = z.infer<typeof updateSetSchema>;
+
 export type CreateWorkoutInput = z.infer<typeof createWorkoutSchema>;
 export type AddExerciseEntryInput = z.infer<typeof addExerciseEntrySchema>;
 export type AddSetInput = z.infer<typeof addSetSchema>;
@@ -131,3 +150,5 @@ export const parseCreateWorkout = (body: unknown): ParseResult<CreateWorkoutInpu
 export const parseAddExerciseEntry = (body: unknown): ParseResult<AddExerciseEntryInput> =>
   parse(addExerciseEntrySchema, body);
 export const parseAddSet = (body: unknown): ParseResult<AddSetInput> => parse(addSetSchema, body);
+export const parseUpdateWorkout = (body: unknown): ParseResult<UpdateWorkoutInput> => parse(updateWorkoutSchema, body);
+export const parseUpdateSet = (body: unknown): ParseResult<UpdateSetInput> => parse(updateSetSchema, body);

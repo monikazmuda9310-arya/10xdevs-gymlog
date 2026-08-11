@@ -60,9 +60,15 @@ export const WORKOUT_MESSAGES = {
   workout_not_found: "That workout could not be found",
   entry_not_found: "That exercise is not part of this workout",
   exercise_not_found: "That exercise could not be found",
+  set_not_found: "That set could not be found",
   // Outcomes the user did not cause.
   unauthenticated: "You need to be signed in to log a workout",
   not_configured: "Supabase is not configured",
+  // **Deliberately NOT collapsed into `unexpected`, and deliberately not answered as "no records
+  // affected".** An empty impact list is a positive claim — "nothing is at stake" — and falling back
+  // to it when the ranking read fails would hand the user reassurance at the exact moment the product
+  // cannot know. The screen keeps the action available and says the consequence is unknown instead.
+  impact_unavailable: "We could not work out what this would cost. Your records may change.",
   unexpected: "Something went wrong. Please try again.",
 } as const;
 
