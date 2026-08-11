@@ -18,7 +18,10 @@
  * **A passing unit test does not prove this works where it runs.** `vitest.config.ts` uses
  * `environment: "node"`, and Node ships full ICU data for every IANA zone. The deployment target is
  * workerd. If that runtime carried reduced ICU, every zone would collapse to UTC here and the tests
- * would still be green. `src/pages/api/dev/tz-probe.ts` is what measures it in the real runtime.
+ * would still be green — so it was measured there instead, through a temporary endpoint that
+ * answered from real workerd with three distinct dates for Kiritimati (+14), UTC and Niue (−11).
+ * The endpoint was deleted once it had answered; the record is in
+ * `context/changes/log-workout-with-estimate/change.md` § Phase 2.
  */
 export function todayIn(timeZone: string, now: Date = new Date()): string {
   try {

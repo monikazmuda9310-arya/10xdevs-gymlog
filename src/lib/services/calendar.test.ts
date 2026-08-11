@@ -21,9 +21,9 @@ describe("todayIn: the zone decides the date", () => {
   });
 
   it("puts the two extreme zones on three different dates at one instant", () => {
-    // Kiritimati is UTC+14 and Niue is UTC-11 — twenty-five hours apart. This is the same check
-    // src/pages/api/dev/tz-probe.ts makes against the real runtime, and it passing HERE proves
-    // only that Node has full ICU data. Keep both.
+    // Kiritimati is UTC+14 and Niue is UTC-11 — twenty-five hours apart. Passing HERE proves only
+    // that Node has full ICU data. The same three dates were measured in real workerd during
+    // Phase 2, through a temporary endpoint deleted in Phase 5; see change.md § Phase 2.
     const instant = new Date("2026-08-11T10:00:00Z");
 
     expect(todayIn("Pacific/Kiritimati", instant)).toBe("2026-08-12");

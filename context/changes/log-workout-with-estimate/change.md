@@ -25,6 +25,16 @@ deviations:
       refused. The suite exercises the same validation, ownership checks, unit-from-profile rule and
       error mapping against gymlog-test, and unlike a one-off script it stays inside the gate. Not
       covered: Astro's routing and origin check, which Phase 4 exercises through a browser.
+  - phase: 5
+    criterion: '5.1 — `git grep -n "tz-probe"` returns nothing'
+    what: >-
+      Unscoped, that grep can never return nothing: this plan, this file and the plan review all
+      name the probe, and they should — the measurement it made is the record of why `todayIn` is
+      trusted. Verified as `git grep -n "tz-probe" -- src/`, which returns nothing and is what the
+      criterion means. Two source comments in calendar.ts and calendar.test.ts pointed at the file
+      as though it still existed and were rewritten to state the measurement instead; a comment
+      naming a deleted file is a small lie that sends the next reader looking for it. Same class of
+      wording problem as the 2.3 deviation.
   - phase: 4
     criterion: "4.4 — account B gets 404 on account A's workout URL, scripted"
     what: >-
