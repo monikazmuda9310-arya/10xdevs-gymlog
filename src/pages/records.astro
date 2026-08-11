@@ -1,0 +1,122 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { listPersonalRecords, type PersonalRecordListItem } from "@/lib/services/records";
+import { getProfile } from "@/lib/services/profiles";
+import { bestEstimateFigure, heaviestFigure } from "@/lib/services/record-display";
+
+// FR-021. A plain Astro page with no island: the list is static, and AGENTS.md § Conventions puts
+// React only where interactivity is needed. Everything derived here is derived on the server.
+
+const { user, supabase } = Astro.locals;
+
+let records: PersonalRecordListItem[] = [];
+let weightUnit: "kg" | "lb" = "kg";
+let estimationFormula: "epley" | "brzycki" = "brzycki";
+let loadFailed = false;
+
+if (supabase && user) {
+  try {
+    const [profile, rows] = await Promise.all([getProfile(supabase, user.id), listPersonalRecords(supabase, user.id)]);
+    records = rows;
+    weightUnit = profile?.weight_unit ?? "kg";
+    estimationFormula = profile?.estimation_formula ?? "brzycki";
+  } catch (error) {
+    // Without this branch a failed read renders as "no records yet" — indistinguishable from an
+    // account that has never logged a set. Same silent-failure class the workout list guards.
+    loadFailed = true;
+    // eslint-disable-next-line no-console -- deliberate server-side diagnostic
+    console.error("records: read failed", error);
+  }
+}
+---
+
+<Layout title="Records">
+  <div class="bg-cosmic min-h-screen p-4">
+    <div class="mx-auto w-full max-w-2xl py-8">
+      <header class="mb-2 flex items-baseline justify-between gap-4">
+        <h1 class="bg-gradient-to-r from-blue-200 to-purple-200 bg-clip-text text-2xl font-bold text-transparent">
+          Records
+        </h1>
+        <a href="/workouts" class="text-sm text-purple-300 hover:underline">Workouts</a>
+      </header>
+      <p class="mb-6 text-sm text-blue-100/50">
+        Your best estimated one-rep max and the heaviest load you have handled, per exercise. Both are read from the
+        sets you still have logged, so they change when your training does.
+      </p>
+
+      {
+        loadFailed ? (
+          <p class="rounded-lg border border-red-400/30 bg-red-900/30 px-4 py-6 text-center text-red-200">
+            Your records could not be loaded. Please refresh; if it keeps happening, the database may be unreachable.
+          </p>
+        ) : records.length === 0 ? (
+          <p class="rounded-lg border border-white/10 bg-white/5 px-4 py-8 text-center text-blue-100/60">
+            No records yet. Log a workout with an exercise and a set, and your first record appears here.
+          </p>
+        ) : (
+          <ul class="space-y-3">
+            {records.map((row) => {
+              const best = bestEstimateFigure(row, weightUnit, estimationFormula);
+              const heaviest = heaviestFigure(row, weightUnit);
+
+              return (
+                <li class="overflow-hidden rounded-lg border border-white/10 bg-white/5">
+                  <header class="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
+                    <h2 class="font-medium text-white">{row.exercise_name}</h2>
+                    <span class="flex items-center gap-2 text-xs">
+                      {row.is_bodyweight && (
+                        <span class="rounded-full bg-blue-500/20 px-2 py-0.5 text-blue-200">bodyweight</span>
+                      )}
+                      <span class="text-blue-100/50">{row.muscle_group}</span>
+                    </span>
+                  </header>
+
+                  {/* Both records absent is a real, ordinary state — a plank, a push-up, an
+                       unweighted pull-up. Saying so is the point: an exercise the user logged and
+                       cannot find here would read as lost data. */}
+                  {best === null && heaviest === null ? (
+                    <p class="border-t border-white/10 px-4 py-3 text-sm text-blue-100/50">
+                      Logged at bodyweight only — no external load to base a record on.
+                    </p>
+                  ) : (
+                    <dl class="grid grid-cols-1 divide-y divide-white/5 border-t border-white/10 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+                      <div class="px-4 py-3">
+                        <dt class="text-xs tracking-wide text-blue-100/50 uppercase">Best estimated 1RM</dt>
+                        {best === null ? (
+                          <dd class="mt-1 text-sm text-blue-100/50">No set in the 1–12 rep range yet</dd>
+                        ) : (
+                          <dd class="mt-1">
+                            <span class="text-lg font-semibold text-purple-200">{best.value}</span>
+                            <span class="ml-1 text-sm text-purple-200/70">{weightUnit}</span>
+                            <span class="mt-0.5 block text-xs text-blue-100/50">
+                              from {best.reps} × {best.weight} {best.weightUnit} on {best.performedOn}
+                            </span>
+                          </dd>
+                        )}
+                      </div>
+
+                      <div class="px-4 py-3">
+                        <dt class="text-xs tracking-wide text-blue-100/50 uppercase">Heaviest weight</dt>
+                        {heaviest === null ? (
+                          <dd class="mt-1 text-sm text-blue-100/50">No loaded set yet</dd>
+                        ) : (
+                          <dd class="mt-1">
+                            <span class="text-lg font-semibold text-amber-200">{heaviest.value}</span>
+                            <span class="ml-1 text-sm text-amber-200/70">{weightUnit}</span>
+                            <span class="mt-0.5 block text-xs text-blue-100/50">
+                              for {heaviest.reps} {heaviest.reps === 1 ? "rep" : "reps"} on {heaviest.performedOn}
+                            </span>
+                          </dd>
+                        )}
+                      </div>
+                    </dl>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )
+      }
+    </div>
+  </div>
+</Layout>

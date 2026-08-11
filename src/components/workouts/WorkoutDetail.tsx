@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { Trophy } from "lucide-react";
-import type { EstimationFormula, Exercise, ExerciseEntryView, LoggedSetView, WeightUnit } from "@/types";
+import type {
+  EstimationFormula,
+  Exercise,
+  ExerciseEntryView,
+  LoggedSetView,
+  RecordAnnouncement,
+  WeightUnit,
+} from "@/types";
 import { bestEstimateOf, estimateForLoggedSet, roundForDisplay } from "@/lib/services/set-display";
 import type { SetEstimate } from "@/lib/services/set-estimate";
 import { workoutMessageForCode } from "@/lib/validation/workout";
@@ -25,6 +32,19 @@ export default function WorkoutDetail({ workoutId, initialEntries, catalogue, we
   // An object rather than a bare id: choosing the same exercise twice must scroll to it twice, and
   // an unchanged id would not re-run the effect below.
   const [focusRequest, setFocusRequest] = useState<{ entryId: string } | null>(null);
+  // Record announcements, keyed by the set that earned one.
+  //
+  // **Deliberately not read back from the server on load** (PRD: "the save-time flag is ephemeral
+  // and only covers the set just logged, while the list is what the user checks"). So this state is
+  // seeded empty and only ever gains entries from a save in this session: after a reload the badges
+  // are gone and `/records` is where the record lives. Keeping them would also mean inventing
+  // behaviour for what happens when S-05 lets a set be edited out from under one.
+  //
+  // A `Map` rather than an object: `.get()` returns `RecordAnnouncement | undefined`, which is the
+  // truth, whereas indexing a `Record<string, T>` is typed as always present because this project
+  // does not enable `noUncheckedIndexedAccess` — and a guard against that reads to the type-checked
+  // lint rule as dead code.
+  const [records, setRecords] = useState(() => new Map<string, RecordAnnouncement>());
 
   useEffect(() => {
     if (!focusRequest) {
@@ -85,10 +105,13 @@ export default function WorkoutDetail({ workoutId, initialEntries, catalogue, we
     }
   }
 
-  function handleLogged(entryId: string, set: LoggedSetView) {
+  function handleLogged(entryId: string, set: LoggedSetView, record: RecordAnnouncement | null) {
     setEntries((current) =>
       current.map((entry) => (entry.id === entryId ? { ...entry, sets: [...entry.sets, set] } : entry)),
     );
+    if (record) {
+      setRecords((current) => new Map(current).set(set.id, record));
+    }
   }
 
   return (
@@ -138,19 +161,30 @@ export default function WorkoutDetail({ workoutId, initialEntries, catalogue, we
 
                 {entry.sets.length > 0 && (
                   <ol className="divide-y divide-white/5 border-t border-white/10">
-                    {entry.sets.map((set, index) => (
-                      <li key={set.id} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-2">
-                        <span className="text-white">
-                          <span className="mr-2 text-xs text-blue-100/40">#{index + 1}</span>
-                          {set.reps} × {set.weight} {set.weight_unit}
-                          {set.rpe !== null && <span className="ml-2 text-xs text-blue-100/50">RPE {set.rpe}</span>}
-                        </span>
-                        <SetEstimateLabel
-                          estimate={estimateForLoggedSet(set, weightUnit, estimationFormula)}
-                          unit={weightUnit}
-                        />
-                      </li>
-                    ))}
+                    {entry.sets.map((set, index) => {
+                      const announcement = records.get(set.id);
+                      return (
+                        <li key={set.id} className="px-4 py-2">
+                          <div className="flex flex-wrap items-baseline justify-between gap-2">
+                            <span className="text-white">
+                              <span className="mr-2 text-xs text-blue-100/40">#{index + 1}</span>
+                              {set.reps} × {set.weight} {set.weight_unit}
+                              {set.rpe !== null && <span className="ml-2 text-xs text-blue-100/50">RPE {set.rpe}</span>}
+                            </span>
+                            <SetEstimateLabel
+                              estimate={estimateForLoggedSet(set, weightUnit, estimationFormula)}
+                              unit={weightUnit}
+                            />
+                          </div>
+                          {announcement && (
+                            // Its own line rather than a third item in the row above: at 360 px the
+                            // row already wraps, and a record is the one thing here that must not
+                            // arrive looking like an afterthought squeezed between two numbers.
+                            <RecordBadge announcement={announcement} unit={weightUnit} formula={estimationFormula} />
+                          )}
+                        </li>
+                      );
+                    })}
                   </ol>
                 )}
 
@@ -158,8 +192,8 @@ export default function WorkoutDetail({ workoutId, initialEntries, catalogue, we
                   entryId={entry.id}
                   isBodyweight={entry.exercises.is_bodyweight}
                   weightUnit={weightUnit}
-                  onLogged={(set) => {
-                    handleLogged(entry.id, set);
+                  onLogged={(set, record) => {
+                    handleLogged(entry.id, set, record);
                   }}
                 />
               </li>
@@ -168,6 +202,42 @@ export default function WorkoutDetail({ workoutId, initialEntries, catalogue, we
         </ul>
       )}
     </div>
+  );
+}
+
+/**
+ * "You just beat your best" — the one thing this product exists to say at the moment it happens.
+ *
+ * **Both numbers on this line are re-derived in TypeScript.** The set's own estimate comes from the
+ * estimator above; what it beat is computed here from the previous best set's typed weight, through
+ * the same `estimateForLoggedSet`. The verdict came from SQL, but no number SQL computed is
+ * rendered — which is what keeps the badge and the workout row from ever disagreeing by a digit.
+ *
+ * The previous best is estimable by construction (it came out of a ranking that excludes everything
+ * unestimable), so the guard below is unreachable in practice. It is written rather than asserted
+ * because the alternative is a non-null assertion that would be wrong exactly once.
+ */
+function RecordBadge({
+  announcement,
+  unit,
+  formula,
+}: {
+  announcement: RecordAnnouncement;
+  unit: WeightUnit;
+  formula: EstimationFormula;
+}) {
+  const previous = estimateForLoggedSet(announcement.previousBest, unit, formula);
+
+  return (
+    <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs font-medium text-amber-300">
+      <Trophy className="size-3.5 shrink-0" />
+      Personal record
+      {previous.kind === "estimate" && (
+        <span className="font-normal text-amber-200/80">
+          — beat {roundForDisplay(previous.oneRepMax)} {unit}
+        </span>
+      )}
+    </p>
   );
 }
 

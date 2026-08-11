@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase";
 // Route protection lives here, in one place, not in per-page checks (AGENTS.md § Auth wiring).
 // `/workouts` covers `/workouts/<id>` too — the check below is a prefix match, so training data is
 // behind authentication at every depth from one array entry.
-const PROTECTED_ROUTES = ["/dashboard", "/exercises", "/workouts"];
+const PROTECTED_ROUTES = ["/dashboard", "/exercises", "/workouts", "/records"];
 
 // The mirror image of PROTECTED_ROUTES: a signed-in visitor has no business staring at a login
 // form. `/auth/confirm-email` is deliberately absent, and the reason is checkable rather than

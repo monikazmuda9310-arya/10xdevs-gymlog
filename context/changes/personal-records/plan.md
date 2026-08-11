@@ -698,24 +698,24 @@ buffers)` on both queries against `gymlog-test` after Phase 1 and record the pla
 
 #### Automated
 
-- [x] 2.1 `npm test` passes, including the new `records-verdict.test.ts` unit tests
-- [x] 2.2 `npm run test:integration` passes, including the seven verdict assertions
-- [x] 2.3 The three pre-existing `/api/sets` assertions pass unchanged
-- [x] 2.4 `npm run lint` passes
-- [x] 2.5 `npm run typecheck` passes
+- [x] 2.1 `npm test` passes, including the new `records-verdict.test.ts` unit tests — 30781d5
+- [x] 2.2 `npm run test:integration` passes, including the seven verdict assertions — 30781d5
+- [x] 2.3 The three pre-existing `/api/sets` assertions pass unchanged — 30781d5
+- [x] 2.4 `npm run lint` passes — 30781d5
+- [x] 2.5 `npm run typecheck` passes — 30781d5
 
 #### Manual
 
-- [x] 2.6 With the verdict query forced to fail, a set still saves and returns 201 with `record: null`, and the failure is logged (`set_estimates` renamed on gymlog-test; `PGRST205` logged, both sets 201 and stored, `record` null; view restored)
+- [x] 2.6 With the verdict query forced to fail, a set still saves and returns 201 with `record: null`, and the failure is logged (`set_estimates` renamed on gymlog-test; `PGRST205` logged, both sets 201 and stored, `record` null; view restored) — 30781d5
 
 ### Phase 3: The screens
 
 #### Automated
 
-- [ ] 3.1 `npm run lint` passes
-- [ ] 3.2 `npm run typecheck` passes
-- [ ] 3.3 `npm test` and `npm run test:integration` pass
-- [ ] 3.4 `npm run build` succeeds
+- [x] 3.1 `npm run lint` passes
+- [x] 3.2 `npm run typecheck` passes
+- [x] 3.3 `npm test` and `npm run test:integration` pass
+- [x] 3.4 `npm run build` succeeds
 
 #### Manual
 

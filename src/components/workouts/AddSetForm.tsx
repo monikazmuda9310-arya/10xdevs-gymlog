@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { CircleAlert, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { LoggedSetView, WeightUnit } from "@/types";
+import type { LoggedSetView, RecordAnnouncement, WeightUnit } from "@/types";
 import {
   MAX_REPS,
   MAX_RPE,
@@ -24,7 +24,13 @@ interface Props {
   isBodyweight: boolean;
   /** The account's unit, rendered as a label — the client never chooses what a weight is stored in. */
   weightUnit: WeightUnit;
-  onLogged: (set: LoggedSetView) => void;
+  /**
+   * The saved set, and the record verdict that arrived with it (FR-020).
+   *
+   * `null` covers both "did not beat anything" and "first set for this exercise" — the screen
+   * renders nothing for either, and US-02 requires the baseline to be silent.
+   */
+  onLogged: (set: LoggedSetView, record: RecordAnnouncement | null) => void;
 }
 
 export function AddSetForm({ entryId, isBodyweight, weightUnit, onLogged }: Props) {
@@ -87,7 +93,8 @@ export function AddSetForm({ entryId, isBodyweight, weightUnit, onLogged }: Prop
         return;
       }
 
-      onLogged((body as { set: LoggedSetView }).set);
+      const logged = body as { set: LoggedSetView; record: RecordAnnouncement | null };
+      onLogged(logged.set, logged.record);
       setRpe("");
       // Repetitions and weight are deliberately KEPT: the next set is usually the same, and on a
       // failure the typed values must survive so the retry is one tap rather than a re-entry.

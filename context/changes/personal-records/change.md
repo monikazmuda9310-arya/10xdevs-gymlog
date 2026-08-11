@@ -87,3 +87,35 @@ second, and names the future edit that would make it load-bearing — pointing `
 the flag was rejected (that edit is plausible and would then leak silently); restructuring the view
 so the flag becomes testable was rejected because it would put a third copy of the 1RM formula into
 the schema, which is the risk this whole design exists to minimise.
+
+### Phase 2 — the endpoint needed no extra read, and one test was rewritten
+
+- The plan said to extend `getEntryForSet` so the verdict could reach the exercise id. It already
+  returned it: S-03 loads `exercises ( id, is_bodyweight )` to answer the bodyweight rule. The
+  verdict therefore costs one query, not two.
+- An assertion written as "still answers 201 when the verdict cannot be computed" was **rewritten**,
+  because its own comment admitted the failure path is unreachable from inside the suite — an empty
+  test reading as coverage, which `lessons.md` calls worse than a missing one. It now asserts what
+  it can (a plank through the endpoint: 201, stored, no announcement) and names in a comment what it
+  does not cover, pointing at manual criterion 2.6, which covers it for real.
+
+### Phase 3 — a display module the plan did not name
+
+`src/lib/services/record-display.ts` (+ its unit tests) was added mid-phase. The plan put the
+nullable-column narrowing and the unit conversion in the page. Both are exactly the logic that shows
+a wrong number silently, and S-03 hit the identical situation — that is what produced
+`set-display.ts` and the `lessons.md` entry about naming the module a unit-test criterion lives in.
+Written as a module so it is directly unit-testable, rather than as helpers buried in `.astro`
+frontmatter that no test can reach.
+
+### Phase 3 — the visual criteria are verified in Phase 4, once, on the public address
+
+Criteria 3.5–3.8 and 3.10 all require logging a set, and `astro dev` reads its Supabase credentials
+from `.dev.vars`, which points at **production** — a scripted or local click-through would put
+throwaway sets into the database the owner trains against (`AGENTS.md` § Cloudflare traps). 3.9
+(route protection) was verified with a read-only probe: `GET /records` while signed out answers
+`302 → /auth/signin`, matching `/workouts`.
+
+**Resolution (owner, 2026-08-11): merge the remaining Phase 3 manual checks into Phase 4's
+click-through**, which happens against the deployed URL where those checks belong anyway. Phase 3
+is committed with those Progress rows still open; they close together with Phase 4's.
