@@ -683,30 +683,30 @@ buffers)` on both queries against `gymlog-test` after Phase 1 and record the pla
 
 #### Automated
 
-- [x] 1.1 `npm run db:push` applies to both projects and `npm run db:status` shows identical histories
-- [x] 1.2 `npm run db:types` regenerates `src/db/database.types.ts` with both views present, and the file is staged
-- [x] 1.3 `npm run test:integration` passes, including all five assertions of the new suite
-- [x] 1.4 `npm run lint` passes
-- [x] 1.5 `npm run typecheck` passes
-- [x] 1.6 `npm test` passes (unchanged)
+- [x] 1.1 `npm run db:push` applies to both projects and `npm run db:status` shows identical histories — 50735e8
+- [x] 1.2 `npm run db:types` regenerates `src/db/database.types.ts` with both views present, and the file is staged — 50735e8
+- [x] 1.3 `npm run test:integration` passes, including all five assertions of the new suite — 50735e8
+- [x] 1.4 `npm run lint` passes — 50735e8
+- [x] 1.5 `npm run typecheck` passes — 50735e8
+- [x] 1.6 `npm test` passes (unchanged) — 50735e8
 
 #### Manual
 
-- [x] 1.7 Each of the four mutations was applied, the named assertion was observed to fail, and the mutation was reverted — recorded with which mutation broke which test (five run; four broke a test, the fifth is recorded as a deviation in `change.md`)
+- [x] 1.7 Each of the four mutations was applied, the named assertion was observed to fail, and the mutation was reverted — recorded with which mutation broke which test (five run; four broke a test, the fifth is recorded as a deviation in `change.md`) — 50735e8
 
 ### Phase 2: The records service and the verdict on `/api/sets`
 
 #### Automated
 
-- [ ] 2.1 `npm test` passes, including the new `records-verdict.test.ts` unit tests
-- [ ] 2.2 `npm run test:integration` passes, including the seven verdict assertions
-- [ ] 2.3 The three pre-existing `/api/sets` assertions pass unchanged
-- [ ] 2.4 `npm run lint` passes
-- [ ] 2.5 `npm run typecheck` passes
+- [x] 2.1 `npm test` passes, including the new `records-verdict.test.ts` unit tests
+- [x] 2.2 `npm run test:integration` passes, including the seven verdict assertions
+- [x] 2.3 The three pre-existing `/api/sets` assertions pass unchanged
+- [x] 2.4 `npm run lint` passes
+- [x] 2.5 `npm run typecheck` passes
 
 #### Manual
 
-- [ ] 2.6 With the verdict query forced to fail, a set still saves and returns 201 with `record: null`, and the failure is logged
+- [x] 2.6 With the verdict query forced to fail, a set still saves and returns 201 with `record: null`, and the failure is logged (`set_estimates` renamed on gymlog-test; `PGRST205` logged, both sets 201 and stored, `record` null; view restored)
 
 ### Phase 3: The screens
 

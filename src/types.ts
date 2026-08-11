@@ -80,6 +80,30 @@ export type ExerciseEntryView = Pick<ExerciseEntry, "id" | "exercise_id"> & {
   sets: LoggedSetView[];
 };
 
+// The two record views (S-04). Both are DERIVED — nothing here is stored, so a record recomputes
+// from the sets that survive and may go DOWN after an edit or a delete. Every column arrives
+// `T | null` because `supabase gen types` cannot prove not-null through a view;
+// `src/lib/services/records.ts` narrows once, at the read.
+
+/** One set with the one-rep max it estimates to, under the row owner's own formula. */
+export type SetEstimateRow = Database["public"]["Views"]["set_estimates"]["Row"];
+
+/**
+ * One exercise the account has logged, with its two records — the best estimated 1RM and the
+ * heaviest absolute weight, which may belong to different sets (US-02). An exercise whose sets are
+ * all at zero load still gets a row, with both sides null, so the screen can say why.
+ */
+export type PersonalRecordRow = Database["public"]["Views"]["personal_records"]["Row"];
+
+/**
+ * What `/api/sets` announces when a saved set beat the previous best, and `null` otherwise.
+ *
+ * Defined next to the verdict rather than here so a hydrated island can import it without reaching
+ * a module that pulls in the Supabase client; re-exported here because `src/types.ts` is where the
+ * DTOs are looked for.
+ */
+export type { RecordAnnouncement, RankedSet, RecordVerdict } from "@/lib/services/records-verdict";
+
 /**
  * Unit weights are entered and displayed in. Storage keeps both: the value as entered alongside the
  * unit it was entered in, plus a generated canonical `sets.weight_kg` — which is what makes a

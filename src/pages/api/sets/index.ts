@@ -1,6 +1,8 @@
 import type { APIRoute } from "astro";
 
 import { getProfile } from "@/lib/services/profiles";
+import { topTwoEstimatesForExercise } from "@/lib/services/records";
+import { verdictForSet, type RecordAnnouncement } from "@/lib/services/records-verdict";
 import { addSet, getEntryForSet } from "@/lib/services/workouts";
 import { parseAddSet } from "@/lib/validation/workout-schemas";
 import { isWeightAllowed, type WorkoutMessageCode } from "@/lib/validation/workout";
@@ -62,7 +64,32 @@ export const POST: APIRoute = async (context) => {
       rpe: parsed.data.rpe,
     });
 
-    return new Response(JSON.stringify({ set }), {
+    // FR-020: the record verdict arrives with the save, on the set that earned it.
+    //
+    // **Its own try/catch, and never a non-2xx.** The set is already committed by the time this
+    // runs, so a failed verdict must cost the badge and nothing else. Reporting an error for a set
+    // that IS in the database would invite the retry `AddSetForm` deliberately makes easy — and a
+    // retry after a successful write logs the same set twice, inflating tonnage and inventing a
+    // record nobody performed. A missing badge is recoverable by reloading; a duplicated set is not.
+    let record: RecordAnnouncement | null = null;
+    try {
+      // The exercise id is already in hand: the ownership read above loaded it to answer the
+      // bodyweight question, so the verdict costs one query rather than two.
+      const topTwo = await topTwoEstimatesForExercise(supabase, user.id, entry.exercises.id);
+      const verdict = verdictForSet(topTwo, set.id);
+      // `baseline` and `none` collapse to null on the wire, deliberately: the screen renders
+      // nothing for either, and shipping the distinction would invite an announcement on the
+      // first-ever set, which US-02 forbids. The distinction stays where it is testable.
+      record = verdict.kind === "record" ? { previousBest: verdict.previousBest } : null;
+    } catch (error) {
+      // eslint-disable-next-line no-console -- deliberate server-side diagnostic
+      console.error("[sets] record verdict failed after a successful insert", {
+        code: (error as { code?: string }).code,
+        error,
+      });
+    }
+
+    return new Response(JSON.stringify({ set, record }), {
       status: 201,
       headers: { "content-type": "application/json" },
     });

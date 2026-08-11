@@ -32,9 +32,11 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
+import type { APIContext } from "astro";
 
 import type { Database } from "@/db/database.types";
 import { estimateOneRepMax, type EstimationFormula } from "@/lib/services/one-rep-max";
+import { POST as addSetRoute } from "@/pages/api/sets/index";
 
 const EMAIL_A = "rls-owner-a@gymlog-test.dev";
 const EMAIL_B = "rls-owner-b@gymlog-test.dev";
@@ -484,5 +486,186 @@ describe("the record views: an exercise with no record still appears", () => {
     expect(record.data?.heaviest_set_id).toBeNull();
     // Nothing to sort it by, so it sinks to the bottom of the list under `nulls last`.
     expect(record.data?.last_record_on).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// The verdict, through the endpoint that announces it.
+//
+// Driven by calling the exported handler directly, as workout-endpoints.test.ts does and for the
+// same reason: `astro dev` reads its credentials from `.dev.vars`, which points at PRODUCTION, so
+// an HTTP round trip would write into the database the owner trains against. This runs the same
+// validation, the same ownership checks and the same writes, against the project that exists to be
+// written to.
+// ---------------------------------------------------------------------------------------------
+
+/** The slice of APIContext the handler actually reads. Cast rather than mocked wholesale. */
+function context(body: unknown, owner: Owner) {
+  return {
+    locals: { supabase: owner.client, user: { id: owner.userId } },
+    request: new Request("http://localhost/api/sets", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  } as unknown as APIContext;
+}
+
+interface SetResponse {
+  set: { id: string };
+  record: { previousBest: { set_id: string; estimate_kg: number } } | null;
+}
+
+/** Log a set the way the application does, and hand back the set plus its verdict. */
+async function logViaEndpoint(owner: Owner, entryId: string, reps: number, weight: number): Promise<SetResponse> {
+  const response = await addSetRoute(context({ exerciseEntryId: entryId, reps, weight }, owner));
+  const body = (await response.json()) as SetResponse & { code?: string };
+  if (response.status !== 201) {
+    throw new Error(`logging ${reps}x${weight} failed (${response.status}): ${body.code ?? "no code"}`);
+  }
+  return body;
+}
+
+/** A fresh exercise with one workout and one entry under it — nothing else has ever been logged. */
+async function freshEntry(
+  owner: Owner,
+  label: string,
+  isBodyweight: boolean,
+  performedOn: string = TODAY,
+): Promise<{ exerciseId: string; entryId: string }> {
+  const exerciseId = await makeExercise(owner, label, isBodyweight);
+  const workoutId = await makeWorkout(owner, label, performedOn);
+  return { exerciseId, entryId: await makeEntry(owner, workoutId, exerciseId) };
+}
+
+describe("the verdict: what /api/sets announces at save time", () => {
+  it("6. says nothing for the first set, and announces the second when it wins", async () => {
+    const { exerciseId, entryId } = await freshEntry(ownerA, "verdict-first", false);
+
+    const first = await logViaEndpoint(ownerA, entryId, 5, 100);
+    // US-02: the first-ever set establishes the baseline and is NOT announced. This is the
+    // assertion that would fail if `baseline` were ever collapsed into `record`.
+    expect(first.record).toBeNull();
+
+    const second = await logViaEndpoint(ownerA, entryId, 5, 110);
+    expect(second.record).not.toBeNull();
+    // The message quotes what was beaten, so the runner-up has to be the set that held it.
+    expect(second.record?.previousBest.set_id).toBe(first.set.id);
+
+    // Persisted state, not the response the caller saw: the record the view now reports is the set
+    // the endpoint just announced.
+    const record = await ownerA.client
+      .from("personal_records")
+      .select("best_estimate_set_id")
+      .eq("user_id", ownerA.userId)
+      .eq("exercise_id", exerciseId)
+      .single();
+    expect(record.data?.best_estimate_set_id).toBe(second.set.id);
+  });
+
+  it("7. announces neither an equal set nor a lighter one", async () => {
+    const { exerciseId, entryId } = await freshEntry(ownerA, "verdict-equal", false);
+
+    const standing = await logViaEndpoint(ownerA, entryId, 5, 100);
+    const equal = await logViaEndpoint(ownerA, entryId, 5, 100);
+    const lighter = await logViaEndpoint(ownerA, entryId, 5, 90);
+
+    // "A set equal to the previous best once both are expressed in the same unit is not a record"
+    // (US-02). Nothing here compares numbers — the equal set simply did not reach the top of the
+    // ranking, because the ordering keeps the older one in front.
+    expect(equal.record).toBeNull();
+    expect(lighter.record).toBeNull();
+
+    const record = await ownerA.client
+      .from("personal_records")
+      .select("best_estimate_set_id")
+      .eq("user_id", ownerA.userId)
+      .eq("exercise_id", exerciseId)
+      .single();
+    expect(record.data?.best_estimate_set_id).toBe(standing.set.id);
+    expect(record.data?.best_estimate_set_id).not.toBe(equal.set.id);
+  });
+
+  it("8. announces neither a set outside the estimate's range nor an assisted one", async () => {
+    const barbell = await freshEntry(ownerA, "verdict-range", false);
+    await logViaEndpoint(ownerA, barbell.entryId, 5, 100);
+
+    // 13 repetitions at 200 kg would out-estimate everything in this exercise's history if the
+    // validity range were ignored — brzycki would read 300. It takes no part instead.
+    const outOfRange = await logViaEndpoint(ownerA, barbell.entryId, 13, 200);
+    expect(outOfRange.record).toBeNull();
+
+    const bodyweight = await freshEntry(ownerA, "verdict-assisted", true);
+    await logViaEndpoint(ownerA, bodyweight.entryId, 5, 10);
+    // An assisted set has no meaningful strength score at any repetition count, so it can neither
+    // set a record nor be quoted as one.
+    const assisted = await logViaEndpoint(ownerA, bodyweight.entryId, 5, -20);
+    expect(assisted.record).toBeNull();
+
+    // The out-of-range set is STORED and readable — it simply carries no estimate. "No record" must
+    // never be implemented by refusing to save.
+    const stored = await ownerA.client
+      .from("set_estimates")
+      .select("set_id, estimate_kg")
+      .eq("user_id", ownerA.userId)
+      .eq("set_id", outOfRange.set.id)
+      .single();
+    expect(stored.data?.set_id).toBe(outOfRange.set.id);
+    expect(stored.data?.estimate_kg).toBeNull();
+  });
+
+  it("9. announces a record logged into a back-dated workout", async () => {
+    // The documented consequence of deciding "previous best" as "every OTHER set" rather than
+    // "every earlier one" (research.md, decision D1). Logging Monday's session on Wednesday must
+    // still tell the user they set a record — the alternative is a record that silently never
+    // arrives because the calendar disagrees with the order things were typed in.
+    const { exerciseId, entryId } = await freshEntry(ownerA, "verdict-today", false);
+    const standing = await logViaEndpoint(ownerA, entryId, 5, 100);
+
+    const backdated = await makeWorkout(ownerA, "verdict-backdated", "2026-08-04");
+    const backdatedEntry = await makeEntry(ownerA, backdated, exerciseId);
+    const better = await logViaEndpoint(ownerA, backdatedEntry, 3, 150);
+
+    expect(better.record).not.toBeNull();
+    expect(better.record?.previousBest.set_id).toBe(standing.set.id);
+
+    // And the record now points at the back-dated set, with ITS date — the record is about the
+    // training, not about when it was typed in.
+    const record = await ownerA.client
+      .from("personal_records")
+      .select("best_estimate_set_id, best_estimate_performed_on")
+      .eq("user_id", ownerA.userId)
+      .eq("exercise_id", exerciseId)
+      .single();
+    expect(record.data?.best_estimate_set_id).toBe(better.set.id);
+    expect(record.data?.best_estimate_performed_on).toBe("2026-08-04");
+  });
+
+  it("10. saves a set that can carry no estimate, and announces nothing for it", async () => {
+    // A plank driven through the real endpoint: 201, the set stored, and no announcement. "No
+    // record" must never be implemented by refusing to save, and a bodyweight set must not be
+    // announced as beating anything just because the ranking beneath it is empty.
+    //
+    // NOTE what this does NOT cover: the verdict query FAILING after a successful insert. That path
+    // cannot be provoked from inside the suite without breaking RLS for everything else, so it is
+    // the plan's manual criterion 2.6 — the view is renamed by hand, a set is logged, and the 201
+    // with `record: null` is observed. Recorded here so the gap is visible rather than assumed.
+    const { entryId } = await freshEntry(ownerA, "verdict-201", true);
+
+    const response = await addSetRoute(context({ exerciseEntryId: entryId, reps: 60, weight: 0 }, ownerA));
+    expect(response.status).toBe(201);
+
+    const body = (await response.json()) as SetResponse;
+    expect(body.record).toBeNull();
+    expect(body.set.id).toBeTruthy();
+
+    const stored = await ownerA.client
+      .from("set_estimates")
+      .select("set_id, estimate_kg")
+      .eq("user_id", ownerA.userId)
+      .eq("set_id", body.set.id)
+      .single();
+    expect(stored.data?.set_id).toBe(body.set.id);
+    expect(stored.data?.estimate_kg).toBeNull();
   });
 });
