@@ -743,9 +743,9 @@ buffers)` on both queries against `gymlog-test` after Phase 1 and record the pla
 
 #### Automated
 
-- [x] 5.1 `npm run lint` passes
+- [x] 5.1 `npm run lint` passes — d5767f5
 
 #### Manual
 
-- [x] 5.2 `AGENTS.md` § Access control makes the view variant obvious to the agent planning S-05 (re-read against the criterion; the "never stored" half was missing from that section and was added there rather than left in § Domain rules)
-- [x] 5.3 The roadmap's S-04 entry reads as done and names what should not be re-opened
+- [x] 5.2 `AGENTS.md` § Access control makes the view variant obvious to the agent planning S-05 (re-read against the criterion; the "never stored" half was missing from that section and was added there rather than left in § Domain rules) — d5767f5
+- [x] 5.3 The roadmap's S-04 entry reads as done and names what should not be re-opened — d5767f5

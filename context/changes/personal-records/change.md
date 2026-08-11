@@ -1,7 +1,7 @@
 ---
 change_id: personal-records
 title: A record is announced when it happens, and listed afterwards
-status: implementing
+status: implemented
 created: 2026-08-11
 updated: 2026-08-11
 archived_at: null
