@@ -1057,10 +1057,10 @@ planning session, and four by the planner. Each states what would have to be tru
 
 #### Automated
 
-- [x] 6.1 The nested-ownership pattern is documented in `AGENTS.md` § Access control
-- [x] 6.2 Markdown Prettier-clean across the three documents
-- [x] 6.3 Gate still green
+- [x] 6.1 The nested-ownership pattern is documented in `AGENTS.md` § Access control — 4d2c03b
+- [x] 6.2 Markdown Prettier-clean across the three documents — 4d2c03b
+- [x] 6.3 Gate still green — 4d2c03b
 
 #### Manual
 
-- [x] 6.4 `AGENTS.md` § Access control makes clear why a nested table needs the composite key
+- [x] 6.4 `AGENTS.md` § Access control makes clear why a nested table needs the composite key — 4d2c03b

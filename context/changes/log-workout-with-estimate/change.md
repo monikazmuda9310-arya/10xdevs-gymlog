@@ -1,7 +1,7 @@
 ---
 change_id: log-workout-with-estimate
 title: Log workout with estimate
-status: implementing
+status: implemented
 created: 2026-08-10
 updated: 2026-08-11
 archived_at: null
@@ -92,5 +92,5 @@ Every gate was green while this was on screen, which is the same shape as S-01's
 `src/pages/api/dev/tz-probe.ts` answered from real workerd with three distinct dates for
 Kiritimati (+14), UTC and Niue (−11). This was an open assumption flagged by the plan review (F1):
 no primary Cloudflare document states it, and no file in this repository had used `Intl` before.
-It is now measured rather than assumed. **The probe is deleted in Phase 5** — that is criterion 5.1,
-not a thing to remember.
+It is now measured rather than assumed. **The probe was deleted in Phase 5** (`3ebf634`), before the
+build, so what deployed never contained it.
