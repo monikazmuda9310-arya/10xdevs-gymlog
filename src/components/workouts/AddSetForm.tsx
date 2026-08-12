@@ -2,18 +2,7 @@ import React, { useState } from "react";
 import { CircleAlert, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LoggedSetView, RecordAnnouncement, WeightUnit } from "@/types";
-import {
-  MAX_REPS,
-  MAX_RPE,
-  MAX_WEIGHT,
-  MAX_WEIGHT_DECIMALS,
-  MIN_REPS,
-  MIN_RPE,
-  MIN_WEIGHT,
-  isWeightAllowed,
-  workoutMessageForCode,
-  type WorkoutMessageCode,
-} from "@/lib/validation/workout";
+import { readSetFields, workoutMessageForCode } from "@/lib/validation/workout";
 
 // Repetitions and weight are the only required fields: this form is meant to be usable one-handed
 // on a 360 px screen between sets, which is the situation the product exists for.
@@ -45,33 +34,16 @@ export function AddSetForm({ entryId, isBodyweight, weightUnit, onLogged }: Prop
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  /**
-   * The same rules the endpoint enforces, checked here first so the ordinary mistakes cost no round
-   * trip. The server still validates every one of them — this is convenience, not the guarantee.
-   */
-  function localFailure(repsValue: number, weightValue: number, rpeValue: number | null): WorkoutMessageCode | null {
-    if (reps.trim() === "") return "reps_required";
-    if (!Number.isInteger(repsValue) || repsValue < MIN_REPS || repsValue > MAX_REPS) return "reps_out_of_range";
-    if (weight.trim() === "" || Number.isNaN(weightValue)) return "weight_required";
-    if (weightValue < MIN_WEIGHT || weightValue > MAX_WEIGHT) return "weight_out_of_range";
-    if (!hasAllowedPrecision(weight)) return "weight_too_precise";
-    if (!isWeightAllowed(weightValue, isBodyweight)) return "weight_needs_bodyweight";
-    if (rpeValue !== null && (Number.isNaN(rpeValue) || rpeValue < MIN_RPE || rpeValue > MAX_RPE))
-      return "rpe_out_of_range";
-    return null;
-  }
-
   async function handleSubmit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
 
-    const repsValue = Number(reps);
-    const weightValue = Number(weight);
-    const rpeValue = rpe.trim() === "" ? null : Number(rpe);
-
-    const failure = localFailure(repsValue, weightValue, rpeValue);
-    if (failure) {
-      setError(workoutMessageForCode(failure));
+    // The same rules the endpoint enforces, checked here first so the ordinary mistake costs no
+    // round trip — and the same call `EditSetForm` makes, so a correction can never be refused by a
+    // rule a new set is not held to. The server still validates every one of them.
+    const fields = readSetFields({ reps, weight, rpe }, isBodyweight);
+    if (!fields.ok) {
+      setError(workoutMessageForCode(fields.code));
       return;
     }
 
@@ -82,7 +54,12 @@ export function AddSetForm({ entryId, isBodyweight, weightUnit, onLogged }: Prop
         headers: { "content-type": "application/json" },
         // No unit in the body, deliberately: the endpoint reads it from the profile. A client that
         // could name it could store a number under the wrong unit and poison every derived figure.
-        body: JSON.stringify({ exerciseEntryId: entryId, reps: repsValue, weight: weightValue, rpe: rpeValue }),
+        body: JSON.stringify({
+          exerciseEntryId: entryId,
+          reps: fields.reps,
+          weight: fields.weight,
+          rpe: fields.rpe,
+        }),
       });
       const body: unknown = await response.json();
 
@@ -200,16 +177,4 @@ export function AddSetForm({ entryId, isBodyweight, weightUnit, onLogged }: Prop
       )}
     </form>
   );
-}
-
-/**
- * Two decimal places at most, checked on the STRING rather than on the parsed number.
- *
- * `102.555` reaches the endpoint as a float whose decimal length is a question about binary
- * representation; what the user typed is not. The column is `numeric(7,3)` and stores exactly what
- * arrives, which is what makes "read back the number you typed" true.
- */
-function hasAllowedPrecision(value: string): boolean {
-  const point = value.indexOf(".");
-  return point === -1 || value.length - point - 1 <= MAX_WEIGHT_DECIMALS;
 }

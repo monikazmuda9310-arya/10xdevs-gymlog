@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_NOTE_LENGTH, isWeightAllowed, workoutMessageForCode } from "@/lib/validation/workout";
+import { MAX_NOTE_LENGTH, isWeightAllowed, readSetFields, workoutMessageForCode } from "@/lib/validation/workout";
 import { parseAddSet, parseCreateWorkout } from "@/lib/validation/workout-schemas";
 
 const UUID = "6f1c9d5e-6b1a-4a3f-9d2e-1c0b5a7e8f34";
@@ -112,6 +112,46 @@ describe("parseAddSet", () => {
       success: false,
       code: "entry_not_found",
     });
+  });
+});
+
+describe("readSetFields: the pre-check both set forms share", () => {
+  // One definition, two callers (AddSetForm and EditSetForm). Before S-05 this lived inside the add
+  // form, where the edit form could not reach it — and two client-side pre-checks that agree today
+  // drift the first time a bound moves, leaving a correction refused by a rule a new set is not
+  // held to.
+  const filled = { reps: "5", weight: "100", rpe: "8" };
+
+  it("reads the three fields and turns an empty RPE into null", () => {
+    expect(readSetFields(filled, false)).toEqual({ ok: true, reps: 5, weight: 100, rpe: 8 });
+    expect(readSetFields({ ...filled, rpe: "" }, false)).toEqual({ ok: true, reps: 5, weight: 100, rpe: null });
+    expect(readSetFields({ ...filled, rpe: "  " }, false)).toEqual({ ok: true, reps: 5, weight: 100, rpe: null });
+  });
+
+  it("tells an empty weight from a zero one", () => {
+    // `Number("")` is 0, so checking the parsed number alone would accept an untouched field as a
+    // legal zero load — and on a bodyweight exercise it would then SAVE as one.
+    expect(readSetFields({ ...filled, weight: "" }, true)).toEqual({ ok: false, code: "weight_required" });
+    expect(readSetFields({ ...filled, weight: "0" }, true)).toEqual({ ok: true, reps: 5, weight: 0, rpe: 8 });
+  });
+
+  it("applies the bodyweight rule, so a barbell lift at zero is refused here too", () => {
+    expect(readSetFields({ ...filled, weight: "0" }, false)).toEqual({ ok: false, code: "weight_needs_bodyweight" });
+    expect(readSetFields({ ...filled, weight: "-20" }, false)).toEqual({ ok: false, code: "weight_needs_bodyweight" });
+    expect(readSetFields({ ...filled, weight: "-20" }, true)).toEqual({ ok: true, reps: 5, weight: -20, rpe: 8 });
+  });
+
+  it("counts decimal places on the string, not on the float", () => {
+    expect(readSetFields({ ...filled, weight: "102.25" }, false).ok).toBe(true);
+    expect(readSetFields({ ...filled, weight: "102.058" }, false)).toEqual({ ok: false, code: "weight_too_precise" });
+  });
+
+  it("reports the first thing wrong, in the order the form reads", () => {
+    expect(readSetFields({ ...filled, reps: "" }, false)).toEqual({ ok: false, code: "reps_required" });
+    expect(readSetFields({ ...filled, reps: "5.5" }, false)).toEqual({ ok: false, code: "reps_out_of_range" });
+    expect(readSetFields({ ...filled, reps: "0" }, false)).toEqual({ ok: false, code: "reps_out_of_range" });
+    expect(readSetFields({ ...filled, weight: "2001" }, false)).toEqual({ ok: false, code: "weight_out_of_range" });
+    expect(readSetFields({ ...filled, rpe: "10.5" }, false)).toEqual({ ok: false, code: "rpe_out_of_range" });
   });
 });
 

@@ -786,39 +786,39 @@ need nothing done to them: records are derived, so the first read after a deleti
 
 #### Automated
 
-- [x] 2.1 Lint, typecheck, unit, integration and build all pass
-- [x] 2.2 `workout-mutations-rls.test.ts` passes, including the `404`-not-`204` assertion
-- [x] 2.3 The three existing POST endpoint files are unchanged
-- [x] 2.4 `weight_unit` appears in the insert path only, never in an update
-- [x] 2.5 `weight_kg` is never written
-- [x] 2.6 A failed ranking query yields `impact_unavailable`, never `{ impact: [] }`
-- [x] 2.7 Mutation (a): dropping `.eq("user_id", …)` from `deleteSet` breaks nothing — the policy is the guarantee, recorded as a finding
-- [x] 2.8 Mutation (b): `204` on zero rows fails the `404` assertion
-- [x] 2.9 Mutation (c): removing the `isWeightAllowed` re-check fails the barbell-at-zero assertion
+- [x] 2.1 Lint, typecheck, unit, integration and build all pass — f6cf0ce
+- [x] 2.2 `workout-mutations-rls.test.ts` passes, including the `404`-not-`204` assertion — f6cf0ce
+- [x] 2.3 The three existing POST endpoint files are unchanged — f6cf0ce
+- [x] 2.4 `weight_unit` appears in the insert path only, never in an update — f6cf0ce
+- [x] 2.5 `weight_kg` is never written — f6cf0ce
+- [x] 2.6 A failed ranking query yields `impact_unavailable`, never `{ impact: [] }` — f6cf0ce
+- [x] 2.7 Mutation (a): dropping `.eq("user_id", …)` from `deleteSet` breaks nothing — the policy is the guarantee, recorded as a finding — f6cf0ce
+- [x] 2.8 Mutation (b): `204` on zero rows fails the `404` assertion — f6cf0ce
+- [x] 2.9 Mutation (c): removing the `isWeightAllowed` re-check fails the barbell-at-zero assertion — f6cf0ce
 
 #### Manual
 
-- [x] 2.10 Owner has seen the mutation-boundary suite's output
+- [x] 2.10 Owner has seen the mutation-boundary suite's output — f6cf0ce
 
 ### Phase 3: The screens — correcting, and being warned first
 
 #### Automated
 
-- [ ] 3.1 Lint, typecheck, unit, integration and build all pass
-- [ ] 3.2 Built client bundle contains no `zod` and no `@supabase/`
-- [ ] 3.3 `WorkoutDetail` island size recorded before and after, measured against the ~15 KB threshold
+- [x] 3.1 Lint, typecheck, unit, integration and build all pass — 165 unit, 83 integration
+- [x] 3.2 Built client bundle contains no `zod` and no `@supabase/` — grep over `dist/client/_astro/`, with a sanity match proving the same grep can find something that is there
+- [x] 3.3 `WorkoutDetail` island size recorded before and after, measured against the ~15 KB threshold — before **10 689 B**; with the shadcn/radix `alert-dialog` **50 720 B (+40 KB)** plus a new 5 194 B chunk, so the threshold decided against it; shipped on the native `<dialog>` at **16 086 B (+5 397 B)**, plus shared `RecordImpactDialog` 6 551 B and the new `WorkoutHeader` island 4 654 B
 
 #### Manual
 
-- [ ] 3.4 Editing a set below the runner-up shows the conditional warning with the correct fall value
-- [ ] 3.5 Deleting the heaviest-record set warns about the heaviest record
-- [ ] 3.6 Deleting a workout holding two exercises' records names both
-- [ ] 3.7 With the impact endpoint failing, the dialog says the consequence is unknown, not "no record affected"
-- [ ] 3.8 The two no-successor outcomes read as different sentences
-- [ ] 3.9 Editing a set removes its record badge
-- [ ] 3.10 Deleting the last set of an entry leaves a usable, still-removable entry
-- [ ] 3.11 The dialog is fully keyboard-operable and traps focus
-- [ ] 3.12 The dialog is usable at 360 px
+- [x] 3.4 Editing a set below the runner-up shows the conditional warning with the correct fall value
+- [x] 3.5 Deleting the heaviest-record set warns about the heaviest record
+- [x] 3.6 Deleting a workout holding two exercises' records names both
+- [x] 3.7 With the impact endpoint failing, the dialog says the consequence is unknown, not "no record affected" — verified against a forced throw in `sets/[id]/impact.ts`, reverted immediately after
+- [x] 3.8 The two no-successor outcomes read as different sentences
+- [x] 3.9 Editing a set removes its record badge
+- [x] 3.10 Deleting the last set of an entry leaves a usable, still-removable entry
+- [x] 3.11 The dialog is fully keyboard-operable and traps focus
+- [x] 3.12 The dialog is usable at 360 px
 
 ### Phase 4: Deploy, and prove it on the public address
 

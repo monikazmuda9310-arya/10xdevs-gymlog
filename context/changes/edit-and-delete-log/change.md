@@ -75,6 +75,45 @@ gate can see that state.
   pinned by assertions that would have to move with them, and this slice adds operations rather than
   churning the ones that work.
 
+- **Phase 3 — the dialog primitive is the plan's measured FALLBACK, not its first choice.** The plan
+  named the shadcn `alert-dialog` with a threshold written in advance: fall back to the native
+  `<dialog>` if `WorkoutDetail`'s built island grows by more than ~15 KB. `npx shadcn@latest add
+  alert-dialog` was installed and measured first. It pulls in `radix-ui` and took that island from
+  **10 689 B to 50 720 B (+40 KB)**, plus a new 5 194 B shared chunk — nearly triple the threshold.
+  The package was removed and `src/components/ui/confirm-dialog.tsx` written on `showModal()`
+  instead, which supplies focus containment, Escape, an inert background and focus restoration from
+  the platform. Two deliberate departures from the UA default are documented in the file: the
+  `cancel` event is intercepted so React state stays the single source of truth, and a backdrop
+  click does nothing, because dismissing an irreversible action by an accidental click-through is
+  what a confirmation exists to prevent. `autoFocus` is also avoided — React implements it as a
+  `.focus()` call on MOUNT, and this dialog is mounted (closed) from page load, so the opening focus
+  is set explicitly in the effect that calls `showModal()`.
+- **Phase 3 — `readSetFields` extracted into `src/lib/validation/workout.ts`, and `AddSetForm`
+  refactored onto it.** The plan said the edit form should pre-check the weight "with
+  `isWeightAllowed` exactly as `AddSetForm` does". Doing that literally would have copied five more
+  rules — reps range, empty-versus-zero weight, bounds, decimal places, RPE — into a second
+  client-side pre-check, and two pre-checks that agree today drift the first time a bound moves,
+  leaving a correction refused by a rule a new set is not held to. One exported function, two
+  callers, five unit tests (`src/lib/validation/workout.test.ts`), and `hasAllowedPrecision` moved
+  out of the component with it.
+- **Phase 3 — two files the plan did not name.** `src/components/workouts/EditSetForm.tsx`, because
+  the inline editor is a form with its own state and `WorkoutDetail` is already long; and
+  `src/components/hooks/useRecordImpact.ts`, because the preflight is made from four call sites
+  across two islands and `AGENTS.md` § Conventions puts hooks there.
+- **Phase 3 — an edit with nothing at stake does not open the dialog.** The plan's state 1 says the
+  dialog "still appears **for a deletion**, because the action is irreversible whether or not a
+  record is at stake". An edit is not irreversible, so the preflight runs first and the dialog
+  appears only when a record is actually affected — or when the preflight could not say. A dialog
+  that always answers "no record depends on this" is how people learn to click through the one that
+  matters.
+- **Phase 3 — `no_sets_left` is a DELETION's answer only, and the dialog says so.** The impact query
+  excludes the set being edited, so an exercise whose only set is the one under correction comes back
+  as "nothing survives". For a deletion that is exactly right. For an edit it would promise that the
+  lift is about to vanish from `/records` because somebody fixed its RPE — the invented screen state
+  the three-outcome successor type exists to prevent. An edit therefore reads both empty outcomes as
+  "no other set could hold it"; a deletion keeps them as two distinct sentences, which is what
+  criterion 3.8 checks.
+
 ### Working mode
 
 No subagents unless the owner asks — including for skills that spawn them by default

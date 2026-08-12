@@ -99,3 +99,72 @@ export function workoutMessageForCode(code: string | null | undefined): string |
 export function isWeightAllowed(weight: number, isBodyweight: boolean): boolean {
   return weight > 0 || isBodyweight;
 }
+
+/** The three fields a set form holds, as typed — strings, because that is what an input carries. */
+export interface SetFieldStrings {
+  reps: string;
+  weight: string;
+  /** Optional: an empty string means "not recorded", which is a real answer rather than a mistake. */
+  rpe: string;
+}
+
+export type SetFieldsResult =
+  | { ok: true; reps: number; weight: number; rpe: number | null }
+  | { ok: false; code: WorkoutMessageCode };
+
+/**
+ * What a set form has, or the first thing wrong with it — for the ADD form and the EDIT form alike.
+ *
+ * **One definition, two callers**, for the same reason `isWeightAllowed` is one definition with
+ * three: the alternative is two client-side pre-checks that agree today and drift the first time a
+ * bound moves, so a correction would be refused by rules a new set is not held to.
+ *
+ * The server still validates every one of these through the zod schemas built from the same
+ * constants. This is convenience — it saves the ordinary mistake a round trip — never the guarantee.
+ *
+ * Checked on the STRINGS where the string is the truth: `Number("")` is `0`, so an empty weight
+ * would otherwise pass as a legal zero, and decimal length is a question about what was typed rather
+ * than about how a float is represented.
+ */
+export function readSetFields({ reps, weight, rpe }: SetFieldStrings, isBodyweight: boolean): SetFieldsResult {
+  if (reps.trim() === "") {
+    return { ok: false, code: "reps_required" };
+  }
+  const repsValue = Number(reps);
+  if (!Number.isInteger(repsValue) || repsValue < MIN_REPS || repsValue > MAX_REPS) {
+    return { ok: false, code: "reps_out_of_range" };
+  }
+
+  const weightValue = Number(weight);
+  if (weight.trim() === "" || Number.isNaN(weightValue)) {
+    return { ok: false, code: "weight_required" };
+  }
+  if (weightValue < MIN_WEIGHT || weightValue > MAX_WEIGHT) {
+    return { ok: false, code: "weight_out_of_range" };
+  }
+  if (!hasAllowedPrecision(weight)) {
+    return { ok: false, code: "weight_too_precise" };
+  }
+  if (!isWeightAllowed(weightValue, isBodyweight)) {
+    return { ok: false, code: "weight_needs_bodyweight" };
+  }
+
+  const rpeValue = rpe.trim() === "" ? null : Number(rpe);
+  if (rpeValue !== null && (Number.isNaN(rpeValue) || rpeValue < MIN_RPE || rpeValue > MAX_RPE)) {
+    return { ok: false, code: "rpe_out_of_range" };
+  }
+
+  return { ok: true, reps: repsValue, weight: weightValue, rpe: rpeValue };
+}
+
+/**
+ * Two decimal places at most, counted on the STRING rather than on the parsed number.
+ *
+ * `102.555` reaches the endpoint as a float whose decimal length is a question about binary
+ * representation; what the user typed is not. The column is `numeric(7,3)` and stores exactly what
+ * arrives, which is what makes "read back the number you typed" true.
+ */
+function hasAllowedPrecision(value: string): boolean {
+  const point = value.indexOf(".");
+  return point === -1 || value.length - point - 1 <= MAX_WEIGHT_DECIMALS;
+}
