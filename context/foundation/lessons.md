@@ -90,3 +90,62 @@
 - **Applies to**: every `/10x-plan` phase whose Success Criteria mention unit tests — especially
   rules that read as belonging to a UI component, because components are where untestable logic
   accumulates.
+
+## Under RLS, a write that touches nothing SUCCEEDS — so "it failed" has to be built
+
+- **Context**: `src/lib/services/workouts.ts` and the six routes under
+  `src/pages/api/{sets,workouts,exercise-entries}/[id]/`, added during S-05. Confirmed by mutation
+  (b) of Phase 2's protocol on 2026-08-12: making `DELETE` answer `204` on zero rows fails the
+  suite's `404` assertion.
+- **Problem**: Row-level security **filters**, it does not raise. An `update` or a `delete` naming
+  another account's row matches zero rows and reports success, indistinguishable at the client from
+  a write that worked. Answering `204` there tells one account it just deleted another's data — a
+  lie, and an existence oracle in the same breath. Nothing about the query looks wrong, and the
+  policy is doing exactly its job.
+- **Rule**: **every mutation `.select()`s what it touched, and a zero-row result becomes a `404`
+  carrying the same message code as "absent".** The read-back is not decoration: it is the only
+  thing that can tell the two cases apart. Pair it with an integration assertion that checks the
+  **status code**, not just the persisted state — "the row survived" and "the caller was told it
+  did not" are two different defects and only the second one lies.
+- **Applies to**: every `update`/`delete` path added to an RLS-protected table, in this repository
+  and in any other. It is the mutation-side twin of the read-side rule that a policy filter and an
+  application filter are different things.
+
+## A query shape that is exact for one row can be wrong for a set of them
+
+- **Context**: `topTwoEstimatesForExercise` in `src/lib/services/records.ts`. S-04 handed S-05 the
+  note "the query behind the warning already exists — nothing to add to the data layer"; planning
+  S-05 found that was true for one of the four operations.
+- **Problem**: "the record falls to the runner-up" is exact when **one** set disappears, because
+  exactly one row leaves the ranking. Removing an exercise entry takes every set of that exercise in
+  that workout, and deleting a workout can take the leader **and** the runner-up together — after
+  which the record falls to the third-best, which a two-row query cannot see. The handover note was
+  not wrong about the query; it was wrong about the scope, and the two read identically. Separately,
+  the same query covered only one of the product's two records, so it was silent on a real fall.
+- **Rule**: **before reusing a ranking query at a new scope, ask how many rows the new operation
+  removes, and whether the answer is still bounded by the query's `limit`.** Where it is not, the
+  shape that generalises is "the best surviving candidate, **excluding** what is about to disappear"
+  — an exclusion filter plus `limit(1)`, which costs the same and is exact at every level. And when
+  a product keeps two rankings, a warning built on one of them is silent by construction, not by
+  accident.
+- **Applies to**: any reuse of a `limit(n)` ranking at a wider scope than it was written for, and
+  any handover note that says "the query you need already exists".
+
+## Write the threshold into the plan BEFORE taking the measurement
+
+- **Context**: S-05 Phase 3's dialog primitive. The plan named the shadcn `alert-dialog` and, in the
+  same paragraph, a fallback and a number: "if `WorkoutDetail`'s built island grows by more than
+  ~15 KB, fall back to the native `<dialog>`".
+- **Problem**: the component was installed and measured, and it took the island from 10 689 B to
+  50 720 B — **+40 KB**, plus a new 5 194 B chunk, on a `client:load` island in a product whose NFR
+  is a 2 s p95 on mobile. With no number agreed in advance, that measurement is a debate: the
+  component is the house convention, it is already half-installed, and "40 KB" sounds tolerable
+  right up until somebody has to defend it. With the number written first, it was arithmetic. The
+  native `<dialog>` shipped at +5 397 B and gives focus containment, Escape, an inert background and
+  focus restoration from the platform rather than from a package.
+- **Rule**: **when a plan says "use X unless it is too expensive", the plan must state what "too
+  expensive" is, in a unit that can be measured, before anything is installed.** A threshold decided
+  after the measurement is not a threshold. State the measurement in Progress either way — including
+  when the default wins — so the next reader knows the question was actually asked.
+- **Applies to**: any dependency added to a hydrated island or other size-sensitive boundary, and
+  more generally to any plan step phrased as a conditional preference.

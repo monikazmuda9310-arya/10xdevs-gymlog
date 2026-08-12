@@ -175,7 +175,29 @@ and `http://localhost:4321/**` for local work.
 | `/api/exercise-entries` | POST, JSON. Adds an exercise to a workout; choosing one already there returns the existing entry rather than an error    |
 | `/api/sets`             | POST, JSON. Logs a set. **The weight unit is not in the body** — it is read from the account's profile on the server     |
 
+Correcting what was logged, added by S-05. Each resource carries its mutations and a preflight that
+answers what the change would cost:
+
+| Route                               | Description                                                                                                                  |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `/api/sets/[id]`                    | PATCH (reps, weight, RPE) and DELETE. **404, never 204/200, when the row is absent or not yours** — the same answer for both |
+| `/api/sets/[id]/impact`             | GET. Which records this set holds and what each falls to without it                                                          |
+| `/api/workouts/[id]`                | PATCH (date, note) and DELETE. Deleting cascades to every entry and set beneath it                                           |
+| `/api/workouts/[id]/impact`         | GET. The only operation that can take several records at once, so it answers for every exercise in the workout               |
+| `/api/exercise-entries/[id]`        | DELETE. Removes one exercise from a workout with its sets. No PATCH — repointing an entry is removing it and picking another |
+| `/api/exercise-entries/[id]/impact` | GET. The same answer scoped to that one exercise                                                                             |
+
 `/api/sets` answers `{ set, record }`: `record` is `null` unless the set just saved beat the previous best for that exercise, in which case it carries the set it beat. A failed record verdict never turns a successful save into an error — the badge is lost, the set is not.
+
+**The weight unit is not in the update payload either** — it is a property of the stored row, not of
+the account editing it. `PATCH /api/sets/[id]` changes repetitions, weight and RPE and leaves
+`weight_unit` exactly as it was, so a set typed in pounds still reads back as the number typed after
+the profile preference changes. `weight_kg` is generated and is never written.
+
+Each `…/impact` answers `{ impact: [...] }`. **When the ranking read fails it answers a non-2xx
+`impact_unavailable`, never an empty list** — "nothing is at stake" is a positive claim, and the
+screen would render it as reassurance. The action stays available; the dialog says the consequence is
+unknown.
 
 Route protection is handled in `src/middleware.ts`, in **both** directions: `PROTECTED_ROUTES` keeps
 signed-out visitors out of the application, and `AUTH_ROUTES` sends a signed-in visitor away from

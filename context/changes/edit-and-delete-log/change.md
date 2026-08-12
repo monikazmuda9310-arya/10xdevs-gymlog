@@ -77,8 +77,8 @@ gate can see that state.
 
 - **Phase 3 — the dialog primitive is the plan's measured FALLBACK, not its first choice.** The plan
   named the shadcn `alert-dialog` with a threshold written in advance: fall back to the native
-  `<dialog>` if `WorkoutDetail`'s built island grows by more than ~15 KB. `npx shadcn@latest add
-  alert-dialog` was installed and measured first. It pulls in `radix-ui` and took that island from
+  `<dialog>` if `WorkoutDetail`'s built island grows by more than ~15 KB. The shadcn component was
+  installed and measured first. It pulls in `radix-ui` and took that island from
   **10 689 B to 50 720 B (+40 KB)**, plus a new 5 194 B shared chunk — nearly triple the threshold.
   The package was removed and `src/components/ui/confirm-dialog.tsx` written on `showModal()`
   instead, which supplies focus containment, Escape, an inert background and focus restoration from

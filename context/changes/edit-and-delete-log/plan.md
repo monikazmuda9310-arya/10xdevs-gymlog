@@ -15,9 +15,9 @@ leaves a product that is complete and **uncorrectable**, in which a mistyped wei
 
 **The database is already ready and needs no migration.** `20260811005248_create_workout_log_with_row_ownership.sql`
 grants `update` and `delete` to `authenticated` on all three tables and carries the matching
-per-operation policies, with an explicit comment at line 151: *"Update and delete are granted
+per-operation policies, with an explicit comment at line 151: _"Update and delete are granted
 although this slice ships no UI for either. The policy is the guarantee… absent screens are scope
-(S-05), not permission."* The cascades exist too: `exercise_entries` and `sets` reference their
+(S-05), not permission."_ The cascades exist too: `exercise_entries` and `sets` reference their
 parent's `(id, user_id)` `on delete cascade`, so deleting a workout removes everything beneath it in
 one statement. **This slice is pure application code.**
 
@@ -53,11 +53,11 @@ need to be computed at all — `public.personal_records` already reports it, tog
 it belongs to (`best_estimate_set_id`, `best_estimate_workout_id`, `heaviest_set_id`,
 `heaviest_workout_id`). That covers all three exclusion levels without touching the views:
 
-| Operation      | Holder is affected when                                            | Successor query excludes  |
-| -------------- | ------------------------------------------------------------------ | ------------------------- |
-| set edit/delete| `best_estimate_set_id = <set>` / `heaviest_set_id = <set>`         | `set_id = <set>`          |
-| entry delete   | `<record>_workout_id = <workout>` **and** `exercise_id = <entry's>`| `exercise_entry_id = <entry>` |
-| workout delete | `<record>_workout_id = <workout>`                                  | `workout_id = <workout>`  |
+| Operation       | Holder is affected when                                             | Successor query excludes      |
+| --------------- | ------------------------------------------------------------------- | ----------------------------- |
+| set edit/delete | `best_estimate_set_id = <set>` / `heaviest_set_id = <set>`          | `set_id = <set>`              |
+| entry delete    | `<record>_workout_id = <workout>` **and** `exercise_id = <entry's>` | `exercise_entry_id = <entry>` |
+| workout delete  | `<record>_workout_id = <workout>`                                   | `workout_id = <workout>`      |
 
 The successor query only runs for exercises that a record read already flagged as affected —
 typically zero, one or two per operation — so the cost is bounded regardless of how large the log
@@ -84,8 +84,8 @@ SQL.
 - `src/lib/services/record-display.ts:51` — every figure printed is re-derived in TypeScript from the
   winning set's typed `weight`/`weight_unit`. **No number computed by SQL is ever displayed.**
 - `src/components/workouts/WorkoutDetail.tsx:41` — the record-badge map's comment defers to this
-  slice: *"Keeping them would also mean inventing behaviour for what happens when S-05 lets a set be
-  edited out from under one."*
+  slice: _"Keeping them would also mean inventing behaviour for what happens when S-05 lets a set be
+  edited out from under one."_
 - `src/components/workouts/WorkoutDetail.tsx:109` — the island only ever **appends** to its entry
   state. Replacing and removing are new operations on that state.
 - `src/pages/workouts/[id].astro:66` — the workout note renders as static Astro text. There is no
@@ -122,7 +122,7 @@ clicking through the deployed URL.
   stored figure would undo S-04 and turn S-06's formula change from a re-derivation into a lie.
 - **No warning about weekly tonnage when a date crosses a week boundary.** FR-006's Socrates note
   asks for it; tonnage does not exist until S-07, so a warning here would describe numbers the user
-  has never seen. Phase 1 instead *proves* there is nothing to recompute. **Open Question 2's
+  has never seen. Phase 1 instead _proves_ there is nothing to recompute. **Open Question 2's
   interface half is hereby passed to S-07 in writing** (Phase 5 records this).
 - **No browser test runner.** Phase 3 of the course contract owns E2E through `/10x-e2e` with two
   chosen risks; bootstrapping Playwright here would duplicate that work.
@@ -211,14 +211,14 @@ zero load is not a heaviest record.
 
 #### 2. The pure decision
 
-**File**: `src/lib/services/record-impact.ts` *(new)*
+**File**: `src/lib/services/record-impact.ts` _(new)_
 
 **Intent**: Given the current holder rows, a description of what is about to disappear, and the
 surviving candidates, say which records fall and to what. **This module is where the "compare ids,
 never numbers" rule lives for this slice**, and it is the module the unit criteria below name.
 
 **Contract**: **Two exported functions, not one** — the split is forced by the data flow and naming it
-here is the point. Deciding *which* records are affected needs only ids; fetching each successor needs
+here is the point. Deciding _which_ records are affected needs only ids; fetching each successor needs
 that answer first; so a single function taking "holders + removal + successors" cannot be written
 without the caller already knowing what it is asking about.
 
@@ -253,7 +253,7 @@ exercise will no longer appear in your records" — never a zero, and never the 
 
 #### 4. Integration coverage for the second ranking
 
-**File**: `tests/integration/record-impact.test.ts` *(new)*
+**File**: `tests/integration/record-impact.test.ts` _(new)_
 
 **Intent**: Pin the exclusion rules and orderings that no unit test can see, against `gymlog-test`,
 following the fixture discipline in AGENTS.md § Testing (reset in `beforeAll`, run-unique values,
@@ -361,7 +361,7 @@ preference. `weight_kg` is never written; it is generated.
 `src/pages/api/sets/[id]/index.ts`, `src/pages/api/sets/[id]/impact.ts`,
 `src/pages/api/workouts/[id]/index.ts`, `src/pages/api/workouts/[id]/impact.ts`,
 `src/pages/api/exercise-entries/[id]/index.ts`, `src/pages/api/exercise-entries/[id]/impact.ts`
-*(all new)*
+_(all new)_
 
 **Intent**: `PATCH` and `DELETE` per resource, plus a `GET` preflight returning what the dialog needs.
 The three existing `POST` endpoints under `index.ts` are **not touched**, so the assertions pinning
@@ -393,7 +393,7 @@ missing target, and the same code is used whether the row is absent or another a
 
 #### 4. The mutation boundary suite
 
-**File**: `tests/integration/workout-mutations-rls.test.ts` *(new)*
+**File**: `tests/integration/workout-mutations-rls.test.ts` _(new)_
 
 **Intent**: The twelve update/delete policies have never been exercised by application code. This is
 the suite that makes them load-bearing, following `workout-log-rls.test.ts`'s pattern — **every
@@ -453,7 +453,7 @@ confirmation dialog carrying the real consequence.
 
 #### 1. The dialog primitive
 
-**File**: `src/components/ui/alert-dialog.tsx` *(added via `npx shadcn@latest add alert-dialog`)*
+**File**: `src/components/ui/alert-dialog.tsx` _(added via `npx shadcn@latest add alert-dialog`)_
 
 **Intent**: A confirmation that traps focus, closes on Escape, and cannot be dismissed by an
 accidental click-through — for the first actions in this product with an irreversible effect.
@@ -468,7 +468,7 @@ management, and record the measurement either way.
 
 #### 2. The warning
 
-**File**: `src/components/workouts/RecordImpactDialog.tsx` *(new)*
+**File**: `src/components/workouts/RecordImpactDialog.tsx` _(new)_
 
 **Intent**: One component used by all four operations, so the sentence a user reads before an
 irreversible action is written once. Names each affected record, the exercise, and what it falls to —
@@ -498,7 +498,7 @@ than absent for a figure the user is about to act on.
 
 #### 3. The workout header
 
-**File**: `src/components/workouts/WorkoutHeader.tsx` *(new)*, wired from `src/pages/workouts/[id].astro`
+**File**: `src/components/workouts/WorkoutHeader.tsx` _(new)_, wired from `src/pages/workouts/[id].astro`
 
 **Intent**: Make the date and note editable in place, and put "delete this workout" where the user is
 when they realise they logged it twice.
@@ -559,7 +559,7 @@ no sets yet; a workout with no entries falls back to the existing empty-state pa
 - **With the impact endpoint forced to fail, the dialog says the consequence is unknown — it does not
   say "no record is affected"** (the F2 state, and the one that silently defeats the slice if wrong)
 - Deleting the only set of an exercise says the exercise will disappear from the records list;
-  deleting the only *estimable* set while a zero-load set remains says instead that it will have no
+  deleting the only _estimable_ set while a zero-load set remains says instead that it will have no
   estimated record
 - Editing a set removes its record badge; reloading the page shows no badges at all, as before
 - Deleting the last set of an entry leaves a usable screen with the exercise still removable
@@ -744,7 +744,7 @@ Free 10 ms CPU cap, which is a hard kill rather than a throttle.
 **A limitation inherited from S-04 and stated rather than hidden**: index usage cannot be verified in
 this environment. `gymlog-test` holds a few dozen sets, so Postgres correctly prefers a sequential
 scan and an `explain` proves nothing about the plan on a real log. The `user_id` filter push-down and
-`security_invoker` behaviour *are* verifiable and were confirmed during S-04's review; index choice is
+`security_invoker` behaviour _are_ verifiable and were confirmed during S-04's review; index choice is
 not. S-07 and S-08 inherit the same gap.
 
 ## Migration Notes
@@ -824,26 +824,26 @@ need nothing done to them: records are derived, so the first read after a deleti
 
 #### Automated
 
-- [x] 4.1 `git status` clean and `git log origin/main..HEAD` empty — checked at `22df4ed`, immediately after the push and before the deploy
-- [x] 4.2 CI run for the deployed SHA green — **run #38**, `22df4ed9d726f9e1f2fb3ae848b59b189e7a0943`, conclusion `success`
-- [x] 4.3 Worker version at 100% of traffic — **`58e847c8-d7fb-49f8-8f11-fb1b9585e700`**
-- [x] 4.4 Scripted probe: `/workouts` and `/records` redirect a signed-out visitor — both `302 → /auth/signin`
-- [x] 4.5 New API routes present in the built manifest — all six in `dist/server/chunks/worker-entry_*.mjs` (**not** `virtual_astro_middleware.mjs`, which the plan named), and proven live: the three `GET …/impact` answer `401 unauthenticated` and the `PATCH`/`DELETE` answer `403` from Astro's `checkOrigin`, while an invented route on the same prefix answers `404`
+- [x] 4.1 `git status` clean and `git log origin/main..HEAD` empty — checked at `22df4ed`, immediately after the push and before the deploy — c196317
+- [x] 4.2 CI run for the deployed SHA green — **run #38**, `22df4ed9d726f9e1f2fb3ae848b59b189e7a0943`, conclusion `success` — c196317
+- [x] 4.3 Worker version at 100% of traffic — **`58e847c8-d7fb-49f8-8f11-fb1b9585e700`** — c196317
+- [x] 4.4 Scripted probe: `/workouts` and `/records` redirect a signed-out visitor — both `302 → /auth/signin` — c196317
+- [x] 4.5 New API routes present in the built manifest — all six in `dist/server/chunks/worker-entry_*.mjs` (**not** `virtual_astro_middleware.mjs`, which the plan named), and proven live: the three `GET …/impact` answer `401 unauthenticated` and the `PATCH`/`DELETE` answer `403` from Astro's `checkOrigin`, while an invented route on the same prefix answers `404` — c196317
 
 #### Manual
 
-- [x] 4.6 Edit a set on the public address and see `/records` change
-- [x] 4.7 Delete a record-holding workout on the public address and see the record fall as warned
-- [x] 4.8 Remove an exercise from a workout on the public address
+- [x] 4.6 Edit a set on the public address and see `/records` change — c196317
+- [x] 4.7 Delete a record-holding workout on the public address and see the record fall as warned — c196317
+- [x] 4.8 Remove an exercise from a workout on the public address — c196317
 
 ### Phase 5: Truth up the documents
 
 #### Automated
 
-- [ ] 5.1 Lint, typecheck, unit, integration and build all pass
-- [ ] 5.2 Every newly cited file path and assertion name resolves
+- [x] 5.1 Lint, typecheck, unit, integration and build all pass — 165 unit, 83 integration
+- [x] 5.2 Every newly cited file path and assertion name resolves — 28 references resolved by script, each printing its target; assertion 9 of `record-impact.test.ts` confirmed to be the date-change proof it is cited as
 - [ ] 5.3 `git log origin/main..HEAD` empty after the phase commit
 
 #### Manual
 
-- [ ] 5.4 README lists six new routes; STATE.md names Open Question 2 as S-07's; roadmap shows S-05 done
+- [x] 5.4 README lists six new routes; STATE.md names Open Question 2 as S-07's; roadmap shows S-05 done

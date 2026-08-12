@@ -45,6 +45,19 @@ without changing the test and saying so.**
     handled" is a fact about the load rather than an estimate. US-02's "sets outside the range never
     trigger a record" governs the save-time **announcement**, of which there is exactly one, on the
     estimate record.
+  - **A warning about a falling record must therefore cover BOTH rankings, and this is the trap.**
+    The estimate ranking alone is silent on exactly the common case: with `100 kg × 1` (estimate 100)
+    and `90 kg × 10` (estimate 120) logged, the heaviest record belongs to the first set and the
+    estimate record to the second, so deleting the `100 kg × 1` drops a real record while the
+    estimate ranking correctly reports "this set is not the leader". Two rankings, two queries —
+    `bestSurvivingEstimate` and `bestSurvivingHeaviest` in `src/lib/services/records.ts`.
+  - **And "the runner-up" is only the right answer for removing ONE set.** `topTwoEstimatesForExercise`
+    is exact there because exactly one row disappears. Removing an exercise entry takes every set of
+    that exercise in that workout, and deleting a workout can take the leader **and** the runner-up
+    together, after which the record falls to the third-best — which a two-row query cannot see. The
+    shape that answers all three levels is "the best surviving candidate, excluding what is about to
+    disappear": one ordered query, one `.neq(…)`, `.limit(1)`. `set_estimates` carries `set_id`,
+    `exercise_entry_id` and `workout_id`, which is what lets one query serve all three.
 - **A personal record is decided on estimated 1RM**, not raw weight. The heaviest absolute weight
   is tracked separately as a second, distinct record.
 - **A training week is Monday–Sunday in the user's own timezone** (stored on their profile), not
@@ -251,6 +264,32 @@ grant select on public.<v> to authenticated;
   `/api/sets` already asks for, not a new number to keep. Adding an `estimated_1rm` or a
   `personal_records` table would undo this and turn S-06's formula change from a re-derivation into
   a lie. See § Domain rules → "Records are derived, never stored as trophies".
+
+### A zero-row UPDATE or DELETE is a SUCCESS — turning it into a 404 is the application's job
+
+RLS filters rows; it does not raise. An `update` or a `delete` naming **another account's** row
+therefore does not error — it matches **zero rows** and reports success, exactly like a delete that
+worked. A handler that answers `204` to that has told one account it just deleted another's data,
+which is both a lie and an existence oracle.
+
+- **Every mutation `.select()`s what it touched**, and the handler answers `404` when nothing came
+  back. `src/lib/services/workouts.ts` returns `null` / `false` for the zero-row case and the six
+  routes under `src/pages/api/{sets,workouts,exercise-entries}/[id]/` map that to the resource's own
+  message code. The same code answers "absent" and "somebody else's", so neither is distinguishable.
+- **`tests/integration/workout-mutations-rls.test.ts` is what makes this load-bearing**, and it is
+  the first thing in this repository to exercise the twelve update/delete policies S-03 created.
+  Every cross-account attempt is paired with a **read back as the row's owner** — the failure worth
+  catching is a caller told "nothing happened" while the write landed.
+- **Measured, not assumed: dropping `.eq("user_id", …)` from `deleteSet` breaks nothing.** The DELETE
+  policy's own predicate is `(select auth.uid()) = user_id`, read from `pg_policies` rather than
+  believed, so the policy alone matches zero rows for account B. The application filter is the index
+  path, as above — and **no assertion writable from that suite can catch its removal.** The edit that
+  would make it load-bearing is RLS being disabled on `sets`, which `workout-log-rls.test.ts` covers
+  from the other side. Named here rather than papered over (`lessons.md`).
+- **A malformed `[id]` must never reach a query.** Postgres answers `22P02` for a uuid column handed
+  something that is not one, which surfaces as a `500` for what is really "no such row" — and a 500
+  is a different fact about the system than a 404. `resolve()` in
+  `src/pages/api/_shared/mutation-route.ts` checks `UUID_PATTERN` first, for all six routes.
 
 ## Commands
 
@@ -529,6 +568,22 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
     whoever builds catalogue editing will meet that.
   - Reachable at `/workouts` and `/workouts/[id]`, written through `/api/workouts`,
     `/api/exercise-entries` and `/api/sets`.
+  - **Corrected through six more routes, added by S-05**: `PATCH`/`DELETE` on
+    `/api/sets/[id]` and `/api/workouts/[id]`, `DELETE` on `/api/exercise-entries/[id]`, and a
+    `GET …/impact` preflight beside each of the three, answering `{ impact: FallingRecord[] }` — what
+    the confirmation dialog needs before an irreversible action (US-02). The three S-03 `POST`
+    endpoints are untouched; the shared preamble is `src/pages/api/_shared/mutation-route.ts`. See
+    § Access control → "A zero-row UPDATE or DELETE is a SUCCESS".
+    - **A failed impact read answers a non-2xx `impact_unavailable`, never `{ impact: [] }`.** An
+      empty list is a positive claim — "no record is at stake" — and the screen renders it as
+      reassurance. This is the **opposite** of the rule `/api/sets` follows for the save-time badge,
+      and deliberately: there the verdict decorated a write that had already committed, so losing it
+      cost nothing; here the preflight **is** the guarantee US-02 asks for. The action stays
+      available and the dialog says the consequence is unknown.
+    - **The update payload carries no `weight_unit` and no `weight_kg`.** The unit belongs to the
+      row, not to the account editing it: re-stamping it from the profile would turn 100 lb into
+      100 kg the first time somebody fixed a typo after S-06 let them switch, silently corrupting
+      every figure derived from `weight_kg`.
 - **Two views, added by S-04** — the first database objects here that are not tables.
   `public.set_estimates` is one row per set with its estimated 1RM under the row owner's own
   formula; `public.personal_records` is one row per exercise the account has logged, with the best
