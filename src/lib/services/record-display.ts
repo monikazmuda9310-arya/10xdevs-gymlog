@@ -65,13 +65,6 @@ export function bestEstimateFigure(
 }
 
 /**
- * The heaviest absolute load ever handled, or `null` when every set was at zero or assisted.
- *
- * **No repetition limit, deliberately** (owner, 2026-08-11): "heaviest ever handled" is a fact about
- * the load, not an estimate, so a twenty-repetition set counts here while carrying no estimate
- * above. The two records may therefore belong to different sets, which US-02 requires.
- */
-/**
  * What the confirmation dialog prints for a record that is about to fall (S-05).
  *
  * Three outcomes, because there are three: a value it falls to, or one of the two ways of having no
@@ -112,6 +105,13 @@ export function fallToFigure(record: FallingRecord, unit: WeightUnit, formula: E
   return { kind: "figure", figure: { value: roundForDisplay(estimate.oneRepMax), ...shared } };
 }
 
+/**
+ * The heaviest absolute load ever handled, or `null` when every set was at zero or assisted.
+ *
+ * **No repetition limit, deliberately** (owner, 2026-08-11): "heaviest ever handled" is a fact about
+ * the load, not an estimate, so a twenty-repetition set counts here while carrying no estimate at
+ * all. The two records may therefore belong to different sets, which US-02 requires.
+ */
 export function heaviestFigure(row: PersonalRecordRow, unit: WeightUnit): RecordFigure | null {
   const reps = row.heaviest_reps;
   const weight = row.heaviest_weight;

@@ -274,14 +274,6 @@ export async function bestSurvivingHeaviest(
 }
 
 /**
- * Whether ANY set for this exercise survives the removal — including sets that qualify for neither
- * record.
- *
- * This is the only thing that separates "the exercise stays on `/records` with no value for this
- * record" from "the exercise disappears from `/records` altogether", and those are two different
- * sentences to show somebody before they confirm.
- */
-/**
  * What this removal costs, end to end — the one call the three impact endpoints make.
  *
  * The order is what keeps it cheap: read the holders once, decide from **ids alone** which records
@@ -304,19 +296,37 @@ export async function impactOf(
     return [];
   }
 
-  const surviving = new Map<string, SurvivingFor>();
-  for (const exerciseId of new Set(affected.map((record) => record.exerciseId))) {
-    const [estimate, heaviest, anySurvives] = await Promise.all([
-      bestSurvivingEstimate(supabase, userId, exerciseId, removal),
-      bestSurvivingHeaviest(supabase, userId, exerciseId, removal),
-      anySetSurvives(supabase, userId, exerciseId, removal),
-    ]);
-    surviving.set(exerciseId, { estimate, heaviest, anySetSurvives: anySurvives });
-  }
+  // Parallel across exercises as well as within one. A set or an entry yields a single exercise and
+  // the difference is nothing — but deleting a workout yields one per exercise whose record lives in
+  // it, which after a good session is realistically six or eight, and the user is watching a spinner
+  // in an open dialog while they resolve. These are awaits on network I/O, so serialising them costs
+  // latency rather than CPU: it would never trip the Workers 10 ms cap, and never show up as an
+  // error either. Bounded work paid in parallel rather than in series.
+  const exerciseIdsAffected = [...new Set(affected.map((record) => record.exerciseId))];
+  const surviving = new Map<string, SurvivingFor>(
+    await Promise.all(
+      exerciseIdsAffected.map(async (exerciseId): Promise<[string, SurvivingFor]> => {
+        const [estimate, heaviest, anySurvives] = await Promise.all([
+          bestSurvivingEstimate(supabase, userId, exerciseId, removal),
+          bestSurvivingHeaviest(supabase, userId, exerciseId, removal),
+          anySetSurvives(supabase, userId, exerciseId, removal),
+        ]);
+        return [exerciseId, { estimate, heaviest, anySetSurvives: anySurvives }];
+      }),
+    ),
+  );
 
   return fallingRecords(affected, surviving);
 }
 
+/**
+ * Whether ANY set for this exercise survives the removal — including sets that qualify for neither
+ * record.
+ *
+ * This is the only thing that separates "the exercise stays on `/records` with no value for this
+ * record" from "the exercise disappears from `/records` altogether", and those are two different
+ * sentences to show somebody before they confirm.
+ */
 export async function anySetSurvives(
   supabase: Client,
   userId: string,

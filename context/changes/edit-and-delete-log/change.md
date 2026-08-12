@@ -1,7 +1,7 @@
 ---
 change_id: edit-and-delete-log
 title: Edit and delete workouts and sets, warned first about which record will fall
-status: implemented
+status: impl_reviewed
 created: 2026-08-11
 updated: 2026-08-12
 archived_at: null

@@ -62,6 +62,13 @@ export function ConfirmDialog({ open, labelledBy, describedBy, onCancel, childre
   return (
     <dialog
       ref={ref}
+      // **The one thing `showModal()` does NOT supply.** A native dialog is `role="dialog"`; the
+      // shadcn/Radix component this replaced is `role="alertdialog"`, which is what tells assistive
+      // technology that the dialog interrupts and demands a response rather than merely being open.
+      // Every action behind this component is irreversible, which is the case the role exists for —
+      // and no keyboard check can catch its absence, because the dialog still operates correctly and
+      // is only announced with a weaker meaning.
+      role="alertdialog"
       aria-labelledby={labelledBy}
       aria-describedby={describedBy}
       onCancel={(event) => {
