@@ -840,10 +840,10 @@ need nothing done to them: records are derived, so the first read after a deleti
 
 #### Automated
 
-- [x] 5.1 Lint, typecheck, unit, integration and build all pass — 165 unit, 83 integration
-- [x] 5.2 Every newly cited file path and assertion name resolves — 28 references resolved by script, each printing its target; assertion 9 of `record-impact.test.ts` confirmed to be the date-change proof it is cited as
-- [ ] 5.3 `git log origin/main..HEAD` empty after the phase commit
+- [x] 5.1 Lint, typecheck, unit, integration and build all pass — 165 unit, 83 integration — 4bac4ed
+- [x] 5.2 Every newly cited file path and assertion name resolves — 28 references resolved by script, each printing its target; assertion 9 of `record-impact.test.ts` confirmed to be the date-change proof it is cited as — 4bac4ed
+- [x] 5.3 `git log origin/main..HEAD` empty after the phase commit — origin/main = 4bac4ed, nothing local and unpushed — 4bac4ed
 
 #### Manual
 
-- [x] 5.4 README lists six new routes; STATE.md names Open Question 2 as S-07's; roadmap shows S-05 done
+- [x] 5.4 README lists six new routes; STATE.md names Open Question 2 as S-07's; roadmap shows S-05 done — 4bac4ed
