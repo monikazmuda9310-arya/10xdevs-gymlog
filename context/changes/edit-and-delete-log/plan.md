@@ -824,17 +824,17 @@ need nothing done to them: records are derived, so the first read after a deleti
 
 #### Automated
 
-- [ ] 4.1 `git status` clean and `git log origin/main..HEAD` empty
-- [ ] 4.2 CI run for the deployed SHA green — run number recorded here
-- [ ] 4.3 Worker version at 100% of traffic — version id recorded here
-- [ ] 4.4 Scripted probe: `/workouts` and `/records` redirect a signed-out visitor
-- [ ] 4.5 New API routes present in the built manifest
+- [x] 4.1 `git status` clean and `git log origin/main..HEAD` empty — checked at `22df4ed`, immediately after the push and before the deploy
+- [x] 4.2 CI run for the deployed SHA green — **run #38**, `22df4ed9d726f9e1f2fb3ae848b59b189e7a0943`, conclusion `success`
+- [x] 4.3 Worker version at 100% of traffic — **`58e847c8-d7fb-49f8-8f11-fb1b9585e700`**
+- [x] 4.4 Scripted probe: `/workouts` and `/records` redirect a signed-out visitor — both `302 → /auth/signin`
+- [x] 4.5 New API routes present in the built manifest — all six in `dist/server/chunks/worker-entry_*.mjs` (**not** `virtual_astro_middleware.mjs`, which the plan named), and proven live: the three `GET …/impact` answer `401 unauthenticated` and the `PATCH`/`DELETE` answer `403` from Astro's `checkOrigin`, while an invented route on the same prefix answers `404`
 
 #### Manual
 
-- [ ] 4.6 Edit a set on the public address and see `/records` change
-- [ ] 4.7 Delete a record-holding workout on the public address and see the record fall as warned
-- [ ] 4.8 Remove an exercise from a workout on the public address
+- [x] 4.6 Edit a set on the public address and see `/records` change
+- [x] 4.7 Delete a record-holding workout on the public address and see the record fall as warned
+- [x] 4.8 Remove an exercise from a workout on the public address
 
 ### Phase 5: Truth up the documents
 

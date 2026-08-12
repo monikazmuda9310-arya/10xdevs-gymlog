@@ -114,6 +114,19 @@ gate can see that state.
   "no other set could hold it"; a deletion keeps them as two distinct sentences, which is what
   criterion 3.8 checks.
 
+- **Phase 4 — the plan named the wrong file for the route manifest.** Criterion 4.5 said the new API
+  routes should be visible in `dist/server/virtual_astro_middleware.mjs`. They are not: that file
+  holds the middleware, and the route table lives in `dist/server/chunks/worker-entry_*.mjs`. The
+  criterion was checked there instead, and then checked again against the deployed address, which is
+  the stronger evidence: the three `GET …/impact` routes answer `401 unauthenticated`, the `PATCH`
+  and `DELETE` routes answer `403` from Astro's `checkOrigin` (a non-GET with no matching `Origin` —
+  the documented trap), and an invented route on the same prefix answers `404`. Without that last
+  contrast the first two results would prove nothing.
+- **Phase 4 — the phase-3 SHA write-back needed its own commit before the push.** Criterion 4.1
+  ("nothing local and unpushed") cannot be satisfied while the previous phase's Progress edit sits
+  dirty, because a phase's own SHA cannot be inside its own commit. Landed as
+  `chore(edit-and-delete-log): record phase 3 SHAs in Progress`, the same shape S-03 used twice.
+
 ### Working mode
 
 No subagents unless the owner asks — including for skills that spawn them by default
