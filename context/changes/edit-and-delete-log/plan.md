@@ -804,21 +804,21 @@ need nothing done to them: records are derived, so the first read after a deleti
 
 #### Automated
 
-- [x] 3.1 Lint, typecheck, unit, integration and build all pass — 165 unit, 83 integration
-- [x] 3.2 Built client bundle contains no `zod` and no `@supabase/` — grep over `dist/client/_astro/`, with a sanity match proving the same grep can find something that is there
-- [x] 3.3 `WorkoutDetail` island size recorded before and after, measured against the ~15 KB threshold — before **10 689 B**; with the shadcn/radix `alert-dialog` **50 720 B (+40 KB)** plus a new 5 194 B chunk, so the threshold decided against it; shipped on the native `<dialog>` at **16 086 B (+5 397 B)**, plus shared `RecordImpactDialog` 6 551 B and the new `WorkoutHeader` island 4 654 B
+- [x] 3.1 Lint, typecheck, unit, integration and build all pass — 165 unit, 83 integration — 16e4dfe
+- [x] 3.2 Built client bundle contains no `zod` and no `@supabase/` — grep over `dist/client/_astro/`, with a sanity match proving the same grep can find something that is there — 16e4dfe
+- [x] 3.3 `WorkoutDetail` island size recorded before and after, measured against the ~15 KB threshold — before **10 689 B**; with the shadcn/radix `alert-dialog` **50 720 B (+40 KB)** plus a new 5 194 B chunk, so the threshold decided against it; shipped on the native `<dialog>` at **16 086 B (+5 397 B)**, plus shared `RecordImpactDialog` 6 551 B and the new `WorkoutHeader` island 4 654 B — 16e4dfe
 
 #### Manual
 
-- [x] 3.4 Editing a set below the runner-up shows the conditional warning with the correct fall value
-- [x] 3.5 Deleting the heaviest-record set warns about the heaviest record
-- [x] 3.6 Deleting a workout holding two exercises' records names both
-- [x] 3.7 With the impact endpoint failing, the dialog says the consequence is unknown, not "no record affected" — verified against a forced throw in `sets/[id]/impact.ts`, reverted immediately after
-- [x] 3.8 The two no-successor outcomes read as different sentences
-- [x] 3.9 Editing a set removes its record badge
-- [x] 3.10 Deleting the last set of an entry leaves a usable, still-removable entry
-- [x] 3.11 The dialog is fully keyboard-operable and traps focus
-- [x] 3.12 The dialog is usable at 360 px
+- [x] 3.4 Editing a set below the runner-up shows the conditional warning with the correct fall value — 16e4dfe
+- [x] 3.5 Deleting the heaviest-record set warns about the heaviest record — 16e4dfe
+- [x] 3.6 Deleting a workout holding two exercises' records names both — 16e4dfe
+- [x] 3.7 With the impact endpoint failing, the dialog says the consequence is unknown, not "no record affected" — verified against a forced throw in `sets/[id]/impact.ts`, reverted immediately after — 16e4dfe
+- [x] 3.8 The two no-successor outcomes read as different sentences — 16e4dfe
+- [x] 3.9 Editing a set removes its record badge — 16e4dfe
+- [x] 3.10 Deleting the last set of an entry leaves a usable, still-removable entry — 16e4dfe
+- [x] 3.11 The dialog is fully keyboard-operable and traps focus — 16e4dfe
+- [x] 3.12 The dialog is usable at 360 px — 16e4dfe
 
 ### Phase 4: Deploy, and prove it on the public address
 
