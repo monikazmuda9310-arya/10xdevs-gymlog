@@ -77,6 +77,29 @@ without changing the test and saying so.**
   UTC. A Sunday-evening session belongs to that week.
 - **Zero-weight sets contribute reps but no tonnage. Negative-weight (assisted) sets are excluded
   from 1RM and from record detection**, and contribute zero — never a negative amount — to tonnage.
+  - **Since S-07 that is one SQL term, not two branches**: `sum(s.reps * greatest(s.weight_kg, 0))`
+    in `public.daily_tonnage`. `greatest` implements both halves at once. Removing it makes an
+    assisted set subtract — measured at **−160 kg** by the S-07 mutation protocol.
+  - **`weight_kg`, never `weight`.** Since S-06 one account can hold both units at once, so summing
+    the number typed produces a figure with no unit and no meaning. Nothing but a reader would catch
+    it: assertion 3 of `tests/integration/weekly-tonnage.test.ts` is that reader.
+  - **A week with sets but zero tonnage is not an empty week.** A week of planks has `hasSets: true`
+    and `kilograms: 0`, and the screen must say "no external load" rather than "you did not train".
+    The figure cannot carry that distinction; `hasSets` does.
+- **A training week is decided in TypeScript and nowhere else, and the database never learns what a
+  week is.** `trainingWeeksFor` in `src/lib/services/calendar.ts` is the single definition — pinned
+  at both DST transitions, the Sunday boundary, and month and year ends. `public.daily_tonnage` is
+  grouped by the raw `performed_on` and receives four date strings. **Never add `date_trunc('week',
+  …)` to SQL**: that is a second answer to the same question, the hazard this repository already
+  carries twice (the 1RM `case` expression and `0.45359237`) and documents both times.
+  - **The profile timezone decides what "today" is, and nothing else.** Turning an instant into a
+    calendar date needs a zone; reinterpreting a stored `performed_on` through one invents an instant
+    that never existed and moves dates by a day at the edges. **No SQL in this repository may
+    reference `profiles.timezone`.**
+  - **Week arithmetic must not subtract milliseconds.** `Europe/Warsaw` has two DST transitions a
+    year, so a week is sometimes 167 or 169 hours. `calendar.ts` works on the `getUTC*` accessors of
+    a zoneless date — which is not "converting through UTC", because there is no zone to convert
+    from; UTC is simply the frame with no DST.
   - **A zero or negative load requires the exercise's `is_bodyweight` flag** (FR-014). A plank at 0
     is honest; a squat at 0 is a typo that would silently zero out a week's tonnage. **This rule
     cannot be a check constraint** — the answer lives in `exercises.is_bodyweight`, a different
@@ -92,10 +115,16 @@ without changing the test and saying so.**
     and every total. **Never write `weight_kg`** — Postgres refuses a non-DEFAULT value for a
     generated column, and the generated types cannot express that, so they list it as optional on
     Insert.
-  - **The conversion factor `0.45359237` has exactly two copies and they must agree**: the
-    generated column in `20260811005248_create_workout_log_with_row_ownership.sql` and `KG_PER_LB`
-    in `src/lib/services/set-display.ts`. A third, rounder one written elsewhere makes two answers
-    possible for the same set.
+  - **The conversion factor `0.45359237` has exactly two copies IN PRODUCTION CODE and they must
+    agree**: the generated column in `20260811005248_create_workout_log_with_row_ownership.sql` and
+    `KG_PER_LB` in `src/lib/services/set-display.ts`. A third, rounder one written elsewhere makes
+    two answers possible for the same set. Convert scalars through `kilogramsIn` and sets through
+    `weightInUnit`, both in that module — never with a literal at a call site.
+    - **Three integration suites restate the constant on purpose and are not copies in this sense**
+      (`preferences-derive`, `weekly-tonnage`, `workout-mutations-rls`). Each is checking the
+      generated column from OUTSIDE, so sharing the production constant would make the check
+      circular. **Say "two in production" rather than a bare count** — this line has been "corrected"
+      to three and then to four by readers grepping the literal, and both corrections were wrong.
   - **The stored unit comes from `profiles.weight_unit` on the server, never from a request body.**
     A client that could name the unit could store `100` marked as pounds while the user typed
     kilograms, and every figure derived from `weight_kg` would be wrong afterwards.
@@ -255,7 +284,7 @@ grant select on public.<v> to authenticated;
   hands **every account's training to every account**, through a route that reads exactly like the
   safe ones. There is no error and no warning; the rows simply arrive.
 - **Only `select` is granted.** A view over aggregates is not writable and nothing should imply it is.
-- **The flag is per view and is NOT inherited — but the two views here are not equally protected by
+- **The flag is per view and is NOT inherited — and the three views here are not equally protected by
   it, and that was measured rather than assumed.** Removing it from `set_estimates` leaks
   immediately and assertion 2 of `tests/integration/personal-records.test.ts` fails. Removing it
   from `personal_records` alone changes nothing observable, because every row that view emits is
@@ -264,6 +293,12 @@ grant select on public.<v> to authenticated;
   access through PostgREST. The flag stays anyway: point `personal_records` at `public.sets`
   directly — an edit somebody will plausibly make "for performance" — and it becomes the only thing
   standing between one account and another's log. Treat it as a tripwire for a human reviewer.
+  - **`daily_tonnage` (S-07) stands where `set_estimates` does, not where `personal_records` does**,
+    because it reads `sets`, `exercise_entries` and `workouts` **directly**. Its flag is therefore
+    load-bearing and **proven so**: assertion 7 of `tests/integration/weekly-tonnage.test.ts` fails
+    when it is removed, and the S-07 mutation protocol confirmed it — with the flag off, account B
+    read **ten rows of account A's tonnage**. So of the three, two flags are guards and one is a
+    tripwire. **Which kind a new view gets is decided by what it reads, not by where it sits.**
 - **The explicit `.eq("user_id", …)` still belongs on every read of a view**, for the reason it
   belongs on a table: the policy is the guarantee, the filter is the index path.
 - **Generated types make every view column nullable.** `supabase gen types` cannot prove not-null
@@ -452,6 +487,16 @@ export `const prerender = false`.
 - **Unit tests run on Vitest and live beside the code** as `src/**/*.test.ts` (`vitest.config.ts`
   at the repository root). Import the subject through the `@/` alias, and import `describe` / `it` /
   `expect` from `"vitest"` — globals are off on purpose.
+- **`vitest.config.ts` pins `TZ` to `America/New_York`, and both properties of that zone are
+  load-bearing.** `calendar.ts` computes week boundaries in a frame with no zone and no DST, and two
+  different reflexes break it: local-`Date` millisecond arithmetic (caught only where the ambient
+  zone HAS daylight saving) and `getDay()` for `getUTCDay()` (caught only where the ambient offset is
+  NEGATIVE, since only there is midnight-UTC the previous day locally). **CI runners are UTC, so
+  without the pin neither guard bites where it matters** — measured in S-07, where both mutations
+  passed under UTC. The first pin tried was `Europe/Warsaw`, the product's own default, which read as
+  principled and left the second guard inert. That the pinned zone is nobody's real zone is the
+  point: the value under test is supposed to be zone-independent. **The config setting overrides a
+  `TZ` prefix on the command line**, so mutating either guard means editing the config.
 - **The harness deliberately does not load Astro's Vite pipeline.** Anything under test must not
   import an `astro:*` virtual module (`astro:env/server` and friends) — it will fail to resolve.
   That is the guardrail that keeps the domain calculations plain and dependency-free.
@@ -477,6 +522,18 @@ export `const prerender = false`.
   - **Assert against re-read rows.** Every negative assertion is paired with a read back as the
     row's owner: the failure mode worth catching is a caller told "nothing happened" while the
     write landed.
+  - **Pick a MARK that is not a prefix of, and not prefixed by, an existing one.** `s03-` is a strict
+    prefix of `s03-endpoints-` and `s03-page-`, so `workout-log-rls` deletes two other suites'
+    fixtures. Benign only because `fileParallelism: false` orders them, and a live trap for the next
+    suite.
+  - **Never mutate the column your own cleanup keys on.** S-07's moved-workout assertion PATCHed
+    `note: null` — and `updateWorkoutSchema` is a full replacement, so it cleared the very column
+    `beforeAll` deletes by. The moved row survived every later teardown and poisoned its date window
+    permanently; the orphan had to be deleted by hand. Re-send the mark instead, and prove the suite
+    repeatable by running it twice.
+  - **A suite that filters by DATE RANGE cannot rely on a name prefix at all**, because the range
+    does not care what anything is called. `weekly-tonnage.test.ts` gives every test its own pair of
+    weeks, anchored in a year no other suite writes to, and passes an explicit `now` to get there.
   - **Fixture discipline**: reset the fixture rows in `beforeAll`, write run-unique values, restore
     in a `finally`. Shared rows plus an interrupted run is how a suite starts failing for reasons
     unrelated to the code, repairable only by hand-written SQL.
@@ -631,7 +688,7 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
       row, not to the account editing it: re-stamping it from the profile would turn 100 lb into
       100 kg the first time somebody fixed a typo after S-06 let them switch, silently corrupting
       every figure derived from `weight_kg`.
-- **Two views, added by S-04** — the first database objects here that are not tables.
+- **Three views. Two added by S-04** — the first database objects here that are not tables.
   `public.set_estimates` is one row per set with its estimated 1RM under the row owner's own
   formula; `public.personal_records` is one row per exercise the account has logged, with the best
   estimate and the heaviest weight, each backed by the set that still holds it. Both
@@ -639,6 +696,16 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
   **neither stores anything**. Read at `/records` and by `/api/sets`, which returns the record
   verdict beside the set it just saved. An exercise logged only at zero load still gets a row, with
   both records null, so the screen can say why rather than omitting a lift the user logged.
+- **`public.daily_tonnage`, added by S-07** — one row per account per day with that day's tonnage,
+  `sum(reps * greatest(weight_kg, 0))`. **It emits no row for a day with no sets**, so the zero a
+  screen shows for an empty week is synthesised in `src/lib/services/tonnage.ts` and must never be
+  produced by a failed read — that read throws instead, and `/dashboard` catches it in the
+  frontmatter and shows its failure sentence with no figure at all. Read only by `/dashboard`.
+  - **The Worker folds at most 14 rows and that is not a violation of "aggregate in Postgres".** The
+    rule exists because work proportional to the number of SETS grows without bound under the 10 ms
+    CPU cap; folding two weeks of daily totals is work proportional to the number of DAYS, which is
+    constant. The per-set arithmetic stays in SQL. The service header says this, and the service
+    throws rather than silently folding a wider window.
 - **Three enums**: `weight_unit`, `estimation_formula`, and `muscle_group` — the last with exactly
   six values, pinned in both directions by `MUSCLE_GROUPS` in `src/types.ts` and a compile-time
   assertion. Add a seventh to the database without adding it there and the build fails, rather than

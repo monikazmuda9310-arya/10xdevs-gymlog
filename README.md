@@ -165,7 +165,7 @@ and `http://localhost:4321/**` for local work.
 | `/auth/signin`          | Email/password sign-in form. On success → `/dashboard`                                                                   |
 | `/auth/signup`          | Email/password sign-up form. On success → `/dashboard`, or `/auth/confirm-email` when a confirmation email is on its way |
 | `/auth/confirm-email`   | "Check your inbox" page — reached only when an email is genuinely coming                                                 |
-| `/dashboard`            | Protected page (redirects to `/auth/signin` when signed out)                                                             |
+| `/dashboard`            | Protected. Total tonnage for this training week next to last week's, plus links into the rest of the product            |
 | `/exercises`            | Protected. The catalogue: 38 seeded exercises plus the account's own, with search and a muscle-group filter              |
 | `/workouts`             | Protected. The account's own workouts, most recent first, and the form that starts one dated today in their timezone     |
 | `/workouts/[id]`        | Protected. One workout: add exercises, log sets, see each set's estimated 1RM. **404 for a workout that is not yours**   |
@@ -215,6 +215,21 @@ number you typed" pull against each other and the product settles the conflict r
   either side of ten repetitions. Switching back restores the previous figures exactly.
 - **Timezone moves no logged workout.** `performed_on` is a calendar date you stated, not an instant.
   It decides which week a session belongs to and what date a new workout defaults to, nothing else.
+
+### Weekly tonnage
+
+`/dashboard` shows total tonnage for the current training week and the previous one (FR-017).
+
+- **A training week runs Monday to Sunday in your own timezone**, so a Sunday-evening session counts
+  in that week. The week is decided in `src/lib/services/calendar.ts` and nowhere else — the database
+  never learns what a week is, and no SQL here reads `profiles.timezone`.
+- **Tonnage is repetitions × weight, summed.** A zero-load set contributes nothing and an assisted
+  set contributes nothing rather than a negative amount — one term, `greatest(weight_kg, 0)`.
+- **Nothing is stored.** `public.daily_tonnage` sums at read time. Moving a workout to another date
+  recomputes both affected weeks on the next read, with no write and nothing to invalidate.
+- **A week with no sets reads as `0` with a sentence saying so.** A week of planks reads as `0`
+  without that sentence — it had sets, just no external load. A failed read shows no figure at all,
+  because an emitted zero is a positive claim.
 
 Each `…/impact` answers `{ impact: [...] }`. **When the ranking read fails it answers a non-2xx
 `impact_unavailable`, never an empty list** — "nothing is at stake" is a positive claim, and the

@@ -252,3 +252,64 @@
   do not write a comment saying it does.
 - **Applies to**: every shared-fixture integration suite, and more generally to any cleanup-based
   guarantee where the cleanup can be skipped by something outside the program's control.
+
+## A handover that passes two decisions in one sentence is inherited as one decision
+
+- **Context**: `context/archive/2026-08-11-edit-and-delete-log/plan.md:123-126`, written by S-05 and
+  read by S-07's planning on 2026-08-13.
+- **Problem**: one sentence handed the next slice **two different open questions** — FR-006's
+  warning-on-a-date-change and PRD Open Question 2's warning-on-a-muscle-group-change. They have
+  different subjects, different consequences and, as the roadmap already recorded in three places,
+  different owners: the second belongs to S-08, because a muscle-group correction moves tonnage
+  **between** per-group buckets and cannot change the weekly total at all. `STATE.md` copied the
+  merged version, and the next slice's own `change.md` copied it from there. It took a fresh reader
+  and a second document to separate them again — and by then the merged claim had been repeated in
+  three places and had budgeted a phase for a question that could not arise.
+- **Rule**: **a handover names one decision per sentence, with its owner and the reason it is
+  theirs.** Where two open questions touch the same feature, say what makes them different in the
+  same breath as handing them over — otherwise the difference is the first thing lost, and what
+  survives is the shorter, wronger version. And when you inherit one, check it against the roadmap
+  and the schema before planning around it: an inherited claim about SCOPE is exactly as checkable as
+  an inherited claim about coverage, and this project has now been wrong about both.
+- **Applies to**: every `## Phase 5` document contract, every "what X left Y" section in a handoff,
+  and every plan that opens by restating what it inherited.
+
+## A test whose title claims more than its body asserts becomes the citation
+
+- **Context**: assertion 9 of `tests/integration/record-impact.test.ts`, titled "moving a session
+  across a Monday changes its week and leaves every record alone". Found during S-07 planning.
+- **Problem**: the body asserts that `getUTCDay()` of two hardcoded constants is 0 and 1 — a fact
+  about JavaScript, not about the product — that `performed_on` propagates through a view, and that
+  the record is unchanged. It computes no week, sums no tonnage and never varies the timezone.
+  "Changes its week" is arithmetic the reader does in their head from two date literals. The title
+  was then cited as proof of week-boundary behaviour in three separate documents, and on that basis
+  a real acceptance criterion (US-03's "moving a workout recomputes both affected weeks") was
+  recorded as covered while nothing in the repository could even answer which week a workout was in.
+- **Rule**: **a test title is a claim, and it will be quoted by people who do not open the file.**
+  Title the assertion after what the body actually checks, and when the setup implies more than the
+  assertions verify, say so in a comment inside the test. The failure is not the missing coverage —
+  gaps are normal and cheap to fill — it is that the gap became invisible, because every later reader
+  found a green test with the right name.
+- **Applies to**: every test whose name contains a domain claim, and to any document citing a test as
+  evidence — cite the assertion, not the title.
+
+## A guard can be inert because of the ENVIRONMENT it runs in, not because of what it asserts
+
+- **Context**: `src/lib/services/calendar.ts` and `vitest.config.ts`, S-07 Phase 1, 2026-08-13.
+- **Problem**: two mutations from the plan's own protocol were expected to break the week-boundary
+  suite and **neither did**. Not because the assertions were weak — they were fine — but because the
+  ambient timezone of the test process decided whether the defect was observable at all. Subtracting
+  milliseconds is exact when the value is anchored at `T00:00:00Z`, because UTC has no daylight
+  saving; `getDay()` and `getUTCDay()` differ only where the ambient offset is negative. CI runners
+  are UTC, so both guards were decoration **in the gate**, which is the only place they matter. Worse,
+  the first fix chosen — pinning `TZ` to `Europe/Warsaw`, the product's own default and the owner's
+  zone — read as principled and silently left the second mutation inert, because Warsaw's offset is
+  positive. Only a zone with **both** properties (DST and a negative offset) exercises both.
+- **Rule**: **when a guard's subject is environment-dependent, pin the environment in the config and
+  say which property of it is load-bearing.** Then re-run every mutation under the pin: a mutation
+  that passed before the pin and fails after it was never testing what you thought. Beware the
+  "principled" choice of environment — matching production sounds right and often exercises fewer
+  paths than a deliberately hostile one, because the value under test is usually supposed to be
+  environment-independent.
+- **Applies to**: timezones, locales, filesystem case-sensitivity, line endings, and any other
+  ambient setting that differs between a developer's machine and CI.

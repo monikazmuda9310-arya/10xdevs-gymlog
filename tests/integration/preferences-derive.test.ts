@@ -329,11 +329,21 @@ describe("changing the timezone moves no workout", () => {
     // profile's timezone. That is the SAME position assertion 2's neighbour is in at the bottom of
     // the "unit" block — which this file DECLINES to assert, for reasons stated there. The two are
     // decided differently on purpose, and the difference is this: the edit that would make this one
-    // bite is concrete and plausible, and S-07 is the slice that will make it. A weekly view that
-    // derives Monday–Sunday boundaries by converting `performed_on` through the profile zone would
-    // turn a stored date into an instant, and this assertion is what would notice. Delete it when
-    // that is no longer true, not before. (context/foundation/lessons.md — "An assertion you keep
-    // because it cannot fail YET must say so in the same words you'd use to refuse one".)
+    // bite is concrete and plausible: a weekly view that derives Monday–Sunday boundaries by
+    // converting `performed_on` through the profile zone would turn a stored date into an instant.
+    //
+    // **CORRECTED 2026-08-13, when S-07 landed.** This comment used to name S-07 as the slice that
+    // would make it bite. It did not: S-07 considered that view and refused it — `daily_tonnage` is
+    // grouped by the raw `performed_on` and its migration header forbids `date_trunc('week', …)` and
+    // any reference to `profiles.timezone`. And S-07's arrival showed the naming was too generous
+    // anyway: a mis-projecting weekly VIEW would move neither `workouts.performed_on` nor
+    // `personal_records`' date columns, so this assertion would not have noticed it either. The real
+    // guard on that rule is the grep over the migration file.
+    //
+    // The plausible next author of the edit is **S-08**, widening `daily_tonnage` to derive a week in
+    // SQL. Keeping the name current is the only thing separating a tripwire from decoration
+    // (`context/foundation/lessons.md` — "An assertion you keep because it cannot fail YET must say
+    // so in the same words you'd use to refuse one").
     await freshEntry(ownerA, "tz-today", TODAY);
     await freshEntry(ownerA, "tz-newyear", "2026-01-01");
     await freshEntry(ownerA, "tz-leap", "2024-02-29");

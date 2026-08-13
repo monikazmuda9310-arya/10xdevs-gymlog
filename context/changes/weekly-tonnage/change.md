@@ -99,3 +99,49 @@ A slice whose outcome is a screen carries its own deployment phase, and the depl
 
 The gate is **six** steps since S-06: `lint` → `typecheck` → `test` → `test:render` →
 `test:integration` → `build`.
+
+### Deviations from the plan, and what they cost (implementation, 2026-08-13)
+
+Five phases, five commits plus two write-backs. Nothing in § What We're NOT Doing was violated: no
+per-group breakdown, no warning on a date change, no delta, no volume fixture, no island, no stored
+derived value, no change to the two existing views, no new index, no E2E.
+
+1. **`vitest.config.ts` pins `TZ`, which the plan did not name.** It is what makes Phase 1's mutation
+   protocol mean anything: both mutations were inert under UTC, the zone CI runs in. The first pin
+   chosen — `Europe/Warsaw`, the product's default — read as principled and left the second mutation
+   inert, because that zone's offset is positive. `America/New_York` carries both required
+   properties. Recorded in `lessons.md`.
+2. **The integration suite gives every test its own pair of weeks**, which the plan did not
+   anticipate. A suite that aggregates by date range cannot be isolated by a name prefix, because the
+   range does not care what a row is called. Found when four assertions read each other's fixtures.
+3. **The moved-workout test poisoned the fixture and had to be fixed.** It PATCHed `note: null`, and
+   `updateWorkoutSchema` is a full replacement — so it cleared the very column `beforeAll` cleans up
+   by. The row survived every later teardown. The orphan was deleted by hand, the test now re-sends
+   its mark, and repeatability was proved by running twice rather than assumed.
+4. **Mutations (a), (c) and (e) of Phase 2 needed a temporary view swap on `gymlog-test`, which
+   S-06's plan review (F2) forbade.** Escalated and allowed by the owner. The two reasons behind that
+   rule do not both hold here — nothing depends on `daily_tonnage`, so no drop cascades — and the
+   verification gap that caused it was closed rather than ignored: each mutation went through a
+   scratchpad runner that refuses a URL equal to production's, and every restore was confirmed by
+   reading `security_invoker`, `GREATEST` and `weight_kg` back out of `pg_class`, not assumed.
+5. **`set_count` was dropped from the view before it was written.** The plan carried it with a
+   justification the review showed to be false: the view is grouped over `sets`, so a row exists iff
+   the day has at least one set and the column is never `0` in an emitted row. Row presence answers
+   the question; a column whose justification cannot be exercised is one a future reader assumes
+   something depends on.
+
+**Findings recorded rather than smoothed over:**
+
+- **Phase 2's mutation (d) does not bite.** No assertion in the integration suite provokes a read
+  failure and none writable from it can — the suite holds only a publishable key and cannot make the
+  database unreachable. The guarantee was named as unproven **and the edit that would prove it was
+  named with it**: Phase 3's render assertion. Phase 3 then proved it.
+- **Plan-review finding F20 was stale.** It said `AGENTS.md` claims a five-step gate and `README.md`
+  omits `test:render`. Both were corrected in S-06's Phase 5; nothing was "fixed" here.
+- **The `KG_PER_LB` count has now been miscorrected twice** — once to three, once to four — by
+  readers grepping the literal. There are **two copies in production code**, which is what the rule is
+  about, plus three integration fixtures that restate it deliberately to check the generated column
+  from outside. `AGENTS.md` now says "two in production" and explains why a bare count is wrong.
+
+**Deployed**: Worker `20e74767-c789-417c-8c90-4dbec665d892` at 100% of traffic, CI **#51** green for
+`d4548bb`. Tests: **211 unit, 103 integration, 18 render**.

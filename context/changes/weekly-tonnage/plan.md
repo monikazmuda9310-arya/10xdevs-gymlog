@@ -859,25 +859,25 @@ must have the view before the committed types are right.
 
 #### Automated
 
-- [x] 4.1 `git status` clean and `git log origin/main..HEAD` empty — checked before the push; four commits landed `f8bdb5e..d4548bb`
-- [x] 4.2 CI run for the deployed SHA green — run number recorded here — **run #51**, for exactly `d4548bb`, all six gate steps green
-- [x] 4.3 `npm run db:status` shows the migration on both projects before the deploy — `20260813150000` on `gymlog-test` and on `gymlog`, confirmed **before** `wrangler deploy`, not after — a Worker reading a view production does not have would 500 on every request
-- [x] 4.4 Worker version at 100% of traffic — version id recorded here — **`20e74767-c789-417c-8c90-4dbec665d892`**. No new Worker secret; this slice adds no environment variable
-- [x] 4.5 Scripted probe: `/dashboard` redirects a signed-out visitor — `302 → /auth/signin`; controls `/records` → the same and `/` → `200`. Probed with `node -e 'fetch(...)'`, never `curl` — schannel fails TLS on fresh Cloudflare hosts
-- [x] 4.6 Probe: `daily_tonnage` answers a permission error (route exists) rather than `PGRST205` (schema cache never reloaded) — **`401`, code `42501`** against production's PostgREST — the route is in the schema cache and `anon` is correctly refused. `PGRST205` would have meant the `notify pgrst` never landed, which looks identical to a missing view from the screen
+- [x] 4.1 `git status` clean and `git log origin/main..HEAD` empty — checked before the push; four commits landed `f8bdb5e..d4548bb` — e571cca
+- [x] 4.2 CI run for the deployed SHA green — run number recorded here — **run #51**, for exactly `d4548bb`, all six gate steps green — e571cca
+- [x] 4.3 `npm run db:status` shows the migration on both projects before the deploy — `20260813150000` on `gymlog-test` and on `gymlog`, confirmed **before** `wrangler deploy`, not after — a Worker reading a view production does not have would 500 on every request — e571cca
+- [x] 4.4 Worker version at 100% of traffic — version id recorded here — **`20e74767-c789-417c-8c90-4dbec665d892`**. No new Worker secret; this slice adds no environment variable — e571cca
+- [x] 4.5 Scripted probe: `/dashboard` redirects a signed-out visitor — `302 → /auth/signin`; controls `/records` → the same and `/` → `200`. Probed with `node -e 'fetch(...)'`, never `curl` — schannel fails TLS on fresh Cloudflare hosts — e571cca
+- [x] 4.6 Probe: `daily_tonnage` answers a permission error (route exists) rather than `PGRST205` (schema cache never reloaded) — **`401`, code `42501`** against production's PostgREST — the route is in the schema cache and `anon` is correctly refused. `PGRST205` would have meant the `notify pgrst` never landed, which looks identical to a missing view from the screen — e571cca
 
 #### Manual
 
-- [x] 4.7 Public address: both figures on the dashboard after signing in — owner confirmed 2026-08-13
-- [x] 4.8 Public address: logging a set moves this week's figure and not last week's — owner confirmed 2026-08-13
-- [x] 4.9 Public address: switching the unit changes both figures together — owner confirmed 2026-08-13
+- [x] 4.7 Public address: both figures on the dashboard after signing in — owner confirmed 2026-08-13 — e571cca
+- [x] 4.8 Public address: logging a set moves this week's figure and not last week's — owner confirmed 2026-08-13 — e571cca
+- [x] 4.9 Public address: switching the unit changes both figures together — owner confirmed 2026-08-13 — e571cca
 
 ### Phase 5: Truth up the documents
 
 #### Automated
 
-- [ ] 5.1 Lint, typecheck, unit, render, integration and build all pass
-- [ ] 5.2 Every newly cited file path and assertion name resolves
-- [ ] 5.3 A script confirms the README line, STATE.md's corrected assertion-9 claim, and the roadmap's
-      S-07 status and resolved "Full record" path
+- [x] 5.1 Lint, typecheck, unit, render, integration and build all pass — 211 unit, 18 render, 103 integration
+- [x] 5.2 Every newly cited file path and assertion name resolves — a script resolved 8 paths and 9 named symbols/assertions; all 17 resolved
+- [x] 5.3 A script confirms the README line, STATE.md's corrected assertion-9 claim, and the roadmap's
+      S-07 status and resolved "Full record" path — 15 checks. **One failed on the first run and it was a real miss**: the assertion-9 claim survived in TWO places in STATE.md, and my regex caught neither. Both are historical handoff sections, so they are annotated as corrected rather than rewritten
 - [ ] 5.4 `git log origin/main..HEAD` empty after the phase commit
