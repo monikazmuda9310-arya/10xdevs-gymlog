@@ -715,7 +715,7 @@ failed restore.
 
 #### Automated
 
-- [x] 5.1 Lint, typecheck, unit, integration and build all pass — 183 unit, 5 render, 95 integration; the gate is **six** steps now
-- [x] 5.2 Every newly cited file path and assertion name resolves — a script resolved 10 paths and 15 named symbols/assertions (`WEIGHT_UNITS`, both tuple assertions, both label records, `isSupportedTimeZone`, `updateProfile`, the three `preferences-derive` assertion titles, the fabricated-id assertion title, the `test:render` script and its CI step). All 25 resolved
-- [x] 5.3 A script confirms the README rows, STATE.md's Open Question 2 note and the roadmap's S-06 status — 12 checks, all passing: both README route rows, "unit affects NEW sets only", the headline-converted/evidence-as-typed rule, STATE.md naming Open Question 2 as S-07's, roadmap S-06 `done` in **both** the At a glance row and the item body, and four AGENTS.md claims (six-step gate, re-derivation, holder change, the 418-zone measurement) plus the three new `lessons.md` entries
-- [x] 5.4 `git log origin/main..HEAD` empty after the phase commit — pushed with the epilogue
+- [x] 5.1 Lint, typecheck, unit, integration and build all pass — 183 unit, 5 render, 95 integration; the gate is **six** steps now — 2685fc0
+- [x] 5.2 Every newly cited file path and assertion name resolves — a script resolved 10 paths and 15 named symbols/assertions (`WEIGHT_UNITS`, both tuple assertions, both label records, `isSupportedTimeZone`, `updateProfile`, the three `preferences-derive` assertion titles, the fabricated-id assertion title, the `test:render` script and its CI step). All 25 resolved — 2685fc0
+- [x] 5.3 A script confirms the README rows, STATE.md's Open Question 2 note and the roadmap's S-06 status — 12 checks, all passing: both README route rows, "unit affects NEW sets only", the headline-converted/evidence-as-typed rule, STATE.md naming Open Question 2 as S-07's, roadmap S-06 `done` in **both** the At a glance row and the item body, and four AGENTS.md claims (six-step gate, re-derivation, holder change, the 418-zone measurement) plus the three new `lessons.md` entries — 2685fc0
+- [x] 5.4 `git log origin/main..HEAD` empty after the phase commit — pushed with the epilogue — 2685fc0
