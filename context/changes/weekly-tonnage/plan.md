@@ -835,25 +835,25 @@ must have the view before the committed types are right.
 
 #### Automated
 
-- [x] 3.0 Baseline `ls dist/client/_astro` from the pre-phase build recorded here — **18 files**: ExerciseCatalogue, Layout.css, NewWorkoutForm, PreferencesForm, RecordImpactDialog, SignInForm, SignUpForm, WorkoutDetail, WorkoutHeader, auth, client, index (x2), loader-circle, search, types, utils, workout
-- [x] 3.1 Lint, typecheck, unit, render, integration and build all pass — 211 unit (+9), 18 render (+7), 103 integration
-- [x] 3.2 `dashboard-tonnage.test.ts` passes: non-vacuity, absent profile, one-week-empty, change-together — 7 assertions across four rendered states
-- [x] 3.3 `kilogramsIn` and `tonnageFigure` unit-tested at zero, sub-unit, small and five-digit, both units — 9 assertions; the sub-unit case is the one that separates rounding-before from rounding-after
-- [x] 3.4 `dist/client/_astro` listing identical to the 3.0 baseline; no `@supabase/` in `dist/client/` — 18 files, same module names, **no new chunk**. Four content hashes moved (Layout.css, RecordImpactDialog, WorkoutDetail, WorkoutHeader) because `set-display.ts` gained an export those islands import — a rehash, not a new module
-- [x] 3.5 `tonnageFigure` passes an explicit locale — no bare `new Intl.NumberFormat()` — the only grep hit is the comment explaining why
-- [x] 3.6 Mutation (a): rounding before converting fails a pounds assertion — fails the sub-unit case: `0.4 kg` prints `0` in pounds where it must print `1`
-- [x] 3.7 Mutation (b): rendering `0` on a failed read fails the failure-state assertion — fails. **This is also the edit Progress 2.10 named**: the read-error guarantee the integration suite could not prove is proven here, at the screen
-- [x] 3.8 Mutation (c): dropping the conversion fails the kg-vs-lb assertion — fails
-- [x] 3.9 Mutation (d): converting only `current` fails the change-together assertion — fails — the half of US-03's fourth criterion a single-figure assertion would have missed
+- [x] 3.0 Baseline `ls dist/client/_astro` from the pre-phase build recorded here — **18 files**: ExerciseCatalogue, Layout.css, NewWorkoutForm, PreferencesForm, RecordImpactDialog, SignInForm, SignUpForm, WorkoutDetail, WorkoutHeader, auth, client, index (x2), loader-circle, search, types, utils, workout — 6e61fd4
+- [x] 3.1 Lint, typecheck, unit, render, integration and build all pass — 211 unit (+9), 18 render (+7), 103 integration — 6e61fd4
+- [x] 3.2 `dashboard-tonnage.test.ts` passes: non-vacuity, absent profile, one-week-empty, change-together — 7 assertions across four rendered states — 6e61fd4
+- [x] 3.3 `kilogramsIn` and `tonnageFigure` unit-tested at zero, sub-unit, small and five-digit, both units — 9 assertions; the sub-unit case is the one that separates rounding-before from rounding-after — 6e61fd4
+- [x] 3.4 `dist/client/_astro` listing identical to the 3.0 baseline; no `@supabase/` in `dist/client/` — 18 files, same module names, **no new chunk**. Four content hashes moved (Layout.css, RecordImpactDialog, WorkoutDetail, WorkoutHeader) because `set-display.ts` gained an export those islands import — a rehash, not a new module — 6e61fd4
+- [x] 3.5 `tonnageFigure` passes an explicit locale — no bare `new Intl.NumberFormat()` — the only grep hit is the comment explaining why — 6e61fd4
+- [x] 3.6 Mutation (a): rounding before converting fails a pounds assertion — fails the sub-unit case: `0.4 kg` prints `0` in pounds where it must print `1` — 6e61fd4
+- [x] 3.7 Mutation (b): rendering `0` on a failed read fails the failure-state assertion — fails. **This is also the edit Progress 2.10 named**: the read-error guarantee the integration suite could not prove is proven here, at the screen — 6e61fd4
+- [x] 3.8 Mutation (c): dropping the conversion fails the kg-vs-lb assertion — fails — 6e61fd4
+- [x] 3.9 Mutation (d): converting only `current` fails the change-together assertion — fails — the half of US-03's fourth criterion a single-figure assertion would have missed — 6e61fd4
 
 #### Manual
 
-- [x] 3.10 Local: both figures appear on `/dashboard` after signing in, without clicking — owner confirmed 2026-08-13
-- [x] 3.11 Local: logging a set moves this week's figure and not last week's — owner confirmed 2026-08-13
-- [x] 3.12 Local: switching the unit changes both figures together — owner confirmed 2026-08-13
-- [x] 3.13 Local: a plank at zero load leaves the figure unchanged — owner confirmed 2026-08-13
-- [x] 3.14 Local: moving a workout from the PREVIOUS week's Sunday to the CURRENT week's Monday moves tonnage between the two visible figures — owner confirmed 2026-08-13
-- [x] 3.15 Local: at 360 px both figures are readable and nothing overlaps — owner confirmed 2026-08-13
+- [x] 3.10 Local: both figures appear on `/dashboard` after signing in, without clicking — owner confirmed 2026-08-13 — 6e61fd4
+- [x] 3.11 Local: logging a set moves this week's figure and not last week's — owner confirmed 2026-08-13 — 6e61fd4
+- [x] 3.12 Local: switching the unit changes both figures together — owner confirmed 2026-08-13 — 6e61fd4
+- [x] 3.13 Local: a plank at zero load leaves the figure unchanged — owner confirmed 2026-08-13 — 6e61fd4
+- [x] 3.14 Local: moving a workout from the PREVIOUS week's Sunday to the CURRENT week's Monday moves tonnage between the two visible figures — owner confirmed 2026-08-13 — 6e61fd4
+- [x] 3.15 Local: at 360 px both figures are readable and nothing overlaps — owner confirmed 2026-08-13 — 6e61fd4
 
 ### Phase 4: Deploy, and prove it on the public address
 
