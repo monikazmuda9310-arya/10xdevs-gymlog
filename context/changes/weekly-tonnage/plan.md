@@ -876,8 +876,8 @@ must have the view before the committed types are right.
 
 #### Automated
 
-- [x] 5.1 Lint, typecheck, unit, render, integration and build all pass — 211 unit, 18 render, 103 integration
-- [x] 5.2 Every newly cited file path and assertion name resolves — a script resolved 8 paths and 9 named symbols/assertions; all 17 resolved
-- [x] 5.3 A script confirms the README line, STATE.md's corrected assertion-9 claim, and the roadmap's
+- [x] 5.1 Lint, typecheck, unit, render, integration and build all pass — 211 unit, 18 render, 103 integration — 9418028
+- [x] 5.2 Every newly cited file path and assertion name resolves — a script resolved 8 paths and 9 named symbols/assertions; all 17 resolved — 9418028
+- [x] 5.3 A script confirms the README line, STATE.md's corrected assertion-9 claim, and the roadmap's — 9418028
       S-07 status and resolved "Full record" path — 15 checks. **One failed on the first run and it was a real miss**: the assertion-9 claim survived in TWO places in STATE.md, and my regex caught neither. Both are historical handoff sections, so they are annotated as corrected rather than rewritten
-- [ ] 5.4 `git log origin/main..HEAD` empty after the phase commit
+- [x] 5.4 `git log origin/main..HEAD` empty after the phase commit — 9418028
