@@ -28,6 +28,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import type { Database } from "@/db/database.types";
+import { resetPreferences } from "./fixture-preferences";
 import {
   anySetSurvives,
   bestSurvivingEstimate,
@@ -217,6 +218,10 @@ beforeAll(async () => {
   const password = required("GYMLOG_TEST_PASSWORD");
 
   ownerA = await authenticate(url, key, EMAIL_A, password);
+
+  // Every ranking this suite reads comes through `set_estimates`, which derives under whatever
+  // formula the profile holds. Establish it rather than inherit it — see `./fixture-preferences.ts`.
+  await resetPreferences(ownerA.client, ownerA.userId);
 
   // Workouts first: deleting them cascades to entries and sets, which is what releases the
   // `on delete restrict` on the exercises this suite created. The reverse order fails.

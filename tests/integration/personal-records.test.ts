@@ -35,6 +35,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { APIContext } from "astro";
 
 import type { Database } from "@/db/database.types";
+import { resetPreferences } from "./fixture-preferences";
 import { estimateOneRepMax, type EstimationFormula } from "@/lib/services/one-rep-max";
 import { POST as addSetRoute } from "@/pages/api/sets/index";
 
@@ -226,6 +227,14 @@ beforeAll(async () => {
   anonymous = createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // **The formula this suite starts from is established here, not inherited.** `currentFormula()`
+  // below captures whatever the profile holds so it can restore it — which faithfully preserves a
+  // value a killed run left behind, rather than correcting it. Two other suites flip this column on
+  // these accounts. See `./fixture-preferences.ts`.
+  for (const owner of [ownerA, ownerB]) {
+    await resetPreferences(owner.client, owner.userId);
+  }
 
   // Workouts first: deleting them cascades to entries and sets, which is what releases the
   // `on delete restrict` on the exercises this suite created. The reverse order fails.

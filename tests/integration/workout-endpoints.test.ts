@@ -15,6 +15,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { APIContext } from "astro";
 
 import type { Database } from "@/db/database.types";
+import { resetPreferences } from "./fixture-preferences";
 import { POST as createWorkoutRoute } from "@/pages/api/workouts/index";
 import { POST as addEntryRoute } from "@/pages/api/exercise-entries/index";
 import { POST as addSetRoute } from "@/pages/api/sets/index";
@@ -65,6 +66,12 @@ beforeAll(async () => {
     throw new Error(`could not sign in ${EMAIL}: ${signIn.error?.message ?? "no session"}`);
   }
   userId = signIn.data.session.user.id;
+
+  // **This suite's own precondition, not somebody else's leftovers.** The `weight_unit` assertion
+  // below reads a value the endpoint stamps FROM THE PROFILE, and two other suites flip that column
+  // on this same account. They restore in a `finally` — which a killed process skips. See
+  // `./fixture-preferences.ts`.
+  await resetPreferences(client, userId);
 
   await client.from("workouts").delete().like("note", `${MARK}%`).eq("user_id", userId);
 
