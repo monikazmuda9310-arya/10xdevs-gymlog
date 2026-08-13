@@ -678,22 +678,22 @@ failed restore.
 
 #### Automated
 
-- [x] 3.1 Lint, typecheck, unit, integration and build all pass — 183 unit, 95 integration, plus 5 render
-- [x] 3.2 Built client bundle contains no `zod` and no `@supabase/` — grep over `dist/client/_astro/` found neither, and the control grep (`createRoot|useState`) matched three chunks, so the same grep can find something genuinely present. A third grep for `Pacific/Kiritimati` over all of `dist/client/` also found nothing
-- [x] 3.3 No zone name appears in any `astro-island` props payload in the rendered `/settings` HTML — `tests/render/settings-island.test.ts`, via Astro's container. **Mutated**: passing `timeZones={timeZones}` as an island prop leaked 415 zone names into `astro-island props` and failed the assertion, then reverted. **Deviation from the plan**: the check RENDERS rather than fetches, because `/settings` is behind `PROTECTED_ROUTES` and `astro dev` authenticates against production; the container needs no server, no session and no network, and reads the same HTML
-- [x] 3.4 The rendered `<option>` set equals `Intl.supportedValuesOf("timeZone")` — same suite, set-equality against the runtime list rather than a count
-- [x] 3.5 No estimate call site hardcodes a unit or a formula — no unit/formula literal appears as an argument to `estimateForLoggedSet`, `estimateOneRepMax`, `weightInUnit`, `bestEstimateFigure`, `heaviestFigure`, `impactSentence` or `fallToFigure` anywhere in `src/components` or `src/pages`. The only literals are `?? "kg"` / `?? "brzycki"` fallbacks on a profile READ, which is where a default belongs
-- [x] 3.6 Settings island's built size recorded here — **`PreferencesForm.D4stSJqD.js`, 5 441 B**, no new chunk. The timezone `<select>` contributes zero bytes to it
+- [x] 3.1 Lint, typecheck, unit, integration and build all pass — 183 unit, 95 integration, plus 5 render — d4c2c80
+- [x] 3.2 Built client bundle contains no `zod` and no `@supabase/` — grep over `dist/client/_astro/` found neither, and the control grep (`createRoot|useState`) matched three chunks, so the same grep can find something genuinely present. A third grep for `Pacific/Kiritimati` over all of `dist/client/` also found nothing — d4c2c80
+- [x] 3.3 No zone name appears in any `astro-island` props payload in the rendered `/settings` HTML — `tests/render/settings-island.test.ts`, via Astro's container. **Mutated**: passing `timeZones={timeZones}` as an island prop leaked 415 zone names into `astro-island props` and failed the assertion, then reverted. **Deviation from the plan**: the check RENDERS rather than fetches, because `/settings` is behind `PROTECTED_ROUTES` and `astro dev` authenticates against production; the container needs no server, no session and no network, and reads the same HTML — d4c2c80
+- [x] 3.4 The rendered `<option>` set equals `Intl.supportedValuesOf("timeZone")` — same suite, set-equality against the runtime list rather than a count — d4c2c80
+- [x] 3.5 No estimate call site hardcodes a unit or a formula — no unit/formula literal appears as an argument to `estimateForLoggedSet`, `estimateOneRepMax`, `weightInUnit`, `bestEstimateFigure`, `heaviestFigure`, `impactSentence` or `fallToFigure` anywhere in `src/components` or `src/pages`. The only literals are `?? "kg"` / `?? "brzycki"` fallbacks on a profile READ, which is where a default belongs — d4c2c80
+- [x] 3.6 Settings island's built size recorded here — **`PreferencesForm.D4stSJqD.js`, 5 441 B**, no new chunk. The timezone `<select>` contributes zero bytes to it — d4c2c80
 
 #### Manual
 
-- [ ] 3.7 Local: switching to pounds stores pounds for new sets; older sets read back as typed
-- [ ] 3.8 Local: switching the formula changes which set holds the best estimate for the fixture
-- [ ] 3.9 Local: the same set's estimate agrees on `/workouts/[id]` and on `/records`
-- [ ] 3.10 Local: switching the timezone changes a new workout's default date and moves no logged workout
-- [ ] 3.11 Local: switching a preference and back restores the original figures exactly
-- [ ] 3.12 The dashboard shows the training-week sentence and link, and no raw timezone string
-- [ ] 3.13 The settings screen is usable at 360 px
+- [x] 3.7 Local: switching to pounds stores pounds for new sets; older sets read back as typed — owner confirmed 2026-08-13
+- [x] 3.8 Local: switching the formula changes which set holds the best estimate for the fixture — owner confirmed 2026-08-13
+- [x] 3.9 Local: the same set's estimate agrees on `/workouts/[id]` and on `/records` — owner confirmed 2026-08-13
+- [x] 3.10 Local: switching the timezone changes a new workout's default date and moves no logged workout — owner confirmed 2026-08-13, **but only on the second attempt, and the first failure was the criterion's fault rather than the product's.** `Pacific/Kiritimati` (+14) was tried first: at 08:26 UTC it reads 22:26 on the SAME calendar date as `Europe/Warsaw`, so nothing on screen changed and the check appeared to fail. Exactly 9 of the 418 zones were on a different date at that hour. Re-run with `Pacific/Niue` and the default moved 2026-08-13 → 2026-08-12 while every logged workout kept its date. **"Somewhere far away" is not the criterion — "a zone that is on a different calendar date right now" is**, and the wording in § Manual Testing Steps step 6 carries the same defect. Recorded for `lessons.md` in Phase 5. Note the invariant half is hour-independent and is covered by `preferences-derive.test.ts` assertion 3
+- [x] 3.11 Local: switching a preference and back restores the original figures exactly — owner confirmed 2026-08-13
+- [x] 3.12 The dashboard shows the training-week sentence and link, and no raw timezone string — owner confirmed 2026-08-13
+- [x] 3.13 The settings screen is usable at 360 px — owner confirmed 2026-08-13
 
 ### Phase 4: Deploy, and prove it on the public address
 
