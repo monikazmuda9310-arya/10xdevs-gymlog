@@ -1,0 +1,102 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { PreferencesForm } from "@/components/settings/PreferencesForm";
+import { getProfile } from "@/lib/services/profiles";
+import { supportedTimeZones } from "@/lib/services/timezones";
+import type { EstimationFormula, WeightUnit } from "@/types";
+
+// FR-016, FR-022, US-03. The three preferences the account has always owned in the database and has
+// never been able to change.
+//
+// **THE TIMEZONE `<option>` ELEMENTS ARE EMITTED HERE, BY ASTRO, AND NEVER BY THE ISLAND.** There
+// are 418 of them (measured in real workerd, see `timezones.ts`) — roughly 17 KB of HTML before
+// compression and ZERO bytes of JavaScript, provided the list never crosses into a prop. Astro
+// serialises island props into an `<astro-island props="…">` attribute, so handing the list to
+// `PreferencesForm` would ship every zone name to the browser for a control that needs no
+// JavaScript. The `<select>` is slotted into the island instead; the island reads its value on
+// submit. See § Critical Implementation Details in this slice's plan.
+
+const { user, supabase } = Astro.locals;
+
+// The same defaults the column carries, used only as the shape of a failed read — never rendered as
+// though they were the account's own choices. `loadFailed` is what keeps those two apart.
+let timezone = "Europe/Warsaw";
+let weightUnit: WeightUnit = "kg";
+let estimationFormula: EstimationFormula = "brzycki";
+let loadFailed = false;
+
+if (supabase && user) {
+  try {
+    const profile = await getProfile(supabase, user.id);
+    if (profile) {
+      timezone = profile.timezone;
+      weightUnit = profile.weight_unit;
+      estimationFormula = profile.estimation_formula;
+    }
+  } catch (error) {
+    // Without this branch a failed read renders the defaults as if the user had chosen them, and
+    // the first Save would write them over whatever the account really had. Same silent-failure
+    // class the records and workout lists guard against.
+    loadFailed = true;
+    // eslint-disable-next-line no-console -- deliberate server-side diagnostic
+    console.error("settings: profile read failed", error);
+  }
+}
+
+const timeZones = supportedTimeZones();
+// A zone that is no longer in the list (a profile written before a runtime upgrade dropped it)
+// must still be selectable, or the form could not be saved at all without silently changing it.
+const zoneIsKnown = timeZones.includes(timezone);
+---
+
+<Layout title="Settings">
+  <div class="bg-cosmic min-h-screen p-4">
+    <div class="mx-auto w-full max-w-2xl py-8">
+      <header class="mb-2 flex items-baseline justify-between gap-4">
+        <h1 class="bg-gradient-to-r from-blue-200 to-purple-200 bg-clip-text text-2xl font-bold text-transparent">
+          Settings
+        </h1>
+        <a href="/dashboard" class="text-sm text-purple-300 hover:underline">Dashboard</a>
+      </header>
+      <p class="mb-6 text-sm text-blue-100/50">
+        How weights are entered, how a one-rep max is estimated, and which week your training is measured in.
+      </p>
+
+      {
+        loadFailed ? (
+          <p class="rounded-lg border border-red-400/30 bg-red-900/30 px-4 py-6 text-center text-red-200">
+            Your preferences could not be loaded, so this form is not shown — saving now would overwrite settings we
+            cannot see. Please refresh; if it keeps happening, the database may be unreachable.
+          </p>
+        ) : (
+          <PreferencesForm
+            client:load
+            timezone={timezone}
+            weightUnit={weightUnit}
+            estimationFormula={estimationFormula}
+          >
+            <label for="settings-timezone" class="sr-only">
+              Training week timezone
+            </label>
+            <select
+              id="settings-timezone"
+              name="timezone"
+              class="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white focus:ring-2 focus:ring-purple-400 focus:outline-none"
+            >
+              {!zoneIsKnown && (
+                <option value={timezone} selected class="bg-slate-900">
+                  {timezone} (not recognised here)
+                </option>
+              )}
+              {timeZones.map((zone) => (
+                <option value={zone} selected={zone === timezone} class="bg-slate-900">
+                  {zone}
+                </option>
+              ))}
+            </select>
+          </PreferencesForm>
+        )
+      }
+    </div>
+  </div>
+</Layout>

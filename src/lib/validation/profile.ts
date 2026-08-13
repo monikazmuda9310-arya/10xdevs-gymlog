@@ -2,9 +2,12 @@
 // ./profile-schemas, built from these) and by the hydrated settings form (which imports the
 // catalogue directly). The same split as ./auth, ./exercise and ./workout, for the same reason.
 //
-// **This module imports nothing.** The settings form is a `client:load` island, so whatever is
-// reachable from here ships to the browser — keep the zod schemas one file away. It must also stay
-// free of `astro:*` imports so the hermetic unit suite can reach it (AGENTS.md § Testing).
+// **The only import here is type-only and erases at compile time.** The settings form is a
+// `client:load` island, so whatever is reachable from here ships to the browser — keep the zod
+// schemas, and with them the timezone list, one file away. It must also stay free of `astro:*`
+// imports so the hermetic unit suite can reach it (AGENTS.md § Testing).
+
+import type { EstimationFormula, WeightUnit } from "@/types";
 
 /**
  * Every message the settings screen can show, and its code.
@@ -35,6 +38,33 @@ export const PROFILE_MESSAGES = {
 } as const;
 
 export type ProfileMessageCode = keyof typeof PROFILE_MESSAGES;
+
+/**
+ * What each enum value is called on screen.
+ *
+ * Typed as a `Record` over the enum rather than as a loose object, so adding a value to the Postgres
+ * enum stops the build here too. The tuple assertions in `@/types` guarantee the value is offered;
+ * these guarantee it is offered with a name, rather than as the raw `lb` the column happens to hold.
+ */
+export const WEIGHT_UNIT_LABELS: Record<WeightUnit, string> = {
+  kg: "Kilograms",
+  lb: "Pounds",
+};
+
+/**
+ * The formula names are the authors', so they are not translated or prettified — a lifter who knows
+ * one of them by name must be able to find it. The hint says what each does differently, because
+ * "Brzycki or Epley" is not a choice most people can make from the names alone.
+ */
+export const ESTIMATION_FORMULA_LABELS: Record<EstimationFormula, string> = {
+  brzycki: "Brzycki",
+  epley: "Epley",
+};
+
+export const ESTIMATION_FORMULA_HINTS: Record<EstimationFormula, string> = {
+  brzycki: "Reads higher as the repetitions climb. Above ten reps it is the more generous of the two.",
+  epley: "Reads higher at low repetitions. Below ten reps it is the more generous of the two.",
+};
 
 /** Absent → no message; unrecognised → the generic one, never the caller's own words. */
 export function profileMessageForCode(code: string | null | undefined): string | null {

@@ -29,8 +29,20 @@ if (error) {
       <p class="text-blue-100/80">
         Welcome, <span class="font-semibold text-white">{user?.email}</span>
       </p>
+      {
+        /*
+        The raw timezone string used to be printed here on its own, which told the reader nothing
+        about what it governed. It names the training week now, and the link is what makes the
+        preference reachable — NOT `Topbar.astro`, which is imported only by `Welcome.astro` and so
+        renders on the public landing page and nowhere else.
+      */
+      }
       <p class="text-blue-100/80">
-        Training week: <span class="font-semibold text-white">{profile?.timezone ?? "not set"}</span>
+        {
+          profile
+            ? `Your training week runs Monday to Sunday in ${profile.timezone}.`
+            : "Your training week timezone is not set yet."
+        }
       </p>
       <p class="mt-2 text-sm text-blue-100/50">This page is only for authenticated users.</p>
       <p class="mt-4">
@@ -41,6 +53,9 @@ if (error) {
       </p>
       <p class="mt-2">
         <a href="/records" class="text-sm text-purple-300 hover:underline">See your records →</a>
+      </p>
+      <p class="mt-2">
+        <a href="/settings" class="text-sm text-purple-300 hover:underline">Units, formula and timezone →</a>
       </p>
       <form method="POST" action="/api/auth/signout" class="mt-6">
         <button

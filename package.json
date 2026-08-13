@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:render": "vitest run --config vitest.render.config.ts",
     "db:status": "node scripts/supabase-db.mjs status",
     "db:push": "node scripts/supabase-db.mjs push",
     "db:types": "node scripts/supabase-db.mjs types && prettier --write src/db/database.types.ts"

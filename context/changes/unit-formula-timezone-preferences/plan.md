@@ -665,25 +665,25 @@ failed restore.
 
 #### Automated
 
-- [x] 2.1 Lint, typecheck, unit, integration and build all pass — 183 unit, 95 integration
-- [x] 2.2 `preferences-derive.test.ts` passes, including the different-record-holder assertion — 5 assertions: the holder flip, its reversibility, the unit boundary, the timezone invariant, and the fixture-restored tripwire
-- [x] 2.3 Mutation (a): the same fixture at ten repetitions cannot distinguish the formulas — both sets moved to ten reps and both formulas named the same `best_estimate_set_id`, so the assertion could no longer tell them apart. Proves a TEST DESIGN, not a guard: the crossing at ten is real
-- [x] 2.4 Mutation (b): re-stamping `weight_unit` in `updateSet` fails the existing-rows assertion — reading the unit from the profile inside `updateSet` turned the kilogram set into `lb` on a plain weight correction; the assertion read `'lb'` where it wanted `'kg'`
+- [x] 2.1 Lint, typecheck, unit, integration and build all pass — 183 unit, 95 integration — 7e25a6e
+- [x] 2.2 `preferences-derive.test.ts` passes, including the different-record-holder assertion — 5 assertions: the holder flip, its reversibility, the unit boundary, the timezone invariant, and the fixture-restored tripwire — 7e25a6e
+- [x] 2.3 Mutation (a): the same fixture at ten repetitions cannot distinguish the formulas — both sets moved to ten reps and both formulas named the same `best_estimate_set_id`, so the assertion could no longer tell them apart. Proves a TEST DESIGN, not a guard: the crossing at ten is real — 7e25a6e
+- [x] 2.4 Mutation (b): re-stamping `weight_unit` in `updateSet` fails the existing-rows assertion — reading the unit from the profile inside `updateSet` turned the kilogram set into `lb` on a plain weight correction; the assertion read `'lb'` where it wanted `'kg'` — 7e25a6e
 
 #### Manual
 
-- [ ] 2.5 Owner has seen the derivation suite's output
+- [x] 2.5 Owner has seen the derivation suite's output — confirmed 2026-08-13, all five assertions shown passing
 
 ### Phase 3: The screen
 
 #### Automated
 
-- [ ] 3.1 Lint, typecheck, unit, integration and build all pass
-- [ ] 3.2 Built client bundle contains no `zod` and no `@supabase/`
-- [ ] 3.3 No zone name appears in any `astro-island` props payload in the rendered `/settings` HTML
-- [ ] 3.4 The rendered `<option>` set equals `Intl.supportedValuesOf("timeZone")`
-- [ ] 3.5 No estimate call site hardcodes a unit or a formula
-- [ ] 3.6 Settings island's built size recorded here
+- [x] 3.1 Lint, typecheck, unit, integration and build all pass — 183 unit, 95 integration, plus 5 render
+- [x] 3.2 Built client bundle contains no `zod` and no `@supabase/` — grep over `dist/client/_astro/` found neither, and the control grep (`createRoot|useState`) matched three chunks, so the same grep can find something genuinely present. A third grep for `Pacific/Kiritimati` over all of `dist/client/` also found nothing
+- [x] 3.3 No zone name appears in any `astro-island` props payload in the rendered `/settings` HTML — `tests/render/settings-island.test.ts`, via Astro's container. **Mutated**: passing `timeZones={timeZones}` as an island prop leaked 415 zone names into `astro-island props` and failed the assertion, then reverted. **Deviation from the plan**: the check RENDERS rather than fetches, because `/settings` is behind `PROTECTED_ROUTES` and `astro dev` authenticates against production; the container needs no server, no session and no network, and reads the same HTML
+- [x] 3.4 The rendered `<option>` set equals `Intl.supportedValuesOf("timeZone")` — same suite, set-equality against the runtime list rather than a count
+- [x] 3.5 No estimate call site hardcodes a unit or a formula — no unit/formula literal appears as an argument to `estimateForLoggedSet`, `estimateOneRepMax`, `weightInUnit`, `bestEstimateFigure`, `heaviestFigure`, `impactSentence` or `fallToFigure` anywhere in `src/components` or `src/pages`. The only literals are `?? "kg"` / `?? "brzycki"` fallbacks on a profile READ, which is where a default belongs
+- [x] 3.6 Settings island's built size recorded here — **`PreferencesForm.D4stSJqD.js`, 5 441 B**, no new chunk. The timezone `<select>` contributes zero bytes to it
 
 #### Manual
 
