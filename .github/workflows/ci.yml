@@ -36,6 +36,12 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       - run: npm test
+      # Renders pages through Astro's container and asserts against the resulting HTML. Hermetic —
+      # no network, no credential — and separate from `npm test` because it is the one suite that
+      # loads Astro's Vite pipeline, which the unit config deliberately does not (AGENTS.md
+      # § Testing). It is in the gate because it holds the ONLY check that would notice the 418-entry
+      # timezone list crossing into island props, and a check outside the gate rots.
+      - run: npm run test:render
       # Against gymlog-test only. No production credential is present on this step, by design:
       # the blast radius of a bad check is a project holding no real data.
       - run: npm run test:integration
