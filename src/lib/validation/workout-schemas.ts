@@ -53,8 +53,12 @@ function isRealDate(value: string): boolean {
  * otherwise be refused by the database as a violation the user cannot act on. `null` is what "no
  * note" means in this schema, and the transform is where the two agree.
  */
+// `unexpected`, not `note_too_long`: a note that is not text cannot come from the form at all, so
+// there is nothing for the user to act on — and WORKOUT_MESSAGES reserves `unexpected` for exactly
+// that. The `error` argument is what keeps zod's own sentence out of the `code` field; `.max()` only
+// runs once the value IS a string. Added 2026-08-13, measured rather than assumed.
 const note = z
-  .string()
+  .string({ error: code("unexpected") })
   .trim()
   .max(MAX_NOTE_LENGTH, code("note_too_long"))
   .nullish()
@@ -85,8 +89,11 @@ const weight = z
     code("weight_too_precise"),
   );
 
+// The `error` covers a present-but-not-a-number RPE, which `.min()`/`.max()` never reach. Here the
+// range message is both accurate and actionable — the field takes a number from 1 to 10 — so unlike
+// `note` above it is not collapsed into `unexpected`.
 const rpe = z
-  .number()
+  .number({ error: code("rpe_out_of_range") })
   .min(MIN_RPE, code("rpe_out_of_range"))
   .max(MAX_RPE, code("rpe_out_of_range"))
   .nullish()
@@ -130,11 +137,16 @@ export type AddSetInput = z.infer<typeof addSetSchema>;
 export type ParseResult<T> = { success: true; data: T } | { success: false; code: WorkoutMessageCode };
 
 function parse<T>(schema: z.ZodType<T>, body: unknown): ParseResult<T> {
-  // Anything that is not an object is treated as an empty one, so the failure comes from the FIELD
-  // schemas and carries a code. Handing zod a string instead makes it raise its own top-level type
-  // error, whose `.message` is prose — and that prose would then travel in the `code` field, which
-  // is the one channel this project keeps free of provider wording. A unit test pins this.
-  const input = typeof body === "object" && body !== null ? body : {};
+  // Anything that is not a plain object is treated as an empty one, so the failure comes from the
+  // FIELD schemas and carries a code. Handing zod a string instead makes it raise its own top-level
+  // type error, whose `.message` is prose — and that prose would then travel in the `code` field,
+  // which is the one channel this project keeps free of provider wording. A unit test pins this.
+  //
+  // **`Array.isArray` is not belt-and-braces.** `typeof [] === "object"` and `[] !== null`, so the
+  // two obvious guards both pass an array straight through and zod answers `"Invalid input: expected
+  // object, received array"` — a sentence, in the code field. Added 2026-08-13 after S-06's new
+  // suite caught it here; the assertion below covered `null` and a string but not `[]`.
+  const input = typeof body === "object" && body !== null && !Array.isArray(body) ? body : {};
 
   const parsed = schema.safeParse(input);
   if (parsed.success) {

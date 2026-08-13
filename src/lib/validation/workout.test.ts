@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_NOTE_LENGTH, isWeightAllowed, readSetFields, workoutMessageForCode } from "@/lib/validation/workout";
-import { parseAddSet, parseCreateWorkout } from "@/lib/validation/workout-schemas";
+import {
+  MAX_NOTE_LENGTH,
+  WORKOUT_MESSAGES,
+  isWeightAllowed,
+  readSetFields,
+  workoutMessageForCode,
+} from "@/lib/validation/workout";
+import {
+  parseAddExerciseEntry,
+  parseAddSet,
+  parseCreateWorkout,
+  parseUpdateSet,
+  parseUpdateWorkout,
+} from "@/lib/validation/workout-schemas";
 
 const UUID = "6f1c9d5e-6b1a-4a3f-9d2e-1c0b5a7e8f34";
 
@@ -59,6 +71,68 @@ describe("parseCreateWorkout", () => {
     expect(parseCreateWorkout({})).toEqual({ success: false, code: "date_required" });
     expect(parseCreateWorkout(null)).toEqual({ success: false, code: "date_required" });
     expect(parseCreateWorkout("2026-08-11")).toEqual({ success: false, code: "date_required" });
+    // `[]` was the gap: `typeof [] === "object"` and `[] !== null`, so it slipped past the guard and
+    // zod answered with its own sentence in the `code` field. Added 2026-08-13.
+    expect(parseCreateWorkout([])).toEqual({ success: false, code: "date_required" });
+  });
+
+  it("never lets zod's own prose travel in the code field", () => {
+    // The stronger form of the assertion above, and the one that would have caught the array gap
+    // without anybody having to think of `[]` specifically: whatever arrives, the code must be one
+    // this project wrote. A provider sentence in this channel is what turns a screen into a
+    // phishing surface, which is why the channel is kept clean rather than merely sanitised at the
+    // point of display.
+    for (const body of ["nonsense", 42, null, undefined, [], [1, 2], true]) {
+      const parsed = parseCreateWorkout(body);
+      expect(parsed.success).toBe(false);
+      expect(!parsed.success && Object.hasOwn(WORKOUT_MESSAGES, parsed.code)).toBe(true);
+    }
+  });
+});
+
+describe("every parser keeps the code channel free of provider wording", () => {
+  // **One assertion over ALL of them, because the defect was never about one parser.** S-06's
+  // implementation review found zod prose reaching the `code` field, and fixing the two obvious
+  // spots was not enough: a field declared without an `error` argument fails its TYPE check before
+  // `.min()` / `.max()` can supply a message, so `{ note: 5 }` and `{ rpe: "high" }` each leaked a
+  // sentence of their own. Those were found by probing, not by reading — so the probe lives here
+  // now, and a new field added without a message is caught the moment somebody sends it the wrong
+  // type rather than the moment a user reads a stranger's words on our own domain.
+  const bodies: [string, (body: unknown) => { success: boolean; code?: string }, unknown[]][] = [
+    [
+      "parseCreateWorkout",
+      parseCreateWorkout,
+      ["x", 1, [], true, { performedOn: 1 }, { performedOn: "2026-08-11", note: 5 }],
+    ],
+    ["parseAddExerciseEntry", parseAddExerciseEntry, ["x", [], { workoutId: 1 }, { workoutId: UUID, exerciseId: 9 }]],
+    [
+      "parseAddSet",
+      parseAddSet,
+      [
+        "x",
+        [],
+        { exerciseEntryId: UUID, reps: "5", weight: 100 },
+        { exerciseEntryId: UUID, reps: 5, weight: "100" },
+        { exerciseEntryId: UUID, reps: 5, weight: 100, rpe: "high" },
+      ],
+    ],
+    [
+      "parseUpdateWorkout",
+      parseUpdateWorkout,
+      ["x", [], { performedOn: true }, { performedOn: "2026-08-11", note: 5 }],
+    ],
+    ["parseUpdateSet", parseUpdateSet, ["x", [], { reps: "5", weight: 1 }, { reps: 5, weight: 1, rpe: "high" }]],
+  ];
+
+  it.each(bodies)("%s answers with a code from WORKOUT_MESSAGES for any hostile body", (_label, parse, inputs) => {
+    for (const body of inputs) {
+      const parsed = parse(body);
+      expect(parsed.success, `${JSON.stringify(body)} should not parse`).toBe(false);
+      expect(
+        Object.hasOwn(WORKOUT_MESSAGES, parsed.code ?? ""),
+        `${JSON.stringify(body)} leaked "${parsed.code}"`,
+      ).toBe(true);
+    }
   });
 });
 

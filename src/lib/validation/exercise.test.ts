@@ -98,10 +98,19 @@ describe("parseCreateExercise", () => {
     });
   });
 
-  it("does not crash on a body that is not an object", () => {
+  it("does not crash on a body that is not an object, and answers with OUR code", () => {
     // A caller can post anything. None of these may reach Postgres or raise.
-    for (const body of [null, undefined, "string", 42, []]) {
-      expect(parseCreateExercise(body).success).toBe(false);
+    //
+    // **The second half of this assertion was missing until 2026-08-13, and its absence is why a
+    // real defect survived here.** Checking only `.success === false` passes just as happily when
+    // the failure carries zod's own sentence — `"Invalid input: expected object, received string"` —
+    // in the `code` field, which is the one channel this project keeps free of provider wording.
+    // `POST /api/exercises` with a body of `"x"` answered exactly that. Found by S-06's
+    // implementation review; the fix is the normalisation in `parseCreateExercise`.
+    for (const body of [null, undefined, "string", 42, [], [1, 2], true]) {
+      const parsed = parseCreateExercise(body);
+      expect(parsed.success).toBe(false);
+      expect(!parsed.success && Object.hasOwn(EXERCISE_MESSAGES, parsed.code)).toBe(true);
     }
   });
 });

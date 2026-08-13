@@ -32,6 +32,16 @@ if (supabase && user) {
       timezone = profile.timezone;
       weightUnit = profile.weight_unit;
       estimationFormula = profile.estimation_formula;
+    } else {
+      // **A missing row is a failed load, not an empty one**, and this branch is what makes the
+      // comment above true. `getProfile` uses `maybeSingle()`, so an absent profile comes back as
+      // `null` WITHOUT throwing — which would otherwise fall through and render the defaults as
+      // though the account had chosen them, the exact confusion `loadFailed` exists to prevent.
+      // It should be unreachable: a trigger creates a profile for every account and there is no
+      // delete path. If it happens, something is wrong that saving over would not fix.
+      loadFailed = true;
+      // eslint-disable-next-line no-console -- deliberate server-side diagnostic
+      console.error("settings: no profile row for", user.id);
     }
   } catch (error) {
     // Without this branch a failed read renders the defaults as if the user had chosen them, and
@@ -80,7 +90,7 @@ const zoneIsKnown = timeZones.includes(timezone);
         loadFailed ? (
           <p class="rounded-lg border border-red-400/30 bg-red-900/30 px-4 py-6 text-center text-red-200">
             Your preferences could not be loaded, so this form is not shown — saving now would overwrite settings we
-            cannot see. Please refresh; if it keeps happening, the database may be unreachable.
+            cannot see. Please refresh; if it keeps happening, your account record may need attention.
           </p>
         ) : (
           <PreferencesForm

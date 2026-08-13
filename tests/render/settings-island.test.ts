@@ -177,3 +177,35 @@ describe("the settings page when the stored zone is not in the list", () => {
     expect(optionValues(html)).not.toContain("");
   });
 });
+
+describe("the settings page when there is no profile row at all", () => {
+  // `getProfile` uses `maybeSingle()`, so an absent row arrives as `null` WITHOUT throwing. Before
+  // 2026-08-13 that fell through and rendered the column defaults as though the account had chosen
+  // them — the exact confusion the page's `loadFailed` branch exists to prevent, reached by the one
+  // path that skipped it. Found by implementation review.
+  it("refuses to render the form rather than presenting defaults as choices", async () => {
+    const container = await AstroContainer.create();
+    container.addServerRenderer({ name: "@astrojs/react", renderer: reactRenderer });
+    container.addClientRenderer({ name: "@astrojs/react", entrypoint: "@astrojs/react/client.js" });
+
+    const empty = await container.renderToString(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      Settings,
+      {
+        locals: {
+          supabase: {
+            from: () => ({
+              select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }),
+            }),
+          },
+          user: { id: "00000000-0000-4000-8000-000000000000" },
+        } as unknown as App.Locals,
+      },
+    );
+
+    expect(empty).toContain("Your preferences could not be loaded");
+    // No form, no island, and above all no `<select>` offering a zone we never read.
+    expect(empty).not.toContain("<astro-island");
+    expect(optionValues(empty)).toEqual([]);
+  });
+});
