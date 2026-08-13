@@ -1,10 +1,10 @@
 ---
 change_id: unit-formula-timezone-preferences
 title: Choose kilograms or pounds, the estimation formula, and the timezone the training week runs in
-status: impl_reviewed
+status: archived
 created: 2026-08-12
 updated: 2026-08-13
-archived_at: null
+archived_at: 2026-08-13T10:47:22Z
 ---
 
 ## Notes
