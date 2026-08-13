@@ -44,8 +44,22 @@ if (supabase && user) {
 }
 
 const timeZones = supportedTimeZones();
-// A zone that is no longer in the list (a profile written before a runtime upgrade dropped it)
-// must still be selectable, or the form could not be saved at all without silently changing it.
+
+// A stored zone this runtime does not recognise — a profile written before an ICU upgrade dropped
+// the name, or a column edited by hand. Rare, and it has exactly one honest presentation.
+//
+// **It is NOT offered as a selectable option**, and the first version of this page got that wrong.
+// The endpoint validates against this same list, so offering the stored value back would produce a
+// `400 timezone_unknown` for a value the page itself supplied — and because the payload is a full
+// replacement, it would block the unit and formula changes with it. That is the two-sources failure
+// § Critical Implementation Details of this slice's plan forbids by name, arriving through the one
+// door nobody was watching.
+//
+// So the placeholder below carries `value=""`, which the schema answers with `timezone_required`
+// ("Choose the timezone your training week runs in") — an accurate, actionable message — and the
+// sentence beside the control says what happened. The account is told what is stored rather than
+// being shown a substitute zone as though it had chosen it, which is the same stance `loadFailed`
+// takes above.
 const zoneIsKnown = timeZones.includes(timezone);
 ---
 
@@ -78,14 +92,22 @@ const zoneIsKnown = timeZones.includes(timezone);
             <label for="settings-timezone" class="sr-only">
               Training week timezone
             </label>
+            {!zoneIsKnown && (
+              <p class="mb-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                Your saved timezone <strong>{timezone}</strong> is not one this version recognises, so dates fall back
+                to UTC — a new workout currently defaults to today in UTC. Pick a replacement below and save.
+              </p>
+            )}
             <select
               id="settings-timezone"
               name="timezone"
               class="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white focus:ring-2 focus:ring-purple-400 focus:outline-none"
             >
+              {/* Empty value and `disabled`: it names what is stored without ever being submittable.
+                  See the note above `zoneIsKnown` for why offering the stored value would be wrong. */}
               {!zoneIsKnown && (
-                <option value={timezone} selected class="bg-slate-900">
-                  {timezone} (not recognised here)
+                <option value="" disabled selected class="bg-slate-900">
+                  {timezone} — not recognised, choose one below
                 </option>
               )}
               {timeZones.map((zone) => (

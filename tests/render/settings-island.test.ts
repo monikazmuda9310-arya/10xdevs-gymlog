@@ -27,19 +27,17 @@ const PROFILE = { timezone: "Europe/Warsaw", weight_unit: "kg", estimation_formu
  * The slice of the Supabase client `getProfile` actually calls. Enough to render the page and
  * nothing more — this suite is about markup, and the read path is covered by the integration check.
  */
-const supabaseStub = {
+const stubReturning = (row: Record<string, string>) => ({
   from: () => ({
     select: () => ({
       eq: () => ({
-        maybeSingle: () => Promise.resolve({ data: PROFILE, error: null }),
+        maybeSingle: () => Promise.resolve({ data: row, error: null }),
       }),
     }),
   }),
-};
+});
 
-let html: string;
-
-beforeAll(async () => {
+async function render(row: Record<string, string>): Promise<string> {
   const container = await AstroContainer.create();
   container.addServerRenderer({ name: "@astrojs/react", renderer: reactRenderer });
   container.addClientRenderer({ name: "@astrojs/react", entrypoint: "@astrojs/react/client.js" });
@@ -47,7 +45,7 @@ beforeAll(async () => {
   // A `.astro` module has no type outside Astro's own pipeline, so the import above lands as `any`
   // for the type-aware lint rules. `astro check` DOES understand it and covers the page itself;
   // the suppression is only about this import boundary.
-  html = await container.renderToString(
+  return container.renderToString(
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     Settings,
     {
@@ -55,11 +53,17 @@ beforeAll(async () => {
       // two fields, and constructing a whole Supabase client and a whole auth User to hand over
       // three strings would obscure what the test is actually about.
       locals: {
-        supabase: supabaseStub,
+        supabase: stubReturning(row),
         user: { id: "00000000-0000-4000-8000-000000000000" },
       } as unknown as App.Locals,
     },
   );
+}
+
+let html: string;
+
+beforeAll(async () => {
+  html = await render(PROFILE);
 });
 
 /** Every `props="…"` payload Astro serialised into the page, decoded from its HTML entities. */
@@ -118,8 +122,58 @@ describe("the settings page's rendered HTML", () => {
 
   it("keeps the select inside the island, where its value can be read on submit", () => {
     // The slot is what makes the no-prop design work. If the `<select>` ever moved outside the
-    // island, `new FormData(form)` would stop seeing it and the timezone would silently never save.
+    // island, `form.elements.namedItem("timezone")` would stop finding it (`PreferencesForm.tsx`)
+    // and the timezone would silently never save.
     const island = /<astro-island[\s\S]*?<\/astro-island>/.exec(html)?.[0] ?? "";
     expect(island).toContain('name="timezone"');
+  });
+});
+
+// A stored zone this runtime does not recognise. Reachable only through an ICU upgrade that drops a
+// name, or a column edited by hand — the write path validates against this same list.
+//
+// **This state had no test, which is why the first version of the page got it wrong**: it offered
+// the stored value back as a selectable `<option>`, so submitting it earned a `400 timezone_unknown`
+// for a value the page itself supplied, and — the payload being a full replacement — blocked the
+// unit and formula changes with it. Found by implementation review on 2026-08-13.
+describe("the settings page when the stored zone is not in the list", () => {
+  const UNKNOWN = "Europe/Warsawa";
+  let odd: string;
+
+  beforeAll(async () => {
+    odd = await render({ ...PROFILE, timezone: UNKNOWN });
+  });
+
+  it("never offers the unrecognised zone as a submittable value", () => {
+    // The assertion that would have caught the original defect. The zone may be NAMED on screen —
+    // the user is entitled to know what is stored — but it must not be the value of any option, or
+    // the page is offering something the endpoint refuses.
+    expect(optionValues(odd)).not.toContain(UNKNOWN);
+    expect(odd).toContain(UNKNOWN); // still named, so the state is legible rather than hidden
+  });
+
+  it("still offers exactly the runtime list, ignoring the placeholder", () => {
+    // The same set-equality as 3.4, which is what breaks if a second source of options ever
+    // reappears. The placeholder carries `value=""` and is excluded by that, not by position.
+    const zones = optionValues(odd).filter((value) => value !== "");
+    expect([...zones].sort()).toEqual([...supportedTimeZones()].sort());
+  });
+
+  it("selects a placeholder that cannot be submitted, so the save message is actionable", () => {
+    // `value=""` reaches the schema as `timezone_required` — "Choose the timezone your training week
+    // runs in" — rather than "That is not a timezone we recognise" for the page's own suggestion.
+    expect(odd).toMatch(/<option[^>]*value=""[^>]*\bdisabled\b/);
+    expect(odd).toMatch(/<option[^>]*value=""[^>]*\bselected\b/);
+  });
+
+  it("says on screen what happened and what to do about it", () => {
+    expect(odd).toMatch(/not one this version recognises/);
+    expect(odd).toMatch(/Pick a replacement below and save/);
+  });
+
+  it("leaves the ordinary case with no placeholder at all", () => {
+    // Guards the other direction: a placeholder rendered unconditionally would put an empty value in
+    // front of every account and make Save fail for everybody.
+    expect(optionValues(html)).not.toContain("");
   });
 });
