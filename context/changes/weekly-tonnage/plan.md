@@ -815,45 +815,45 @@ must have the view before the committed types are right.
 
 #### Automated
 
-- [x] 2.1 Lint, typecheck, unit, render, integration and build all pass — 202 unit, 11 render, 103 integration (+8)
-- [x] 2.2 `npm run db:status` shows the migration applied to both projects — `20260813150000` on `gymlog-test` and `gymlog`
-- [x] 2.3 `database.types.ts` regenerated and committed with `daily_tonnage` in the `Views` block — three columns, all `T | null` as expected through a view
-- [x] 2.4 The migration contains no `profiles`, no `timezone` and no `date_trunc` — the real guard. The single hit in the SQL body is the word "timezones" **inside the `comment on view` string**, which is prose, not a reference
-- [x] 2.5 `weekly-tonnage.test.ts` passes, including the Sunday-boundary and moved-workout assertions — 8 assertions
-- [x] 2.6 `preferences-derive.test.ts` assertion 3 still passes — regression check, not the guard
-- [x] 2.7 Mutation (a): removing `greatest(…, 0)` makes the assisted-set total go negative — **−160 kg**
-- [x] 2.8 Mutation (b): shifting the range by one day fails the Sunday boundary — fails three assertions, including the independent-sum one
-- [x] 2.9 Mutation (c): summing `weight` instead of `weight_kg` fails the mixed-unit assertion — reads the naive **1000** where the answer is **726.80**
-- [x] 2.10 Mutation (d): answering `0` on a read error fails the zero assertion — **it does NOT, and the claim is corrected rather than the test faked** (`lessons.md`). No assertion in this suite provokes a read failure, and none writable from it can: the failure needs the database unreachable or the grant removed, neither of which a suite holding only a publishable key can arrange. **The guarantee is therefore unproven, and the edit that would make it bite is a render assertion in Phase 3** — stubbing the service to throw and requiring the page to show its failure sentence and no figure. Criterion 3.7 is that assertion; this row is what points at it
-- [x] 2.11 Mutation (e): removing `security_invoker` fails the cross-account assertion — the sharpest of the five: with the flag off, **account B read ten rows of account A's tonnage**. **Deviation, decided by the owner**: the S-06 review (F2) forbade replacing a view out of band, and doing this needed exactly that. It was allowed here because the two reasons behind that rule do not both hold — nothing depends on `daily_tonnage`, so no drop cascades — and because the verification gap that caused the rule was closed rather than ignored: each mutation was applied to `gymlog-test` alone through a scratchpad runner that refuses a URL equal to production's, and every restore was confirmed by reading `security_invoker`, `GREATEST` and `weight_kg` back out of `pg_class`/`pg_get_viewdef`, not by assuming
+- [x] 2.1 Lint, typecheck, unit, render, integration and build all pass — 202 unit, 11 render, 103 integration (+8) — 7f62140
+- [x] 2.2 `npm run db:status` shows the migration applied to both projects — `20260813150000` on `gymlog-test` and `gymlog` — 7f62140
+- [x] 2.3 `database.types.ts` regenerated and committed with `daily_tonnage` in the `Views` block — three columns, all `T | null` as expected through a view — 7f62140
+- [x] 2.4 The migration contains no `profiles`, no `timezone` and no `date_trunc` — the real guard. The single hit in the SQL body is the word "timezones" **inside the `comment on view` string**, which is prose, not a reference — 7f62140
+- [x] 2.5 `weekly-tonnage.test.ts` passes, including the Sunday-boundary and moved-workout assertions — 8 assertions — 7f62140
+- [x] 2.6 `preferences-derive.test.ts` assertion 3 still passes — regression check, not the guard — 7f62140
+- [x] 2.7 Mutation (a): removing `greatest(…, 0)` makes the assisted-set total go negative — **−160 kg** — 7f62140
+- [x] 2.8 Mutation (b): shifting the range by one day fails the Sunday boundary — fails three assertions, including the independent-sum one — 7f62140
+- [x] 2.9 Mutation (c): summing `weight` instead of `weight_kg` fails the mixed-unit assertion — reads the naive **1000** where the answer is **726.80** — 7f62140
+- [x] 2.10 Mutation (d): answering `0` on a read error fails the zero assertion — **it does NOT, and the claim is corrected rather than the test faked** (`lessons.md`). No assertion in this suite provokes a read failure, and none writable from it can: the failure needs the database unreachable or the grant removed, neither of which a suite holding only a publishable key can arrange. **The guarantee is therefore unproven, and the edit that would make it bite is a render assertion in Phase 3** — stubbing the service to throw and requiring the page to show its failure sentence and no figure. Criterion 3.7 is that assertion; this row is what points at it — 7f62140
+- [x] 2.11 Mutation (e): removing `security_invoker` fails the cross-account assertion — the sharpest of the five: with the flag off, **account B read ten rows of account A's tonnage**. **Deviation, decided by the owner**: the S-06 review (F2) forbade replacing a view out of band, and doing this needed exactly that. It was allowed here because the two reasons behind that rule do not both hold — nothing depends on `daily_tonnage`, so no drop cascades — and because the verification gap that caused the rule was closed rather than ignored: each mutation was applied to `gymlog-test` alone through a scratchpad runner that refuses a URL equal to production's, and every restore was confirmed by reading `security_invoker`, `GREATEST` and `weight_kg` back out of `pg_class`/`pg_get_viewdef`, not by assuming — 7f62140
 
 #### Manual
 
-- [ ] 2.12 Owner has seen the suite's output, in particular the Sunday-boundary and moved-workout assertions
+- [x] 2.12 Owner has seen the suite's output, in particular the Sunday-boundary and moved-workout assertions — confirmed 2026-08-13 — 7f62140
 
 ### Phase 3: The screen
 
 #### Automated
 
-- [ ] 3.0 Baseline `ls dist/client/_astro` from the pre-phase build recorded here
-- [ ] 3.1 Lint, typecheck, unit, render, integration and build all pass
-- [ ] 3.2 `dashboard-tonnage.test.ts` passes: non-vacuity, absent profile, one-week-empty, change-together
-- [ ] 3.3 `kilogramsIn` and `tonnageFigure` unit-tested at zero, sub-unit, small and five-digit, both units
-- [ ] 3.4 `dist/client/_astro` listing identical to the 3.0 baseline; no `@supabase/` in `dist/client/`
-- [ ] 3.5 `tonnageFigure` passes an explicit locale — no bare `new Intl.NumberFormat()`
-- [ ] 3.6 Mutation (a): rounding before converting fails a pounds assertion
-- [ ] 3.7 Mutation (b): rendering `0` on a failed read fails the failure-state assertion
-- [ ] 3.8 Mutation (c): dropping the conversion fails the kg-vs-lb assertion
-- [ ] 3.9 Mutation (d): converting only `current` fails the change-together assertion
+- [x] 3.0 Baseline `ls dist/client/_astro` from the pre-phase build recorded here — **18 files**: ExerciseCatalogue, Layout.css, NewWorkoutForm, PreferencesForm, RecordImpactDialog, SignInForm, SignUpForm, WorkoutDetail, WorkoutHeader, auth, client, index (x2), loader-circle, search, types, utils, workout
+- [x] 3.1 Lint, typecheck, unit, render, integration and build all pass — 211 unit (+9), 18 render (+7), 103 integration
+- [x] 3.2 `dashboard-tonnage.test.ts` passes: non-vacuity, absent profile, one-week-empty, change-together — 7 assertions across four rendered states
+- [x] 3.3 `kilogramsIn` and `tonnageFigure` unit-tested at zero, sub-unit, small and five-digit, both units — 9 assertions; the sub-unit case is the one that separates rounding-before from rounding-after
+- [x] 3.4 `dist/client/_astro` listing identical to the 3.0 baseline; no `@supabase/` in `dist/client/` — 18 files, same module names, **no new chunk**. Four content hashes moved (Layout.css, RecordImpactDialog, WorkoutDetail, WorkoutHeader) because `set-display.ts` gained an export those islands import — a rehash, not a new module
+- [x] 3.5 `tonnageFigure` passes an explicit locale — no bare `new Intl.NumberFormat()` — the only grep hit is the comment explaining why
+- [x] 3.6 Mutation (a): rounding before converting fails a pounds assertion — fails the sub-unit case: `0.4 kg` prints `0` in pounds where it must print `1`
+- [x] 3.7 Mutation (b): rendering `0` on a failed read fails the failure-state assertion — fails. **This is also the edit Progress 2.10 named**: the read-error guarantee the integration suite could not prove is proven here, at the screen
+- [x] 3.8 Mutation (c): dropping the conversion fails the kg-vs-lb assertion — fails
+- [x] 3.9 Mutation (d): converting only `current` fails the change-together assertion — fails — the half of US-03's fourth criterion a single-figure assertion would have missed
 
 #### Manual
 
-- [ ] 3.10 Local: both figures appear on `/dashboard` after signing in, without clicking
-- [ ] 3.11 Local: logging a set moves this week's figure and not last week's
-- [ ] 3.12 Local: switching the unit changes both figures together
-- [ ] 3.13 Local: a plank at zero load leaves the figure unchanged
-- [ ] 3.14 Local: moving a workout from the PREVIOUS week's Sunday to the CURRENT week's Monday moves tonnage between the two visible figures
-- [ ] 3.15 Local: at 360 px both figures are readable and nothing overlaps
+- [x] 3.10 Local: both figures appear on `/dashboard` after signing in, without clicking — owner confirmed 2026-08-13
+- [x] 3.11 Local: logging a set moves this week's figure and not last week's — owner confirmed 2026-08-13
+- [x] 3.12 Local: switching the unit changes both figures together — owner confirmed 2026-08-13
+- [x] 3.13 Local: a plank at zero load leaves the figure unchanged — owner confirmed 2026-08-13
+- [x] 3.14 Local: moving a workout from the PREVIOUS week's Sunday to the CURRENT week's Monday moves tonnage between the two visible figures — owner confirmed 2026-08-13
+- [x] 3.15 Local: at 360 px both figures are readable and nothing overlaps — owner confirmed 2026-08-13
 
 ### Phase 4: Deploy, and prove it on the public address
 

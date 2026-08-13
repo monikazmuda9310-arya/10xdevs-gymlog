@@ -1,12 +1,20 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import { weeklyTonnage, type WeekTonnage } from "@/lib/services/tonnage";
+import { tonnageFigure } from "@/lib/services/tonnage-display";
+import type { WeightUnit } from "@/types";
 
 const { user, supabase } = Astro.locals;
 
 // Deliberately unfiltered: the point of this read is that RLS returns exactly one row — the
 // signed-in account's own. maybeSingle(), not single(), so a missing row renders as a missing
 // value rather than a 500.
-const { data: profile, error } = (await supabase?.from("profiles").select("timezone").maybeSingle()) ?? {
+//
+// S-07 widened it from `timezone` to `timezone, weight_unit` and changed nothing else. The tonnage
+// figures need the zone to know which weeks to compare and the unit to print in, and taking both
+// from this one read keeps F-03's demonstration intact, keeps the page to a single profile query,
+// and keeps `getProfile` — whose `.eq("id", …)` would destroy the demonstration — out of it.
+const { data: profile, error } = (await supabase?.from("profiles").select("timezone, weight_unit").maybeSingle()) ?? {
   data: null,
   error: null,
 };
@@ -18,6 +26,30 @@ if (error) {
   // eslint-disable-next-line no-console
   console.warn(`dashboard: profile read failed (${error.code}): ${error.message}`);
 }
+
+// **A missing profile is a failed load for the tonnage figures, not an empty one.** Before S-07 a
+// null profile only cost this page a sentence about the training week. Now it means the unit and the
+// zone are both unknown — and printing a figure under a defaulted unit, or a week computed in UTC
+// for somebody who is not in it, is the defect the S-06 implementation review found in
+// `settings.astro` and pinned at `tests/render/settings-island.test.ts`: never present a default as
+// though it were the account's own choice.
+let tonnage: { current: WeekTonnage; previous: WeekTonnage } | null = null;
+let tonnageFailed = !profile;
+
+if (supabase && user && profile) {
+  try {
+    tonnage = await weeklyTonnage(supabase, user.id, profile.timezone);
+  } catch (readError) {
+    // The service throws rather than answering zero, because an emitted zero is a positive claim —
+    // "you did no work this week" — and that is the wrong sentence when the database is unreachable.
+    // The throw has to be caught HERE: an Astro frontmatter that throws produces a 500, not a page.
+    tonnageFailed = true;
+    // eslint-disable-next-line no-console -- deliberate server-side diagnostic
+    console.error("dashboard: weekly tonnage read failed", readError);
+  }
+}
+
+const weightUnit: WeightUnit = profile?.weight_unit ?? "kg";
 ---
 
 <Layout title="Dashboard">
@@ -44,7 +76,52 @@ if (error) {
             : "Your training week timezone is not set yet."
         }
       </p>
-      <p class="mt-2 text-sm text-blue-100/50">This page is only for authenticated users.</p>
+      {
+        /*
+        FR-017. Two figures, and three states — but the failure state is per PAGE while "no sets" is
+        per WEEK, because US-03's criterion is about a week and not about a screen. The commonest
+        real state is the first week somebody logs: this week has work, last week has none. A
+        page-level model would put that in the "figures" branch and leave last week's 0 bare, which
+        is the blank the criterion forbids.
+      */
+      }
+      <section class="mt-6 border-t border-white/10 pt-5">
+        <h2 class="mb-3 text-xs tracking-wide text-blue-100/50 uppercase">Tonnage</h2>
+        {
+          tonnageFailed || !tonnage ? (
+            <p class="rounded-lg border border-red-400/30 bg-red-900/30 px-4 py-4 text-sm text-red-200">
+              Your weekly tonnage could not be loaded. Please refresh; if it keeps happening, the database may be
+              unreachable.
+            </p>
+          ) : (
+            <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {[
+                { label: "This week", week: tonnage.current },
+                { label: "Last week", week: tonnage.previous },
+              ].map(({ label, week }) => (
+                <div class="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-left">
+                  <dt class="text-xs text-blue-100/50">{label}</dt>
+                  <dd class="mt-1">
+                    <span class="text-2xl font-semibold text-purple-200">
+                      {tonnageFigure(week.kilograms, weightUnit)}
+                    </span>
+                    <span class="ml-1 text-sm text-purple-200/70">{weightUnit}</span>
+                    {/*
+                      The zero is still shown — US-03 requires it — with a sentence saying why, so it
+                      cannot be read as "the product lost my training". `hasSets`, not the figure,
+                      decides: a week of planks has sets and rounds to 0, and must not be told it was
+                      a rest week.
+                    */}
+                    {!week.hasSets && <span class="mt-1 block text-xs text-blue-100/50">No sets logged this week</span>}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )
+        }
+      </section>
+
+      <p class="mt-6 text-sm text-blue-100/50">This page is only for authenticated users.</p>
       <p class="mt-4">
         <a href="/workouts" class="text-sm text-purple-300 hover:underline">Log a workout →</a>
       </p>

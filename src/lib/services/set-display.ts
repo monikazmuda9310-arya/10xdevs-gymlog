@@ -55,6 +55,24 @@ export function weightInUnit(set: DisplayableSet, unit: WeightUnit): number {
   }
 
   const kilograms = set.weight_kg ?? toKilograms(set.weight, set.weight_unit);
+  return kilogramsIn(kilograms, unit);
+}
+
+/**
+ * A scalar in kilograms, expressed in `unit`.
+ *
+ * **Separate from `weightInUnit` because a total is not a set.** `weightInUnit` takes a
+ * `DisplayableSet` and its whole point is the first branch above — a set stored in the reader's unit
+ * answers with the number that was typed, never a conversion round trip. A weekly tonnage total has
+ * no `reps`, no stored unit and no typed original: it is a sum of `weight_kg` across sets that may
+ * have been entered in different units, so there is nothing to preserve and everything to convert.
+ *
+ * Faking a `DisplayableSet` to reuse the other function would work arithmetically and is exactly the
+ * kind of edit that hides a unit bug. Converting at the call site with a literal factor would create
+ * a third copy of `0.45359237`, which AGENTS.md forbids by name. So: one exported scalar converter,
+ * in the module that already owns the constant.
+ */
+export function kilogramsIn(kilograms: number, unit: WeightUnit): number {
   return unit === "kg" ? kilograms : kilograms / KG_PER_LB;
 }
 
