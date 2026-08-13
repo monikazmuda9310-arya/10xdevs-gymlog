@@ -803,29 +803,29 @@ must have the view before the committed types are right.
 
 #### Automated
 
-- [x] 1.1 Lint, typecheck, unit, render, integration and build all pass — 202 unit (was 189), 11 render, 95 integration
-- [x] 1.2 `calendar.test.ts` covers the Sunday, DST, month-end and year-end boundaries — 13 new assertions: Sunday, Monday, all seven weekdays of one week, month end, year end, leap day, both DST directions, the Sunday-night rollover in the reader's zone, and a 365-instant sweep asserting both weeks are always 7 days and always meet
-- [x] 1.3 `calendar.ts` still imports nothing and reaches no `astro:*` module — zero `import` statements; the only `astro:` in the file is the comment saying it has none
-- [x] 1.4 Mutation (a): millisecond subtraction fails the DST case — a LOCAL `Date` constructor plus `days * 86400000` fails the 365-instant sweep (`expected 172800000 to be 86400000`). **Finding: it passes under UTC**, which is what CI runs, so the guard was decoration in the gate until the zone was pinned — see 1.7
-- [x] 1.5 Mutation (b): `getDay()` for `getUTCDay()` fails a boundary — fails six assertions. **Finding: it too was inert until the pin, and for a different reason.** For a value anchored at `T00:00:00Z` the two accessors differ only at a NEGATIVE ambient offset, so it passed under UTC and under `Europe/Warsaw` alike
-- [x] 1.6 Mutation (c): shifting the weekday mapping by one fails the Sunday case — fails six assertions
-- [x] 1.7 **Added: `vitest.config.ts` pins `TZ` to a zone with DST and a negative offset.** Not in the plan, and it is what makes 1.4 and 1.5 mean anything. The first pin chosen was `Europe/Warsaw` — the product's default and the owner's zone, which read as principled and **silently left mutation (b) inert**, since Warsaw's offset is positive. `America/New_York` has both properties and both mutations bite under one setting. That it is nobody's real zone is the point: the value under test is supposed to be zone-independent. Note the config setting **overrides a `TZ` prefix on the command line**
+- [x] 1.1 Lint, typecheck, unit, render, integration and build all pass — 202 unit (was 189), 11 render, 95 integration — c5da6da
+- [x] 1.2 `calendar.test.ts` covers the Sunday, DST, month-end and year-end boundaries — 13 new assertions: Sunday, Monday, all seven weekdays of one week, month end, year end, leap day, both DST directions, the Sunday-night rollover in the reader's zone, and a 365-instant sweep asserting both weeks are always 7 days and always meet — c5da6da
+- [x] 1.3 `calendar.ts` still imports nothing and reaches no `astro:*` module — zero `import` statements; the only `astro:` in the file is the comment saying it has none — c5da6da
+- [x] 1.4 Mutation (a): millisecond subtraction fails the DST case — a LOCAL `Date` constructor plus `days * 86400000` fails the 365-instant sweep (`expected 172800000 to be 86400000`). **Finding: it passes under UTC**, which is what CI runs, so the guard was decoration in the gate until the zone was pinned — see 1.7 — c5da6da
+- [x] 1.5 Mutation (b): `getDay()` for `getUTCDay()` fails a boundary — fails six assertions. **Finding: it too was inert until the pin, and for a different reason.** For a value anchored at `T00:00:00Z` the two accessors differ only at a NEGATIVE ambient offset, so it passed under UTC and under `Europe/Warsaw` alike — c5da6da
+- [x] 1.6 Mutation (c): shifting the weekday mapping by one fails the Sunday case — fails six assertions — c5da6da
+- [x] 1.7 **Added: `vitest.config.ts` pins `TZ` to a zone with DST and a negative offset.** Not in the plan, and it is what makes 1.4 and 1.5 mean anything. The first pin chosen was `Europe/Warsaw` — the product's default and the owner's zone, which read as principled and **silently left mutation (b) inert**, since Warsaw's offset is positive. `America/New_York` has both properties and both mutations bite under one setting. That it is nobody's real zone is the point: the value under test is supposed to be zone-independent. Note the config setting **overrides a `TZ` prefix on the command line** — c5da6da
 
 ### Phase 2: The aggregation
 
 #### Automated
 
-- [ ] 2.1 Lint, typecheck, unit, render, integration and build all pass
-- [ ] 2.2 `npm run db:status` shows the migration applied to both projects
-- [ ] 2.3 `database.types.ts` regenerated and committed with `daily_tonnage` in the `Views` block
-- [ ] 2.4 The migration contains no `profiles`, no `timezone` and no `date_trunc` — the real guard
-- [ ] 2.5 `weekly-tonnage.test.ts` passes, including the Sunday-boundary and moved-workout assertions
-- [ ] 2.6 `preferences-derive.test.ts` assertion 3 still passes — regression check, not the guard
-- [ ] 2.7 Mutation (a): removing `greatest(…, 0)` makes the assisted-set total go negative
-- [ ] 2.8 Mutation (b): shifting the range by one day fails the Sunday boundary
-- [ ] 2.9 Mutation (c): summing `weight` instead of `weight_kg` fails the mixed-unit assertion
-- [ ] 2.10 Mutation (d): answering `0` on a read error fails the zero assertion — or the claim is corrected where it lives
-- [ ] 2.11 Mutation (e): removing `security_invoker` fails the cross-account assertion
+- [x] 2.1 Lint, typecheck, unit, render, integration and build all pass — 202 unit, 11 render, 103 integration (+8)
+- [x] 2.2 `npm run db:status` shows the migration applied to both projects — `20260813150000` on `gymlog-test` and `gymlog`
+- [x] 2.3 `database.types.ts` regenerated and committed with `daily_tonnage` in the `Views` block — three columns, all `T | null` as expected through a view
+- [x] 2.4 The migration contains no `profiles`, no `timezone` and no `date_trunc` — the real guard. The single hit in the SQL body is the word "timezones" **inside the `comment on view` string**, which is prose, not a reference
+- [x] 2.5 `weekly-tonnage.test.ts` passes, including the Sunday-boundary and moved-workout assertions — 8 assertions
+- [x] 2.6 `preferences-derive.test.ts` assertion 3 still passes — regression check, not the guard
+- [x] 2.7 Mutation (a): removing `greatest(…, 0)` makes the assisted-set total go negative — **−160 kg**
+- [x] 2.8 Mutation (b): shifting the range by one day fails the Sunday boundary — fails three assertions, including the independent-sum one
+- [x] 2.9 Mutation (c): summing `weight` instead of `weight_kg` fails the mixed-unit assertion — reads the naive **1000** where the answer is **726.80**
+- [x] 2.10 Mutation (d): answering `0` on a read error fails the zero assertion — **it does NOT, and the claim is corrected rather than the test faked** (`lessons.md`). No assertion in this suite provokes a read failure, and none writable from it can: the failure needs the database unreachable or the grant removed, neither of which a suite holding only a publishable key can arrange. **The guarantee is therefore unproven, and the edit that would make it bite is a render assertion in Phase 3** — stubbing the service to throw and requiring the page to show its failure sentence and no figure. Criterion 3.7 is that assertion; this row is what points at it
+- [x] 2.11 Mutation (e): removing `security_invoker` fails the cross-account assertion — the sharpest of the five: with the flag off, **account B read ten rows of account A's tonnage**. **Deviation, decided by the owner**: the S-06 review (F2) forbade replacing a view out of band, and doing this needed exactly that. It was allowed here because the two reasons behind that rule do not both hold — nothing depends on `daily_tonnage`, so no drop cascades — and because the verification gap that caused the rule was closed rather than ignored: each mutation was applied to `gymlog-test` alone through a scratchpad runner that refuses a URL equal to production's, and every restore was confirmed by reading `security_invoker`, `GREATEST` and `weight_kg` back out of `pg_class`/`pg_get_viewdef`, not by assuming
 
 #### Manual
 

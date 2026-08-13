@@ -183,6 +183,14 @@ export type Database = {
       };
     };
     Views: {
+      daily_tonnage: {
+        Row: {
+          performed_on: string | null;
+          tonnage_kg: number | null;
+          user_id: string | null;
+        };
+        Relationships: [];
+      };
       personal_records: {
         Row: {
           best_estimate_kg: number | null;
