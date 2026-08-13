@@ -653,22 +653,22 @@ failed restore.
 
 #### Automated
 
-- [x] 1.1 Lint, typecheck, unit, integration and build all pass — 183 unit, 90 integration
-- [x] 1.2 `profile-mutations-rls.test.ts` passes, including the fabricated-id assertion — 7 assertions
-- [x] 1.3 No migration: `git diff --name-only origin/main...HEAD -- supabase/` is empty
-- [x] 1.4 No `.delete(` in the profile service or route
-- [x] 1.5 Mutation (a): dropping the timezone check fails the unknown-timezone assertion — assertion 3 went `200` where it wanted `400`, and assertion 7 additionally caught `Europe/Warsawa` left on the shared fixture
-- [x] 1.6 Mutation (b): resolving the row from anything but `locals.user.id` fails the fabricated-id assertion — resolving it from `supabase.auth.getUser()` instead answered `200` where the suite wanted `404` **and** wrote `Pacific/Kiritimati` onto account A. **Recorded finding**: the first form of this mutation, deleting `.eq("id", userId)` outright, fails for the wrong reason — PostgREST refuses an unfiltered `UPDATE`, so the suite sees a `500`. So on `profiles` the filter is load-bearing, unlike `deleteSet`, where AGENTS.md records that dropping it breaks nothing
-- [x] 1.7 Mutation (c): shrinking `WEIGHT_UNITS` fails typecheck on the `src/types.ts` assertion — `ts(2344) Type 'false' does not satisfy the constraint 'true'`; the twin assertion on `ESTIMATION_FORMULAS` was mutated too and fails the same way
+- [x] 1.1 Lint, typecheck, unit, integration and build all pass — 183 unit, 90 integration — 0246a21
+- [x] 1.2 `profile-mutations-rls.test.ts` passes, including the fabricated-id assertion — 7 assertions — 0246a21
+- [x] 1.3 No migration: `git diff --name-only origin/main...HEAD -- supabase/` is empty — 0246a21
+- [x] 1.4 No `.delete(` in the profile service or route — 0246a21
+- [x] 1.5 Mutation (a): dropping the timezone check fails the unknown-timezone assertion — assertion 3 went `200` where it wanted `400`, and assertion 7 additionally caught `Europe/Warsawa` left on the shared fixture — 0246a21
+- [x] 1.6 Mutation (b): resolving the row from anything but `locals.user.id` fails the fabricated-id assertion — resolving it from `supabase.auth.getUser()` instead answered `200` where the suite wanted `404` **and** wrote `Pacific/Kiritimati` onto account A. **Recorded finding**: the first form of this mutation, deleting `.eq("id", userId)` outright, fails for the wrong reason — PostgREST refuses an unfiltered `UPDATE`, so the suite sees a `500`. So on `profiles` the filter is load-bearing, unlike `deleteSet`, where AGENTS.md records that dropping it breaks nothing — 0246a21
+- [x] 1.7 Mutation (c): shrinking `WEIGHT_UNITS` fails typecheck on the `src/types.ts` assertion — `ts(2344) Type 'false' does not satisfy the constraint 'true'`; the twin assertion on `ESTIMATION_FORMULAS` was mutated too and fails the same way — 0246a21
 
 ### Phase 2: Prove what nothing covers today
 
 #### Automated
 
-- [ ] 2.1 Lint, typecheck, unit, integration and build all pass
-- [ ] 2.2 `preferences-derive.test.ts` passes, including the different-record-holder assertion
-- [ ] 2.3 Mutation (a): the same fixture at ten repetitions cannot distinguish the formulas
-- [ ] 2.4 Mutation (b): re-stamping `weight_unit` in `updateSet` fails the existing-rows assertion
+- [x] 2.1 Lint, typecheck, unit, integration and build all pass — 183 unit, 95 integration
+- [x] 2.2 `preferences-derive.test.ts` passes, including the different-record-holder assertion — 5 assertions: the holder flip, its reversibility, the unit boundary, the timezone invariant, and the fixture-restored tripwire
+- [x] 2.3 Mutation (a): the same fixture at ten repetitions cannot distinguish the formulas — both sets moved to ten reps and both formulas named the same `best_estimate_set_id`, so the assertion could no longer tell them apart. Proves a TEST DESIGN, not a guard: the crossing at ten is real
+- [x] 2.4 Mutation (b): re-stamping `weight_unit` in `updateSet` fails the existing-rows assertion — reading the unit from the profile inside `updateSet` turned the kilogram set into `lb` on a plain weight correction; the assertion read `'lb'` where it wanted `'kg'`
 
 #### Manual
 
