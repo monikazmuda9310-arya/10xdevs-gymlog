@@ -859,18 +859,18 @@ must have the view before the committed types are right.
 
 #### Automated
 
-- [ ] 4.1 `git status` clean and `git log origin/main..HEAD` empty
-- [ ] 4.2 CI run for the deployed SHA green — run number recorded here
-- [ ] 4.3 `npm run db:status` shows the migration on both projects before the deploy
-- [ ] 4.4 Worker version at 100% of traffic — version id recorded here
-- [ ] 4.5 Scripted probe: `/dashboard` redirects a signed-out visitor
-- [ ] 4.6 Probe: `daily_tonnage` answers a permission error (route exists) rather than `PGRST205` (schema cache never reloaded)
+- [x] 4.1 `git status` clean and `git log origin/main..HEAD` empty — checked before the push; four commits landed `f8bdb5e..d4548bb`
+- [x] 4.2 CI run for the deployed SHA green — run number recorded here — **run #51**, for exactly `d4548bb`, all six gate steps green
+- [x] 4.3 `npm run db:status` shows the migration on both projects before the deploy — `20260813150000` on `gymlog-test` and on `gymlog`, confirmed **before** `wrangler deploy`, not after — a Worker reading a view production does not have would 500 on every request
+- [x] 4.4 Worker version at 100% of traffic — version id recorded here — **`20e74767-c789-417c-8c90-4dbec665d892`**. No new Worker secret; this slice adds no environment variable
+- [x] 4.5 Scripted probe: `/dashboard` redirects a signed-out visitor — `302 → /auth/signin`; controls `/records` → the same and `/` → `200`. Probed with `node -e 'fetch(...)'`, never `curl` — schannel fails TLS on fresh Cloudflare hosts
+- [x] 4.6 Probe: `daily_tonnage` answers a permission error (route exists) rather than `PGRST205` (schema cache never reloaded) — **`401`, code `42501`** against production's PostgREST — the route is in the schema cache and `anon` is correctly refused. `PGRST205` would have meant the `notify pgrst` never landed, which looks identical to a missing view from the screen
 
 #### Manual
 
-- [ ] 4.7 Public address: both figures on the dashboard after signing in
-- [ ] 4.8 Public address: logging a set moves this week's figure and not last week's
-- [ ] 4.9 Public address: switching the unit changes both figures together
+- [x] 4.7 Public address: both figures on the dashboard after signing in — owner confirmed 2026-08-13
+- [x] 4.8 Public address: logging a set moves this week's figure and not last week's — owner confirmed 2026-08-13
+- [x] 4.9 Public address: switching the unit changes both figures together — owner confirmed 2026-08-13
 
 ### Phase 5: Truth up the documents
 
