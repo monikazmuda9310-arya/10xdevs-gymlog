@@ -322,6 +322,18 @@ describe("changing the timezone moves no workout", () => {
     //
     // Pacific/Kiritimati (+14) and Pacific/Niue (−11) are the pair `calendar.ts` was measured with
     // in real workerd — 25 hours apart, so any instant-shaped storage would move a date somewhere.
+    //
+    // **THIS IS A TRIPWIRE, NOT A GUARD, AND SAYING SO IS THE POINT.** No mutation available today
+    // makes it fail: `profiles.timezone` has no path to `workouts.performed_on` (a `date` the user
+    // states) or to the date columns of `personal_records`, and `set_estimates` never references the
+    // profile's timezone. That is the SAME position assertion 2's neighbour is in at the bottom of
+    // the "unit" block — which this file DECLINES to assert, for reasons stated there. The two are
+    // decided differently on purpose, and the difference is this: the edit that would make this one
+    // bite is concrete and plausible, and S-07 is the slice that will make it. A weekly view that
+    // derives Monday–Sunday boundaries by converting `performed_on` through the profile zone would
+    // turn a stored date into an instant, and this assertion is what would notice. Delete it when
+    // that is no longer true, not before. (context/foundation/lessons.md — "An assertion you keep
+    // because it cannot fail YET must say so in the same words you'd use to refuse one".)
     await freshEntry(ownerA, "tz-today", TODAY);
     await freshEntry(ownerA, "tz-newyear", "2026-01-01");
     await freshEntry(ownerA, "tz-leap", "2024-02-29");

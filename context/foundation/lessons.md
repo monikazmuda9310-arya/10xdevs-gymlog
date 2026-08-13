@@ -207,3 +207,48 @@
   "the default follows" half genuinely needs a human.
 - **Applies to**: every `#### Manual Verification` item involving dates, times, zones, expiry or
   anything else whose observable value depends on when the check is performed.
+
+## An assertion you keep because it cannot fail YET must say so in the same words you'd use to refuse one
+
+- **Context**: `tests/integration/preferences-derive.test.ts`, S-06. Found by implementation review
+  on 2026-08-13 (F7).
+- **Problem**: the file contains two assertions in identical epistemic positions and presents them
+  as opposites. At `:309` it **declines** to assert that changing the unit leaves record holders
+  unchanged, with a comment naming `weight_kg` as the reason no path exists and citing the rule
+  below about decoration that reads as coverage. Twenty lines earlier, assertion 3 asserts that a
+  25-hour timezone swing moves no `performed_on` — which also cannot fail today, for exactly the
+  same kind of reason: `profiles.timezone` has no path to a `date` column the user stated. Both
+  calls are defensible. Keeping assertion 3 is right, because a plausible future edit (a
+  Monday–Sunday week view that converts dates through the profile zone) would make it bite. But the
+  file argues carefully for one and says nothing for the other, so a reader learns the wrong lesson
+  from whichever they read second.
+- **Rule**: **when you keep an assertion that cannot currently fail, write the same paragraph you
+  would write to refuse it** — name the guarantee, say plainly that no mutation available today
+  breaks it, and name the specific future edit that would. That paragraph is the difference between
+  a tripwire and decoration, and it is the only thing distinguishing them, because the code looks
+  identical. Deciding differently in two similar places is fine; deciding differently *silently* is
+  what leaves the next reader guessing which one was the accident.
+- **Applies to**: any suite where some assertions are guards and others are tripwires — and to every
+  pair of similar decisions inside one file, where an unexplained asymmetry reads as an oversight.
+
+## A `finally` that restores shared state does not survive a killed process — let each consumer establish its own preconditions
+
+- **Context**: `tests/integration/preferences-derive.test.ts` and `profile-mutations-rls.test.ts`
+  flip `weight_unit` and `estimation_formula` on `rls-owner-a`, an account `workout-endpoints.test.ts`
+  and `personal-records.test.ts` also read. Found by implementation review on 2026-08-13 (F8).
+- **Problem**: the discipline was followed exactly — reset in `beforeAll`, run-unique values,
+  restore in `finally`, plus a closing tripwire assertion in each suite — and it still has a hole,
+  because `finally` is application-level. A **process kill** (Ctrl-C, a cancelled CI job, an OOM)
+  between the flip and the restore skips it, and so does a network failure inside the restore's own
+  write. The closing tripwire never runs either, so the damage does not surface where it was caused:
+  it surfaces on the *next* run, in `workout-endpoints.test.ts`, which asserts a new set is stamped
+  `"kg"` and does not reset preferences itself. That is precisely the "a suite failing for reasons
+  unrelated to the code under test" outcome the discipline exists to prevent — the prevention was
+  one run short, and both suites' comments claimed otherwise.
+- **Rule**: **teardown protects the happy path; only setup protects the next run.** Where suites
+  share mutable fixture state, every suite that DEPENDS on a value must establish it in its own
+  `beforeAll` rather than trusting the suite that changes it to put it back. Keep the `finally` — it
+  is what keeps an ordinary failure from leaking — but do not let it carry the whole guarantee, and
+  do not write a comment saying it does.
+- **Applies to**: every shared-fixture integration suite, and more generally to any cleanup-based
+  guarantee where the cleanup can be skipped by something outside the program's control.
