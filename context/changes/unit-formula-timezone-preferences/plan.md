@@ -699,17 +699,17 @@ failed restore.
 
 #### Automated
 
-- [ ] 4.1 `git status` clean and `git log origin/main..HEAD` empty
-- [ ] 4.2 CI run for the deployed SHA green — run number recorded here
-- [ ] 4.3 Worker version at 100% of traffic — version id recorded here
-- [ ] 4.4 Scripted probe: `/settings` redirects a signed-out visitor and `PATCH /api/profile` refuses one
-- [ ] 4.5 The new route is present in the built server manifest
+- [x] 4.1 `git status` clean and `git log origin/main..HEAD` empty — checked before this row was written; five commits pushed `b41426c..b251103`
+- [x] 4.2 CI run for the deployed SHA green — **run #44**, for exactly `b251103`, every step green **including the new `npm run test:render`**, which was wired into `.github/workflows/ci.yml` before the push on the owner's decision. A check outside the gate rots, and this one holds the only assertion that would notice the 418-entry list crossing into island props
+- [x] 4.3 Worker version at 100% of traffic — version id **`b8a05a85-73a8-4427-bf1f-d3a96bf46d0a`**, deployed 2026-08-13, confirmed by `npx wrangler deployments list`. No new Worker secret: this slice adds no environment variable
+- [x] 4.4 Scripted probe: `/settings` redirects a signed-out visitor and `PATCH /api/profile` refuses one — `/settings` → `302 /auth/signin` (control: `/records` → the same, `/` → `200`); `PATCH /api/profile` → `401 {"code":"unauthenticated"}` for a valid payload, a bogus zone, a bogus unit and an empty body alike. **The 401 comes BEFORE validation**, so an anonymous caller cannot use the endpoint as an oracle for which timezones exist. Probed with `node -e 'fetch(...)'`, never `curl` — schannel fails TLS on fresh Cloudflare hosts
+- [x] 4.5 The new route is present in the built server manifest — `"route":"/api/profile","type":"endpoint"` and `"route":"/settings","type":"page"` both found in `dist/server/`. **This mattered**: the first probe after deploying answered a 404 HTML page for `PATCH /api/profile`, and the manifest check is what said "edge propagation", not "the deploy is broken". The next request answered `401` correctly. Exactly the trap this criterion exists for
 
 #### Manual
 
-- [ ] 4.6 Public address: change the unit and log a set in it
-- [ ] 4.7 Public address: change the formula and see `/records` re-derive
-- [ ] 4.8 Public address: change the timezone and see a new workout's default follow
+- [x] 4.6 Public address: change the unit and log a set in it — owner confirmed 2026-08-13 against `https://gymlog.10x-astro-starter.workers.dev`
+- [x] 4.7 Public address: change the formula and see `/records` re-derive — owner confirmed 2026-08-13
+- [x] 4.8 Public address: change the timezone and see a new workout's default follow — owner confirmed 2026-08-13, using `Pacific/Niue` for the reason recorded at 3.10
 
 ### Phase 5: Truth up the documents
 
