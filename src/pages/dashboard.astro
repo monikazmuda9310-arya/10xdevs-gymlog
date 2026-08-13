@@ -112,7 +112,9 @@ const weightUnit: WeightUnit = profile?.weight_unit ?? "kg";
                       decides: a week of planks has sets and rounds to 0, and must not be told it was
                       a rest week.
                     */}
-                    {!week.hasSets && <span class="mt-1 block text-xs text-blue-100/50">No sets logged this week</span>}
+                    {!week.hasSets && (
+                      <span class="mt-1 block text-xs text-blue-100/50">No sets logged {label.toLowerCase()}</span>
+                    )}
                   </dd>
                 </div>
               ))}

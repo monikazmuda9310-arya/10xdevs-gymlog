@@ -278,7 +278,9 @@ The sum, in Postgres, proven against real rows. The first migration in three sli
 scan and the per-set arithmetic never leaves the database.
 
 **Contract**: `public.daily_tonnage`, grouped by `(user_id, performed_on)`, exposing
-`user_id, performed_on, tonnage_kg, set_count`. Copies `set_estimates` **exactly**:
+`user_id, performed_on, tonnage_kg`. (This line enumerated `set_count` until the implementation
+review; the paragraph below dropped it and this one was missed — the plan contradicted itself as
+written, and the implementation followed the later, controlling paragraph.) Copies `set_estimates` **exactly**:
 `with (security_invoker = true)`; `revoke all … from anon, authenticated` **before**
 `grant select … to authenticated`; joins written on `(id, user_id)` at every level to give the planner
 the owner filter; `notify pgrst, 'reload schema';` last.

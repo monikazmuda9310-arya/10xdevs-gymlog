@@ -12,7 +12,7 @@
  * rather than left to be noticed.
  */
 
-import { kilogramsIn, roundForDisplay } from "@/lib/services/set-display";
+import { kilogramsIn } from "@/lib/services/set-display";
 import type { WeightUnit } from "@/types";
 
 /**
@@ -39,9 +39,3 @@ export function tonnageFigure(kilograms: number, unit: WeightUnit): string {
 
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Math.round(converted));
 }
-
-/**
- * Re-exported so a page needs one import for the display layer, and so the contrast stays visible:
- * a SET's weight rounds to one decimal place, a WEEK's total to whole units.
- */
-export { roundForDisplay };

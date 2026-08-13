@@ -52,7 +52,17 @@ function stub({ profile, rows }: { profile: typeof PROFILE | null; rows: DailyRo
     select: () => ({ maybeSingle: () => Promise.resolve({ data: profile, error: null }) }),
   };
 
-  return { from: (table: string) => (table === "profiles" ? profiles : daily) };
+  // Throws on an unstubbed table rather than quietly answering the daily chain. A third read added
+  // to the page would otherwise get a chain whose `.eq()` returns a non-thenable, `await` would hand
+  // that straight back, `error` would be undefined, and the page would sail on — leaving this suite
+  // green against a read that never happened.
+  return {
+    from: (table: string) => {
+      if (table === "profiles") return profiles;
+      if (table === "daily_tonnage") return daily;
+      throw new Error(`unstubbed table: ${table}`);
+    },
+  };
 }
 
 async function render(config: Parameters<typeof stub>[0]): Promise<string> {
@@ -75,7 +85,10 @@ async function render(config: Parameters<typeof stub>[0]): Promise<string> {
 }
 
 const FAILURE = "Your weekly tonnage could not be loaded";
-const NO_SETS = "No sets logged this week";
+// Per WEEK, not per page: the card that is empty names its own week. Rendering "this week" under
+// the *Last week* card was the copy defect the implementation review found — and the old constant
+// pinned it, so a passing assertion was holding it in place.
+const NO_SETS = "No sets logged last week";
 /** The class the figure itself carries — present iff a number is on screen. */
 const FIGURE_CLASS = "text-2xl font-semibold text-purple-200";
 
@@ -138,7 +151,19 @@ describe("the dashboard when a week is empty", () => {
     // the sentence.
     expect(oneEmpty).toContain("12,346");
     expect(oneEmpty).toContain(NO_SETS);
-    // And exactly one week says it — not both, and not neither.
+    // **The empty week still renders a FIGURE**, and this half was missing until the implementation
+    // review: code that hid the number for an empty week — the blank US-03 forbids — passed the
+    // suite, because the only figure asserted belonged to the other week. Two figure spans, one 0.
+    // Two figure spans, and one of them reads exactly "0" — not merely a second empty span.
+    const figures = oneEmpty
+      .split(FIGURE_CLASS)
+      .slice(1)
+      .map((part) => part.slice(part.indexOf(">") + 1, part.indexOf("</span>")).trim());
+
+    expect(figures).toHaveLength(2);
+    expect(figures).toContain("12,346");
+    expect(figures).toContain("0");
+    // And exactly one week says the sentence — not both, and not neither.
     expect(oneEmpty.split(NO_SETS)).toHaveLength(2);
   });
 

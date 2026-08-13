@@ -2,7 +2,7 @@
 // this repository, because a week's tonnage is a five-digit number where a set's weight is a
 // two-digit one.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { kilogramsIn } from "@/lib/services/set-display";
 import { tonnageFigure } from "@/lib/services/tonnage-display";
@@ -59,12 +59,37 @@ describe("tonnageFigure: a week's total", () => {
   });
 
   it("never emits a locale-dependent separator", () => {
-    // The whole reason the locale is passed explicitly. Under de-DE the default would render this
-    // as "12.346", which a reader parses as twelve. Asserting the comma pins the choice; asserting
-    // the absence of a dot pins the failure mode.
+    // Under de-DE the default would render this as "12.346", which a reader parses as twelve.
     const figure = tonnageFigure(12345.7, "kg");
 
     expect(figure).toBe("12,346");
     expect(figure).not.toContain(".");
+  });
+
+  it("passes the locale EXPLICITLY, asserted independently of the ambient one", () => {
+    // **The assertion above is not the guard, and finding that out is the point.** It only fails
+    // where the machine's own default locale groups differently — `pl-PL` here, so it does. CI
+    // runners have no `LANG` set and Node resolves the default to `en-US`, so on the one machine
+    // that matters, deleting `"en-US"` from `tonnageFigure` would pass. That is the defect this
+    // slice recorded in `lessons.md` — "a guard can be inert because of the ENVIRONMENT it runs in"
+    // — repeated one file away, in a module whose own header says the render suite cannot catch it
+    // and does not notice that the unit suite could not either.
+    //
+    // Spying on the constructor makes the guard environment-independent: it asserts what the code
+    // ASKED FOR rather than what this machine happened to answer.
+    const original = Intl.NumberFormat;
+    // A `function` expression, not an arrow: only the former is constructible, and this is invoked
+    // with `new`. `Reflect.construct` hands back the real formatter, so the mock observes the
+    // argument without changing the answer.
+    const passThrough = function (...args: unknown[]) {
+      return Reflect.construct(original, args) as Intl.NumberFormat;
+    };
+    const spy = vi.spyOn(Intl, "NumberFormat").mockImplementation(passThrough);
+    try {
+      tonnageFigure(12345.7, "kg");
+      expect(spy).toHaveBeenCalledWith("en-US", { maximumFractionDigits: 0 });
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

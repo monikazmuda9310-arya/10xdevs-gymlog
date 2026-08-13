@@ -87,6 +87,21 @@ export async function weeklyTonnage(
     throw error;
   }
 
+  // **This is what makes the `.gte`/`.lte` bounds load-bearing, and without it they are not.**
+  // `fold` filters by week again in TypeScript, so deleting both bounds from the query changes no
+  // answer — every assertion still passes while the Worker quietly receives one row per training day
+  // in the account's entire history. That is unbounded work under a 10 ms CPU cap: the precise thing
+  // this module's header claims to prevent. Found by implementation review; the query promised a
+  // window, so a row outside it is a broken promise rather than a row to ignore.
+  for (const row of data) {
+    if (row.performed_on !== null && (row.performed_on < previous.start || row.performed_on > current.end)) {
+      throw new Error(
+        `weeklyTonnage: daily_tonnage returned ${row.performed_on}, outside the requested ` +
+          `${previous.start}..${current.end} window`,
+      );
+    }
+  }
+
   return {
     current: fold(current, data),
     previous: fold(previous, data),
@@ -115,11 +130,14 @@ function fold(week: DateRange, rows: DailyRow[]): WeekTonnage {
     return row.performed_on >= week.start && row.performed_on <= week.end;
   });
 
-  return {
-    ...week,
-    kilograms: inWeek.reduce((total, row) => total + Number(row.tonnage_kg), 0),
-    hasSets: inWeek.length > 0,
-  };
+  const kilograms = inWeek.reduce((total, row) => total + Number(row.tonnage_kg), 0);
+  // A non-finite total would render as the string "NaN" — not a crash, but a number the user would
+  // believe. This module refuses to understate a week; refusing to invent one costs a line.
+  if (!Number.isFinite(kilograms)) {
+    throw new Error(`weeklyTonnage: ${week.start}..${week.end} summed to a non-finite value`);
+  }
+
+  return { ...week, kilograms, hasSets: inWeek.length > 0 };
 }
 
 /** Whole days between two `YYYY-MM-DD` dates, in the same zoneless frame `calendar.ts` uses. */

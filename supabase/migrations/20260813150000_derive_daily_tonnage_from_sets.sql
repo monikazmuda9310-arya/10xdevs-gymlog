@@ -43,8 +43,11 @@
 -- `set_estimates` does rather than where `personal_records` does. Without the flag the view executes
 -- as its owner — `postgres`, which owns every table here and is not subject to their policies — and
 -- hands every account's tonnage to every account, with no error and no warning, through a route that
--- reads exactly like the safe ones. Assertion 6 of tests/integration/weekly-tonnage.test.ts is what
--- holds it, and the S-07 mutation protocol removed the flag and confirmed that assertion fails.
+-- reads exactly like the safe ones. Assertion 7 of tests/integration/weekly-tonnage.test.ts is what
+-- holds it -- specifically its third probe, where account B names account A's user_id directly. The
+-- S-07 mutation protocol removed the flag and confirmed that probe fails, returning ten of A's rows.
+-- (This said "assertion 6" until the implementation review; 6 is the empty-week test and survives
+-- the flag's removal. A comment claiming "test X fails if Y changes" is itself a checkable claim.)
 create view public.daily_tonnage with (security_invoker = true) as
 select
   s.user_id,

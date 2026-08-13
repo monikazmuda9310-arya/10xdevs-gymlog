@@ -155,6 +155,13 @@ describe("trainingWeeksFor: the two weeks the dashboard compares", () => {
       const span = (range: { start: string; end: string }) =>
         (Date.parse(`${range.end}T00:00:00Z`) - Date.parse(`${range.start}T00:00:00Z`)) / 86_400_000;
 
+      // The anchor is a MONDAY. Without this the whole sweep passes against a `mondayOf` that
+      // returns a Sunday — every span is still 6 and the two weeks still meet.
+      expect(new Date(`${current.start}T00:00:00Z`).getUTCDay(), `week start at ${instant.toISOString()}`).toBe(1);
+      // The 14 the title claims, computed with the same expression `tonnage.ts` uses for its guard.
+      const window =
+        (Date.parse(`${current.end}T00:00:00Z`) - Date.parse(`${previous.start}T00:00:00Z`)) / 86_400_000 + 1;
+      expect(window, `window at ${instant.toISOString()}`).toBe(14);
       expect(span(current), `current week at ${instant.toISOString()}`).toBe(6);
       expect(span(previous), `previous week at ${instant.toISOString()}`).toBe(6);
       // The two weeks meet: the day after previous.end is current.start.

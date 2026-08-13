@@ -48,6 +48,7 @@ const ANCHORS = {
   boundary: "2025-09-10",
   moved: "2025-10-08",
   empty: "2025-11-12",
+  access: "2025-12-10",
 } as const;
 
 interface Weeks {
@@ -242,8 +243,10 @@ describe("weekly tonnage: the sum itself", () => {
 
     const { current } = await read(ownerA, weeks.now);
 
+    // Zero, not a negative number: `toBe(0)` already covers both, so there is no second assertion
+    // here pretending to add one. `hasSets` is the half that matters — the week HAS sets, so the
+    // screen must say "no external load" rather than "you did not train".
     expect(current.kilograms).toBe(0);
-    expect(current.kilograms).not.toBeLessThan(0);
     expect(current.hasSets).toBe(true);
   });
 
@@ -339,12 +342,19 @@ describe("weekly tonnage: the access boundary", () => {
     // which owns every table and is not subject to their policies — and hands every account's
     // training volume to every account. The S-07 mutation protocol removes the flag and this is
     // what fails.
-    // Reuses assertion 1's window, where A has tonnage and B has none.
-    const weeks = weeksAround(ANCHORS.sum);
+    // **Its own window and its own fixture.** This used to reuse assertion 1's, which made an
+    // access-control test fail whenever an arithmetic test did — and made `-t "7."` fail on its own.
+    // AGENTS.md § Testing: every test its own setup, action, assertion.
+    const weeks = weeksAround(ANCHORS.access);
+    const exerciseId = await makeExercise(ownerA, "access");
+    await logWorkout(ownerA, exerciseId, ANCHORS.access, [{ reps: 5, weight: 100 }]);
+
     const mine = await read(ownerA, weeks.now);
     expect(mine.current.kilograms).toBeGreaterThan(0);
 
-    // B logged nothing in this window; if the view leaked, A's tonnage would appear here.
+    // **This read is the non-vacuity control for the probe below, NOT a leak test.** `read()` scopes
+    // by `.eq("user_id", ownerB.userId)`, so even a leaking view would be filtered by PostgREST
+    // before B saw anything. Only naming A's identifier directly can observe the leak.
     const theirs = await read(ownerB, weeks.now);
     expect(theirs.current.kilograms).toBe(0);
 
