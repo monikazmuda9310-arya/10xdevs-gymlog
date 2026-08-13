@@ -1,9 +1,9 @@
 ---
 change_id: weekly-tonnage
 title: See this training week's total tonnage next to last week's
-status: implemented
+status: impl_reviewed
 created: 2026-08-13
-updated: 2026-08-13
+updated: 2026-08-14
 archived_at: null
 ---
 
