@@ -114,6 +114,16 @@ export type WeightUnit = Database["public"]["Enums"]["weight_unit"];
 /** Which formula estimates a one-rep max. Both are valid for 1–12 repetitions only. */
 export type EstimationFormula = Database["public"]["Enums"]["estimation_formula"];
 
+/**
+ * The same two pairs, as values — for the same reason `MUSCLE_GROUPS` exists.
+ *
+ * The settings form has to iterate both, and a hand-written list inside a component is how a third
+ * value ships to the database and never reaches the screen. Order matches each enum's declaration
+ * order, which is what any `order by` will use.
+ */
+export const WEIGHT_UNITS = ["kg", "lb"] as const;
+export const ESTIMATION_FORMULAS = ["epley", "brzycki"] as const;
+
 // `src/lib/services/one-rep-max.ts` declares the same union by hand, and must keep doing so:
 // AGENTS.md requires the calculation module stay dependency-free so it remains directly
 // unit-testable. The duplication is therefore deliberate — but nothing else would keep the two in
@@ -132,3 +142,12 @@ export type _EstimationFormulaUnionsAgree = Assert<MutuallyAssignable<Estimation
 // database, being assignable to exercises through the API, and silently missing from every filter
 // and select on screen. `false`, not `never`, for the reason spelled out above.
 export type _MuscleGroupTupleCoversEnum = Assert<MutuallyAssignable<MuscleGroup, (typeof MUSCLE_GROUPS)[number]>>;
+
+// And the same guard for the two preference tuples, which S-06 puts in a `<select>`. Drop a value
+// from either tuple while the Postgres enum still carries it — or add one to the enum without
+// teaching the tuple — and this stops compiling. The failure it replaces is a preference the account
+// can hold in storage and can never see, let alone change back.
+export type _WeightUnitTupleCoversEnum = Assert<MutuallyAssignable<WeightUnit, (typeof WEIGHT_UNITS)[number]>>;
+export type _EstimationFormulaTupleCoversEnum = Assert<
+  MutuallyAssignable<EstimationFormula, (typeof ESTIMATION_FORMULAS)[number]>
+>;
