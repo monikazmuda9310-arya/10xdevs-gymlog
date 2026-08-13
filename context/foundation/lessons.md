@@ -149,3 +149,61 @@
   when the default wins — so the next reader knows the question was actually asked.
 - **Applies to**: any dependency added to a hydrated island or other size-sensitive boundary, and
   more generally to any plan step phrased as a conditional preference.
+
+## "A user cannot do X yet" is not "X is untested" — read the suite before planning around the gap
+
+- **Context**: S-06's first plan draft, caught by `/10x-plan-review` on 2026-08-12 (finding F1).
+- **Problem**: the plan's headline risk was the `s.reps::numeric / 30` cast inside `set_estimates` —
+  the one that makes Epley degenerate to `estimate = weight` under integer division. The plan
+  reasoned: this defect only shows for an account that switches formula, nobody can switch formula
+  yet, therefore it is untested, therefore the slice's largest phase should be built around proving
+  it. Every step of that follows except the third. `tests/integration/personal-records.test.ts` had
+  been toggling `estimation_formula` since S-04 — `setFormula` at `:212`, assertions 4 and 4b — so
+  dropping the cast already failed the gate on every push. **An entire phase was designed to cover
+  something already covered**, and it survived until a reader who had not written the plan checked
+  the suite.
+- **Rule**: **"the user cannot reach this yet" describes the UI, not the test suite.** Before
+  planning work around an untested behaviour, open the suite and look for it — grep the column name,
+  the function name, the constant. Tests reach past the UI routinely: an integration check can write
+  a column no screen exposes. The two claims feel identical when writing a plan and are not, and the
+  false one costs a phase.
+- **Applies to**: every `/10x-plan` that justifies a phase with "nothing covers this today", and
+  every plan review — verifying that claim is cheap and it is where the largest phases hide.
+
+## A mutation that fails for the WRONG REASON has not confirmed the guard
+
+- **Context**: S-06 Phase 1's mutation (b), 2026-08-13. The criterion read "resolving the row from
+  anything other than `locals.user.id` fails the fabricated-id assertion".
+- **Problem**: the obvious mutation — delete `.eq("id", userId)` from `updateProfile` — made the
+  suite go red, and stopping there would have recorded the guard as confirmed. It was not. PostgREST
+  **refuses an `UPDATE` carrying no filter at all**, so the endpoint answered `500` and the assertion
+  failed on a status code it never intended to test. The claim being checked was "the handler writes
+  only the row named by `locals.user.id`", and a malformed query says nothing about it. Sharpened to
+  "resolve the row from `supabase.auth.getUser()` instead", the mutation failed **correctly**:
+  `200` where the suite wanted `404`, and the fabricated call's payload written onto a real account.
+- **Rule**: **when a mutation goes red, read the failure and check it is the failure the criterion
+  describes.** A guard is confirmed by the assertion failing *for its own reason* — the wrong value,
+  the wrong row, the wrong status — not merely by the suite turning red. Red for an unrelated reason
+  is the mutation-testing twin of a test that cannot fail: it reads as evidence and is not.
+- **Applies to**: every mutation step. It is cheap to check and it is the only thing separating
+  "I broke the guard" from "I broke the query".
+
+## A manual criterion whose outcome depends on the hour it runs is a badly written criterion
+
+- **Context**: S-06 criterion 3.10 and § Manual Testing Steps step 6 — "switch the timezone to
+  something far away, start a new workout, and confirm the default date follows". Run by the owner on
+  2026-08-13 at 10:26 Warsaw time; it appeared to fail.
+- **Problem**: the instruction named `Pacific/Kiritimati`, which is UTC+14 — as far away as a zone
+  gets. At 08:26 UTC that reads 22:26 on the **same calendar date** as Warsaw, so the default date
+  did not move and the product looked broken. Exactly **9 of the 418 zones** were on a different date
+  at that hour; by late evening in Warsaw almost all of them would have been. **"Far away" is not the
+  property being tested** — "currently on a different calendar date" is, and the two coincide often
+  enough that the wrong one reads as correct while the plan is being written.
+- **Rule**: **state a manual criterion in terms of the property it tests, and give the reader a way
+  to establish that property at the moment they run it.** Where the property is time-dependent, the
+  step carries the one-liner that computes it rather than a fixed example. And prefer to pin the
+  hour-independent half in an automated check: here `preferences-derive.test.ts` assertion 3 asserts
+  the invariant — a 25-hour swing moves no `performed_on` — which holds at every hour, while only the
+  "the default follows" half genuinely needs a human.
+- **Applies to**: every `#### Manual Verification` item involving dates, times, zones, expiry or
+  anything else whose observable value depends on when the check is performed.

@@ -699,23 +699,23 @@ failed restore.
 
 #### Automated
 
-- [x] 4.1 `git status` clean and `git log origin/main..HEAD` empty — checked before this row was written; five commits pushed `b41426c..b251103`
-- [x] 4.2 CI run for the deployed SHA green — **run #44**, for exactly `b251103`, every step green **including the new `npm run test:render`**, which was wired into `.github/workflows/ci.yml` before the push on the owner's decision. A check outside the gate rots, and this one holds the only assertion that would notice the 418-entry list crossing into island props
-- [x] 4.3 Worker version at 100% of traffic — version id **`b8a05a85-73a8-4427-bf1f-d3a96bf46d0a`**, deployed 2026-08-13, confirmed by `npx wrangler deployments list`. No new Worker secret: this slice adds no environment variable
-- [x] 4.4 Scripted probe: `/settings` redirects a signed-out visitor and `PATCH /api/profile` refuses one — `/settings` → `302 /auth/signin` (control: `/records` → the same, `/` → `200`); `PATCH /api/profile` → `401 {"code":"unauthenticated"}` for a valid payload, a bogus zone, a bogus unit and an empty body alike. **The 401 comes BEFORE validation**, so an anonymous caller cannot use the endpoint as an oracle for which timezones exist. Probed with `node -e 'fetch(...)'`, never `curl` — schannel fails TLS on fresh Cloudflare hosts
-- [x] 4.5 The new route is present in the built server manifest — `"route":"/api/profile","type":"endpoint"` and `"route":"/settings","type":"page"` both found in `dist/server/`. **This mattered**: the first probe after deploying answered a 404 HTML page for `PATCH /api/profile`, and the manifest check is what said "edge propagation", not "the deploy is broken". The next request answered `401` correctly. Exactly the trap this criterion exists for
+- [x] 4.1 `git status` clean and `git log origin/main..HEAD` empty — checked before this row was written; five commits pushed `b41426c..b251103` — e312980
+- [x] 4.2 CI run for the deployed SHA green — **run #44**, for exactly `b251103`, every step green **including the new `npm run test:render`**, which was wired into `.github/workflows/ci.yml` before the push on the owner's decision. A check outside the gate rots, and this one holds the only assertion that would notice the 418-entry list crossing into island props — e312980
+- [x] 4.3 Worker version at 100% of traffic — version id **`b8a05a85-73a8-4427-bf1f-d3a96bf46d0a`**, deployed 2026-08-13, confirmed by `npx wrangler deployments list`. No new Worker secret: this slice adds no environment variable — e312980
+- [x] 4.4 Scripted probe: `/settings` redirects a signed-out visitor and `PATCH /api/profile` refuses one — `/settings` → `302 /auth/signin` (control: `/records` → the same, `/` → `200`); `PATCH /api/profile` → `401 {"code":"unauthenticated"}` for a valid payload, a bogus zone, a bogus unit and an empty body alike. **The 401 comes BEFORE validation**, so an anonymous caller cannot use the endpoint as an oracle for which timezones exist. Probed with `node -e 'fetch(...)'`, never `curl` — schannel fails TLS on fresh Cloudflare hosts — e312980
+- [x] 4.5 The new route is present in the built server manifest — `"route":"/api/profile","type":"endpoint"` and `"route":"/settings","type":"page"` both found in `dist/server/`. **This mattered**: the first probe after deploying answered a 404 HTML page for `PATCH /api/profile`, and the manifest check is what said "edge propagation", not "the deploy is broken". The next request answered `401` correctly. Exactly the trap this criterion exists for — e312980
 
 #### Manual
 
-- [x] 4.6 Public address: change the unit and log a set in it — owner confirmed 2026-08-13 against `https://gymlog.10x-astro-starter.workers.dev`
-- [x] 4.7 Public address: change the formula and see `/records` re-derive — owner confirmed 2026-08-13
-- [x] 4.8 Public address: change the timezone and see a new workout's default follow — owner confirmed 2026-08-13, using `Pacific/Niue` for the reason recorded at 3.10
+- [x] 4.6 Public address: change the unit and log a set in it — owner confirmed 2026-08-13 against `https://gymlog.10x-astro-starter.workers.dev` — e312980
+- [x] 4.7 Public address: change the formula and see `/records` re-derive — owner confirmed 2026-08-13 — e312980
+- [x] 4.8 Public address: change the timezone and see a new workout's default follow — owner confirmed 2026-08-13, using `Pacific/Niue` for the reason recorded at 3.10 — e312980
 
 ### Phase 5: Truth up the documents
 
 #### Automated
 
-- [ ] 5.1 Lint, typecheck, unit, integration and build all pass
-- [ ] 5.2 Every newly cited file path and assertion name resolves
-- [ ] 5.3 A script confirms the README rows, STATE.md's Open Question 2 note and the roadmap's S-06 status
-- [ ] 5.4 `git log origin/main..HEAD` empty after the phase commit
+- [x] 5.1 Lint, typecheck, unit, integration and build all pass — 183 unit, 5 render, 95 integration; the gate is **six** steps now
+- [x] 5.2 Every newly cited file path and assertion name resolves — a script resolved 10 paths and 15 named symbols/assertions (`WEIGHT_UNITS`, both tuple assertions, both label records, `isSupportedTimeZone`, `updateProfile`, the three `preferences-derive` assertion titles, the fabricated-id assertion title, the `test:render` script and its CI step). All 25 resolved
+- [x] 5.3 A script confirms the README rows, STATE.md's Open Question 2 note and the roadmap's S-06 status — 12 checks, all passing: both README route rows, "unit affects NEW sets only", the headline-converted/evidence-as-typed rule, STATE.md naming Open Question 2 as S-07's, roadmap S-06 `done` in **both** the At a glance row and the item body, and four AGENTS.md claims (six-step gate, re-derivation, holder change, the 418-zone measurement) plus the three new `lessons.md` entries
+- [x] 5.4 `git log origin/main..HEAD` empty after the phase commit — pushed with the epilogue

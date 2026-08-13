@@ -32,6 +32,19 @@ without changing the test and saying so.**
   - **The two formulas cross at exactly 10 repetitions** (`36/27` and `1 + 10/30` are both `4/3`).
     A set of ten reads identically under either, so it proves nothing about the formula toggle —
     and it is the first thing to suspect when somebody reports that switching does nothing.
+  - **The view reads the formula PER ROW, from the joined profile** — `coalesce(p.estimation_formula,
+    'brzycki')` in `set_estimates`. Nothing anywhere reads a hardcoded formula, which is why S-06
+    could make the column user-settable **with no migration at all**: changing it re-derives every
+    estimate, every record and every impact warning on the next read, with no write and nothing to
+    invalidate. A formula change is a re-derivation, never a data migration. Anyone who "optimises"
+    this by storing an estimate turns it back into one.
+  - **A formula switch can change WHICH SET HOLDS a record, not merely the number on it** — because
+    the two formulas rank differently on either side of ten repetitions. With `100 kg × 5` and
+    `82 kg × 12` logged: Brzycki puts the twelve-rep set first (118.08 vs 112.5) and Epley the
+    five-rep set (116.67 vs 114.80). `tests/integration/preferences-derive.test.ts` assertion 1 pins
+    this, deciding by **`best_estimate_set_id`** rather than by comparing numbers across the SQL/TS
+    boundary. Value parity for both formulas is a different claim and lives in
+    `personal-records.test.ts` assertions 4 and 4b.
 - **Records are derived, never stored as trophies.** A record is always the best _surviving_ set,
   recomputed when the underlying sets change. A record may therefore go _down_ after an edit or
   delete, and the user is warned by how much before confirming. Never write a record row that can
@@ -286,6 +299,15 @@ which is both a lie and an existence oracle.
   path, as above — and **no assertion writable from that suite can catch its removal.** The edit that
   would make it load-bearing is RLS being disabled on `sets`, which `workout-log-rls.test.ts` covers
   from the other side. Named here rather than papered over (`lessons.md`).
+- **But on `profiles` the same filter IS load-bearing, and for a reason that has nothing to do with
+  RLS.** `updateProfile` carries `.eq("id", userId)`; removing it does not quietly widen the update,
+  it **fails outright with a `500`**, because PostgREST refuses an `UPDATE` with no filter at all.
+  Measured during S-06's mutation protocol. Two consequences worth carrying: the two cases look
+  identical in the code and are not, so "the filter is only the index path" is false as a general
+  claim; and a mutation that fails for the *wrong reason* has not confirmed the guard — the S-06
+  mutation had to be sharpened to "resolve the row from `supabase.auth.getUser()` instead of
+  `locals.user.id`", which then failed correctly, answering `200` where the suite wanted `404` and
+  writing the caller's payload onto a real account.
 - **A malformed `[id]` must never reach a query.** Postgres answers `22P02` for a uuid column handed
   something that is not one, which surfaces as a `500` for what is really "no such row" — and a 500
   is a different fact about the system than a 404. `resolve()` in
@@ -296,11 +318,15 @@ which is both a lie and an existence oracle.
 Scripts, local Supabase setup, and deploy steps: @README.md
 
 The gate, in the order CI runs it: `npm run lint` → `npm run typecheck` → `npm test` →
-`npm run test:integration` → `npm run build`. Run all five before claiming a change is done —
-the integration check needs network and the test project's credentials, so it is the one that
-fails first on a fresh clone. `npm run typecheck` is
+`npm run test:render` → `npm run test:integration` → `npm run build`. Run all **six** before claiming
+a change is done — the integration check needs network and the test project's credentials, so it is
+the one that fails first on a fresh clone. `npm run typecheck` is
 `astro check`, which covers `.astro` and `.ts` alike; `npm test` is a single non-interactive
 Vitest run, `npm run test:watch` is the local loop.
+
+**There are three Vitest projects and they cannot see each other's files** — deliberately, by
+include glob: `src/**` for `npm test`, `tests/integration/**`, `tests/render/**`. See § Testing for
+what each is for and why `test:render` needs its own config at all.
 
 **There is no local database stack and none is wanted.** Every migration and every data-touching
 check runs against a hosted project through `--db-url`. There are **two** projects: `gymlog` is
@@ -313,6 +339,7 @@ check write to.
 | `npm run db:push`          | applies every pending migration to **both**, `gymlog-test` first        |
 | `npm run db:types`         | regenerates `src/db/database.types.ts` from the **production** schema   |
 | `npm run test:integration` | the RLS check against `gymlog-test`; never runs inside `npm test`       |
+| `npm run test:render`      | renders pages through Astro's container and asserts on the HTML        |
 
 - **There is deliberately no single-target push.** Advancing one schema and forgetting the other is
   the only way the two drift, so forgetting is not an available mistake. If the production push
@@ -401,7 +428,15 @@ export `const prerender = false`.
 - **Tailwind classes**: use `cn()` from `@/lib/utils`. Never concatenate class strings by hand.
 - **shadcn/ui** lives in `src/components/ui/` ("new-york" variant). Add with
   `npx shadcn@latest add [name]`.
-- **API routes** export uppercase `GET` / `POST`; validate every input with zod.
+- **API routes** export uppercase `GET` / `POST` / `PATCH` / `DELETE`; validate every input with zod.
+- **A large collection is rendered by Astro and slotted into an island, never passed as a prop.**
+  Astro serialises island props into an `<astro-island props="…">` attribute in the HTML, so a prop
+  is a wire, not a reference: S-06's 418-entry timezone list would have shipped ~7 KB of zone names
+  to the browser to be parsed at hydration, for a `<select>` that needs no JavaScript at all.
+  `settings.astro` emits the `<option>` elements and slots the `<select>` into `PreferencesForm`,
+  which reads its value from the form on submit. **A check against `dist/client/` cannot see this
+  mistake** — server-rendered HTML does not live there — which is why the guard is
+  `tests/render/settings-island.test.ts` instead.
 - **Migrations**: `supabase/migrations/YYYYMMDDHHmmss_short_description.sql`.
 - **React**: no Next.js directives (`"use client"` and friends). Hooks go in
   `src/components/hooks/`.
@@ -420,6 +455,18 @@ export `const prerender = false`.
 - **The harness deliberately does not load Astro's Vite pipeline.** Anything under test must not
   import an `astro:*` virtual module (`astro:env/server` and friends) — it will fail to resolve.
   That is the guardrail that keeps the domain calculations plain and dependency-free.
+- **Render checks live in `tests/render/`**, under `vitest.render.config.ts`, run by
+  `npm run test:render`. This is the **only** suite that loads Astro's Vite pipeline, and it exists
+  for the one question neither other project can ask: _what does the rendered HTML actually
+  contain?_ It renders a real page through Astro's container with fake `locals` — no server, no
+  session, no network — which is what makes it usable on pages behind `PROTECTED_ROUTES`.
+  - **`configFile: false` in that config is not a preference.** Loading `astro.config.mjs` pulls in
+    `@astrojs/cloudflare`, which brings `@cloudflare/vite-plugin` and hands Vitest's runner to
+    workerd, where it dies with `ReferenceError: exports is not defined` before a test runs. The
+    config restates the real one minus the adapter and the sitemap.
+  - **So do not assert anything runtime-specific here.** Island prop serialisation and `<option>`
+    emission are Astro core and do not vary by adapter; whether workerd has full ICU does, and was
+    measured in workerd (`src/lib/services/timezones.ts`).
 - **Integration checks that touch stored data live in `tests/integration/`**, under
   `vitest.integration.config.ts`, run by `npm run test:integration` — never by `npm test`, whose
   include glob is `src/**` so it cannot match them. Keep it that way: a network-dependent test
@@ -551,10 +598,10 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
   build fails against the Cloudflare adapter (`Could not find the prerender entry point`),
   reproduced on 7.1.6 and 7.2.0. Do not "helpfully" bump it; see
   `context/changes/bootstrap-verification/verification.md` for the full record.
-- CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit tests, the integration check (against
-  `gymlog-test`) and build, in that order, on every push and PR to `main`. It carries a
-  `concurrency` group so two runs cannot race the shared fixture rows. The browser test is not
-  wired yet.
+- CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit tests, **the render check**, the
+  integration check (against `gymlog-test`) and build, in that order, on every push and PR to
+  `main`. It carries a `concurrency` group so two runs cannot race the shared fixture rows. The
+  browser test is not wired yet.
 - **Five tables exist.**
   - `public.profiles` — one row per account, created by a trigger on `auth.users` and backfilled.
   - `public.exercises` — the catalogue: **38 seeded rows** with `user_id is null`, readable by every
@@ -596,3 +643,29 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
   six values, pinned in both directions by `MUSCLE_GROUPS` in `src/types.ts` and a compile-time
   assertion. Add a seventh to the database without adding it there and the build fails, rather than
   the group existing in storage and silently missing from every filter on screen.
+  - **All three now have that pinning**, not just `muscle_group`: S-06 added `WEIGHT_UNITS` and
+    `ESTIMATION_FORMULAS` beside it, because the settings form has to iterate both. Each carries its
+    own `Assert<MutuallyAssignable<…>>`, and both were mutated to confirm they fail
+    (`ts(2344) Type 'false' does not satisfy the constraint 'true'`). `WEIGHT_UNIT_LABELS` and
+    `ESTIMATION_FORMULA_LABELS` in `src/lib/validation/profile.ts` are typed as `Record` over the
+    enum for the same reason one step further on: a new value cannot reach the screen unnamed.
+- **The account's three preferences are settable, added by S-06 — with no migration.** F-03 created
+  the columns, the grant and the update policy; S-04's view already read the formula per row. The
+  slice is a screen, an endpoint, and the branches those two make reachable.
+  - `/settings` and `PATCH /api/profile`, which replaces all three at once. **A partial patch is
+    refused on purpose**: "absent" and "explicitly set" are indistinguishable in JSON, so one Save
+    sends every value the user was looking at.
+  - **Nothing stored is converted, ever.** Changing `weight_unit` changes what NEW sets are stamped
+    with; every set already logged keeps the unit it was typed in, and **editing one must not
+    re-stamp it** — `updateSet` takes no unit, and `preferences-derive.test.ts` assertion 2 fails if
+    it ever does. Changing `estimation_formula` re-derives. Changing `timezone` moves no
+    `performed_on`, because that column is a calendar date the user stated rather than an instant.
+  - **`Intl.supportedValuesOf("timeZone")` is available in workerd and answers 418 zones**
+    (measured through `astro dev`, which runs the real runtime; `hasWarsaw`, `hasKiritimati`, 6825
+    bytes of joined names). `src/lib/services/timezones.ts` is the single source the `<select>` and
+    the validator both read — if they came from two places the form could offer a value the server
+    then refused. Its small hardcoded fallback is a **tripwire, not a supported mode**.
+  - **An unknown timezone is refused server-side**, by membership rather than by shape. `todayIn`
+    catches the `RangeError` a bad zone raises and answers in UTC (`calendar.ts:29`), deliberately —
+    so `Europe/Warsawa` would produce a wrong week boundary with nothing on screen saying so. That
+    was unreachable while nobody could write the column; a form makes it reachable.

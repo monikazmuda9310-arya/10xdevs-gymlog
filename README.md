@@ -59,6 +59,7 @@ npm run dev
 - `npm test` - Run the unit tests once (Vitest, non-interactive, hermetic — no network)
 - `npm run test:watch` - Run the unit tests in watch mode
 - `npm run test:integration` - Run the RLS check against the `gymlog-test` project (needs network)
+- `npm run test:render` - Render pages through Astro's container and assert on the resulting HTML (hermetic)
 - `npm run db:status` - Print both projects' migration histories — the drift check
 - `npm run db:push` - Apply pending migrations to both projects, `gymlog-test` first
 - `npm run db:types` - Regenerate `src/db/database.types.ts` from the production schema
@@ -169,11 +170,13 @@ and `http://localhost:4321/**` for local work.
 | `/workouts`             | Protected. The account's own workouts, most recent first, and the form that starts one dated today in their timezone     |
 | `/workouts/[id]`        | Protected. One workout: add exercises, log sets, see each set's estimated 1RM. **404 for a workout that is not yours**   |
 | `/records`              | Protected. Current records per exercise — best estimated 1RM and heaviest weight, each with the set and date behind it   |
+| `/settings`             | Protected. Weight unit, estimation formula, and the timezone the training week runs in. One form, one Save              |
 | `/api/auth/signout`     | POST. Always → `/auth/signin`, so returning requires authenticating again                                                |
 | `/api/exercises`        | POST, **JSON** (not a form post — the caller is a hydrated island). Creates a custom exercise for the signed-in account  |
 | `/api/workouts`         | POST, JSON. Creates a workout from `{ performedOn, note? }`                                                              |
 | `/api/exercise-entries` | POST, JSON. Adds an exercise to a workout; choosing one already there returns the existing entry rather than an error    |
 | `/api/sets`             | POST, JSON. Logs a set. **The weight unit is not in the body** — it is read from the account's profile on the server     |
+| `/api/profile`          | PATCH, JSON. Replaces all three preferences at once. Writes only the row named by `locals.user.id`; no route parameter  |
 
 Correcting what was logged, added by S-05. Each resource carries its mutations and a preflight that
 answers what the change would cost:
@@ -193,6 +196,25 @@ answers what the change would cost:
 the account editing it. `PATCH /api/sets/[id]` changes repetitions, weight and RPE and leaves
 `weight_unit` exactly as it was, so a set typed in pounds still reads back as the number typed after
 the profile preference changes. `weight_kg` is generated and is never written.
+
+### Changing a preference changes what is DERIVED, never what is stored
+
+`PATCH /api/profile` (S-06) writes three columns and nothing else. What follows from each is worth
+stating precisely, because "every weight is shown in your unit" and "a weight reads back as the
+number you typed" pull against each other and the product settles the conflict rather than ducking it:
+
+- **Weight unit affects NEW sets only.** The unit is stamped from the profile at insert, so every set
+  already logged keeps the unit it was typed in — including when you later correct its weight.
+- **A derived HEADLINE figure is expressed in the reader's unit; the EVIDENCE line quoting the set is
+  shown as typed** (owner ruling on FR-022, 2026-08-12). So `/records` may read
+  `220.5 lb — from 5 × 100 kg on 2026-08-13`. Both numbers are true and neither is rounded into the
+  other. Do not "fix" `heaviestFigure` to stop converting.
+- **Estimation formula re-derives history rather than rewriting it.** `set_estimates` reads the
+  column per row, so switching recomputes every estimate and record on the next read — and can change
+  **which set holds** a record, not merely the number, because the two formulas rank differently
+  either side of ten repetitions. Switching back restores the previous figures exactly.
+- **Timezone moves no logged workout.** `performed_on` is a calendar date you stated, not an instant.
+  It decides which week a session belongs to and what date a new workout defaults to, nothing else.
 
 Each `…/impact` answers `{ impact: [...] }`. **When the ranking read fails it answers a non-2xx
 `impact_unavailable`, never an empty list** — "nothing is at stake" is a positive claim, and the
@@ -224,7 +246,9 @@ Set `SUPABASE_URL` and `SUPABASE_KEY` as secrets in your Cloudflare dashboard or
 
 ## CI
 
-GitHub Actions runs lint, typecheck, unit tests, the integration check and build on every push and PR to `main`. The workflow carries a `concurrency` group so two runs cannot race the integration check's shared fixture rows.
+GitHub Actions runs lint, typecheck, unit tests, the render check, the integration check and build on every push and PR to `main`. The workflow carries a `concurrency` group so two runs cannot race the integration check's shared fixture rows.
+
+`npm run test:render` needs no secrets and no network — it renders pages through Astro's container and asserts on the HTML. It is in the gate because it holds the only check that would notice the 418-entry timezone list being passed as an island prop, and a check outside the gate rots.
 
 Five repository secrets:
 

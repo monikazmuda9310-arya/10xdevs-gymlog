@@ -129,3 +129,53 @@ A slice whose outcome is a screen carries its own deployment phase, and the depl
 **automatic** criterion "pushed to `origin/main` and CI green" with the run number in Progress
 (`context/foundation/lessons.md`, plus the S-05 requirement that came from session 8's twice-unpushed
 work).
+
+### Deviations from the plan, and what they cost (implementation, 2026-08-13)
+
+Five phases, five commits plus two write-back commits. Nothing in the plan's § What We're NOT Doing
+was violated: **no migration on either database**, no conversion of stored weights, no confirmation
+dialog, no delete path on `profiles`, no out-of-band DDL, no E2E.
+
+1. **Criteria 3.3 and 3.4 render rather than fetch.** The plan asked for "a script that fetches the
+   rendered `/settings` HTML". It cannot: `/settings` is in `PROTECTED_ROUTES`, and `astro dev`
+   authenticates against **production**, so a fetch would need a real production session. Astro's
+   container renders the real page component with fake `locals` — no server, no session, no network —
+   and answers the same question about the same HTML. Cost: a **third Vitest project**
+   (`vitest.render.config.ts`, `tests/render/`), which the owner then approved wiring into CI. Its
+   `configFile: false` is forced: loading `astro.config.mjs` pulls in `@astrojs/cloudflare`, whose
+   Vite plugin hands the Vitest runner to workerd and kills it with
+   `ReferenceError: exports is not defined`.
+2. **Phase 1's mutation (b) had to be sharpened.** Deleting `.eq("id", userId)` from `updateProfile`
+   fails the suite for the wrong reason — PostgREST refuses an unfiltered `UPDATE`, so the endpoint
+   answers `500`, which says nothing about *which row* the handler resolves. Re-run as "resolve the
+   row from `supabase.auth.getUser()`", it failed correctly. Carried into `lessons.md` and into
+   `AGENTS.md` § Access control, because it also means the "the filter is only the index path" note
+   recorded for `deleteSet` does **not** generalise.
+3. **Criterion 3.10 needed a second attempt, and the criterion was at fault.** `Pacific/Kiritimati`
+   (+14) is on the *same* calendar date as Warsaw at 08:26 UTC, so the default date did not move and
+   the product looked broken. Exactly 9 of 418 zones qualified at that hour. Re-run with
+   `Pacific/Niue` it passed. Carried into `lessons.md`.
+4. **A finding in a sibling module, deliberately NOT fixed here.** The new unit suite caught that
+   `typeof body === "object"` admits an array, so zod answers with its own prose
+   (`"Invalid input: expected object, received array"`) in the `code` field — the one channel this
+   project keeps free of provider wording. Fixed in `profile-schemas.ts` with `Array.isArray`. **The
+   same hole is in `workout-schemas.ts`, and a wider one in `exercise-schemas.ts`**
+   (`safeParse(body ?? {})` admits a bare string). Out of scope for S-06 and left untouched; the
+   message catalogues mean nothing reaches the screen, so the impact is discipline rather than
+   exposure. Raised with the owner; no decision taken.
+5. **Labels landed in `src/lib/validation/profile.ts`, which the plan said "imports nothing".** It
+   now has one **type-only** import from `@/types`, which erases at compile time, so the island's
+   bundle is unaffected. The gain is real: `WEIGHT_UNIT_LABELS` and `ESTIMATION_FORMULA_LABELS` are
+   typed as `Record` over each enum, so a value added to the Postgres enum cannot ship to the screen
+   without a name.
+
+Additions the plan did not name, each small and each earning its place: assertion 1b of
+`preferences-derive.test.ts` (switching back restores the original record *holder*, which is the
+"nothing is stored" promise stated as a test); assertion 7 of `profile-mutations-rls.test.ts` and
+assertion 4 of `preferences-derive.test.ts` (the shared fixture is left on the defaults — the
+tripwire for a run that dies between a flip and its restore, surfacing in the suite that caused it
+rather than in an unrelated one); and `ESTIMATION_FORMULA_HINTS`, because "Brzycki or Epley" is not a
+choice most people can make from the names.
+
+**Deployed**: Worker version `b8a05a85-73a8-4427-bf1f-d3a96bf46d0a` at 100% of traffic, CI run **#44**
+green for `b251103`. Tests: **183 unit, 95 integration, 5 render**.
