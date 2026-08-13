@@ -803,12 +803,13 @@ must have the view before the committed types are right.
 
 #### Automated
 
-- [ ] 1.1 Lint, typecheck, unit, render, integration and build all pass
-- [ ] 1.2 `calendar.test.ts` covers the Sunday, DST, month-end and year-end boundaries
-- [ ] 1.3 `calendar.ts` still imports nothing and reaches no `astro:*` module
-- [ ] 1.4 Mutation (a): millisecond subtraction fails the DST case
-- [ ] 1.5 Mutation (b): `getDay()` for `getUTCDay()` fails a boundary — or is recorded as a finding
-- [ ] 1.6 Mutation (c): shifting the weekday mapping by one fails the Sunday case
+- [x] 1.1 Lint, typecheck, unit, render, integration and build all pass — 202 unit (was 189), 11 render, 95 integration
+- [x] 1.2 `calendar.test.ts` covers the Sunday, DST, month-end and year-end boundaries — 13 new assertions: Sunday, Monday, all seven weekdays of one week, month end, year end, leap day, both DST directions, the Sunday-night rollover in the reader's zone, and a 365-instant sweep asserting both weeks are always 7 days and always meet
+- [x] 1.3 `calendar.ts` still imports nothing and reaches no `astro:*` module — zero `import` statements; the only `astro:` in the file is the comment saying it has none
+- [x] 1.4 Mutation (a): millisecond subtraction fails the DST case — a LOCAL `Date` constructor plus `days * 86400000` fails the 365-instant sweep (`expected 172800000 to be 86400000`). **Finding: it passes under UTC**, which is what CI runs, so the guard was decoration in the gate until the zone was pinned — see 1.7
+- [x] 1.5 Mutation (b): `getDay()` for `getUTCDay()` fails a boundary — fails six assertions. **Finding: it too was inert until the pin, and for a different reason.** For a value anchored at `T00:00:00Z` the two accessors differ only at a NEGATIVE ambient offset, so it passed under UTC and under `Europe/Warsaw` alike
+- [x] 1.6 Mutation (c): shifting the weekday mapping by one fails the Sunday case — fails six assertions
+- [x] 1.7 **Added: `vitest.config.ts` pins `TZ` to a zone with DST and a negative offset.** Not in the plan, and it is what makes 1.4 and 1.5 mean anything. The first pin chosen was `Europe/Warsaw` — the product's default and the owner's zone, which read as principled and **silently left mutation (b) inert**, since Warsaw's offset is positive. `America/New_York` has both properties and both mutations bite under one setting. That it is nobody's real zone is the point: the value under test is supposed to be zone-independent. Note the config setting **overrides a `TZ` prefix on the command line**
 
 ### Phase 2: The aggregation
 
