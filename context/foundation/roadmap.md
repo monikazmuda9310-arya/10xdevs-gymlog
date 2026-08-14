@@ -63,7 +63,7 @@ the primary success criterion, and it is placed as early as its prerequisites al
 | S-05 | edit-and-delete-log               | correct or remove a workout or a set, warned first about any record that will fall      | S-04, F-01                                                                                                                      | FR-006, FR-007, FR-010, US-02                                                       | done     |
 | S-06 | unit-formula-timezone-preferences | choose kilograms or pounds, the estimation formula, and the timezone their week runs in | S-03, F-03                                                                                                                      | FR-016, FR-022, US-03, NFR §unit round-trip                                         | done |
 | S-07 | weekly-tonnage                    | see this training week's total tonnage next to last week's                              | S-05, S-06, F-01                                                                                                                | US-03, FR-017                                                                       | done |
-| S-08 | tonnage-breakdown                 | see where the week's work went, per exercise and per muscle group                       | S-07, F-01                                                                                                                      | US-03, FR-018, FR-019                                                               | proposed |
+| S-08 | tonnage-breakdown                 | see where the week's work went, per exercise and per muscle group                       | S-07, F-01                                                                                                                      | US-03, FR-018, FR-019                                                               | planning |
 | S-09 | account-boundary                  | be certain no other account can reach their training, and delete their own account      | S-02, S-03, S-06, F-01, F-03                                                                                                    | US-04, NFR §no cross-account reach, NFR §own-data deletion                          | proposed |
 
 ## Streams
@@ -252,7 +252,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Unknowns:**
   - How is an exercise's muscle group corrected after the fact? Changing it retroactively rewrites every historical per-group figure that exercise contributed to — numbers the user has already seen — and the alternative is applying the change only going forward. — Owner: user. Block: no.
 - **Risk:** the breakdown is only worth showing if it reconciles: every exercise contributes to exactly one group precisely so the group rows sum to the week's total, with no set counted twice and none left out. Sequenced immediately after the total so both figures come from the same aggregation and cannot drift apart. Inherits S-07's unmeasurable-processing-cap constraint unchanged — see that item's Risk. It is also the natural stopping point if the schedule tightens — the total answers the primary question on its own, and this slice answers the secondary one.
-- **Status:** proposed
+- **Status:** planning
 
 ### S-09: The account boundary, proven and reversible
 
