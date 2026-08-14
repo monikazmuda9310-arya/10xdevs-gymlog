@@ -751,18 +751,18 @@ the next read.
 
 #### Automated
 
-- [x] 1.1 `npm run db:push` applies to both projects; `npm run db:status` shows one version
-- [x] 1.2 `npm run db:types` emits the new view under `Views`
-- [x] 1.3 `npm run lint` and `npm run typecheck` pass
-- [x] 1.4 `npm run test:integration` passes, twice in a row
-- [x] 1.5 Mutation (a): `left join` → `join` fails assertion 9 and only 9, sum below its own total
-- [x] 1.6 Mutation (b): removing `security_invoker` fails assertion 7
-- [x] 1.7 Mutation (c): removing `greatest(…)` fails assertion 4 with a negative figure
-- [x] 1.8 Mutation (d): `weight_kg` → `weight` fails assertion 3
+- [x] 1.1 `npm run db:push` applies to both projects; `npm run db:status` shows one version — 0095c0f
+- [x] 1.2 `npm run db:types` emits the new view under `Views` — 0095c0f
+- [x] 1.3 `npm run lint` and `npm run typecheck` pass — 0095c0f
+- [x] 1.4 `npm run test:integration` passes, twice in a row — 0095c0f
+- [x] 1.5 Mutation (a): `left join` → `join` fails assertion 9 and only 9, sum below its own total — 0095c0f
+- [x] 1.6 Mutation (b): removing `security_invoker` fails assertion 7 — 0095c0f
+- [x] 1.7 Mutation (c): removing `greatest(…)` fails assertion 4 with a negative figure — 0095c0f
+- [x] 1.8 Mutation (d): `weight_kg` → `weight` fails assertion 3 — 0095c0f
 
 #### Manual
 
-- [x] 1.9 `npm run db:status` output recorded in Progress
+- [x] 1.9 `npm run db:status` output recorded in Progress — 0095c0f
 
 #### Phase 1 evidence
 
