@@ -165,18 +165,18 @@ and `http://localhost:4321/**` for local work.
 | `/auth/signin`          | Email/password sign-in form. On success → `/dashboard`                                                                   |
 | `/auth/signup`          | Email/password sign-up form. On success → `/dashboard`, or `/auth/confirm-email` when a confirmation email is on its way |
 | `/auth/confirm-email`   | "Check your inbox" page — reached only when an email is genuinely coming                                                 |
-| `/dashboard`            | Protected. Total tonnage for this training week next to last week's, plus links into the rest of the product            |
+| `/dashboard`            | Protected. This training week's tonnage next to last week's, **broken down per muscle group and per exercise**           |
 | `/exercises`            | Protected. The catalogue: 38 seeded exercises plus the account's own, with search and a muscle-group filter              |
 | `/workouts`             | Protected. The account's own workouts, most recent first, and the form that starts one dated today in their timezone     |
 | `/workouts/[id]`        | Protected. One workout: add exercises, log sets, see each set's estimated 1RM. **404 for a workout that is not yours**   |
 | `/records`              | Protected. Current records per exercise — best estimated 1RM and heaviest weight, each with the set and date behind it   |
-| `/settings`             | Protected. Weight unit, estimation formula, and the timezone the training week runs in. One form, one Save              |
+| `/settings`             | Protected. Weight unit, estimation formula, and the timezone the training week runs in. One form, one Save               |
 | `/api/auth/signout`     | POST. Always → `/auth/signin`, so returning requires authenticating again                                                |
 | `/api/exercises`        | POST, **JSON** (not a form post — the caller is a hydrated island). Creates a custom exercise for the signed-in account  |
 | `/api/workouts`         | POST, JSON. Creates a workout from `{ performedOn, note? }`                                                              |
 | `/api/exercise-entries` | POST, JSON. Adds an exercise to a workout; choosing one already there returns the existing entry rather than an error    |
 | `/api/sets`             | POST, JSON. Logs a set. **The weight unit is not in the body** — it is read from the account's profile on the server     |
-| `/api/profile`          | PATCH, JSON. Replaces all three preferences at once. Writes only the row named by `locals.user.id`; no route parameter  |
+| `/api/profile`          | PATCH, JSON. Replaces all three preferences at once. Writes only the row named by `locals.user.id`; no route parameter   |
 
 Correcting what was logged, added by S-05. Each resource carries its mutations and a preflight that
 answers what the change would cost:
@@ -227,9 +227,31 @@ number you typed" pull against each other and the product settles the conflict r
   set contributes nothing rather than a negative amount — one term, `greatest(weight_kg, 0)`.
 - **Nothing is stored.** `public.daily_tonnage` sums at read time. Moving a workout to another date
   recomputes both affected weeks on the next read, with no write and nothing to invalidate.
-- **A week with no sets reads as `0` with a sentence saying so.** A week of planks reads as `0`
-  without that sentence — it had sets, just no external load. A failed read shows no figure at all,
-  because an emitted zero is a positive claim.
+- **A week with no sets reads as `0` with a sentence saying so.** A week of planks reads as `0` with
+  a different sentence — "Sets logged, no external load" — because it had sets, just nothing to
+  weigh. A failed read shows no figure at all, because an emitted zero is a positive claim.
+
+### Where the week's work went
+
+Under the two totals, `/dashboard` breaks the **current** week down per muscle group and per exercise
+(FR-018, FR-019). Last week keeps its total and nothing else.
+
+- **All six groups are always listed**, largest first, each with a proportional bar. An untrained
+  group reads `0` with "No sets"; a group whose only sets were planks reads `0` with "Sets logged, no
+  external load". The imbalance the chart exists to show is only visible if the empty groups are on
+  screen.
+- **The group figures sum to the week's total, and that is enforced rather than claimed.** The
+  breakdown is compared against the total at read time and **a breakdown that does not reconcile is
+  not shown at all** — the sentence takes its place and both totals stay put.
+- **The printed rows are rounded together**, so the column literally adds up to the figure above it.
+  The price is that a row can read one whole unit away from its own independently rounded value; the
+  column winning that trade is an owner ruling (2026-08-14), because adding the rows up is the only
+  check a reader can perform.
+- **The muscle group is joined at read time and never stored**, so correcting an exercise's group
+  moves historical tonnage between buckets on the next read and cannot change the week's total. There
+  is no edit path for the group yet.
+- **An `Unattributed` row appears only when tonnage exists whose exercise this account can no longer
+  read.** It is not an error state and its kilograms still count — losing them would be the failure.
 
 Each `…/impact` answers `{ impact: [...] }`. **When the ranking read fails it answers a non-2xx
 `impact_unavailable`, never an empty list** — "nothing is at stake" is a positive claim, and the

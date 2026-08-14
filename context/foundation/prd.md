@@ -453,11 +453,34 @@ a user (FR-012) are private to that account.
    portable between gyms), and grip or angle variants such as close-grip bench — FR-012 exists so
    the user adds those themselves.
 
-2. **How is an exercise's muscle group corrected after the fact?** — If a user assigns the wrong
-   group to a custom exercise, changing it retroactively rewrites every historical per-group
-   tonnage figure that exercise contributed to. Whether that is acceptable (numbers the user
-   already saw will change) or whether the change should apply only going forward needs
-   deciding. Owner: user. By: implementation planning. Block: no.
+2. ~~**How is an exercise's muscle group corrected after the fact?**~~
+   — **RESOLVED (owner, 2026-08-14).**
+
+   **The correction is retroactive, and it is retroactive by construction rather than by choice.**
+   Nothing stores the muscle group beside a set: `sets` carries no copy and `exercise_entries`
+   deliberately carries none either, so the group is joined from `public.exercises` at read time.
+   Changing it therefore moves every historical per-group figure that exercise contributed to, on the
+   next read, with no write and nothing to invalidate.
+
+   **What that costs is smaller than it first sounds, and saying where it stops is the point.** The
+   correction moves tonnage **between** buckets and **cannot change the week's total**, because the
+   total never learns what a group is — `public.daily_tonnage` does not join `exercises` at all. So
+   the number the user checks their week against is bit-identical before and after, and only the
+   split under it moves. A correction is also self-evidently a correction: the figures move because
+   the user said the old ones were wrong.
+
+   Rejected alternative, with the reason: **snapshotting the group onto the exercise entry**, which
+   would make corrections forward-only and leave already-seen numbers frozen. It was declined
+   because it contradicts the load-bearing absence recorded in
+   `supabase/migrations/20260811005248_create_workout_log_with_row_ownership.sql:71-76` ("No
+   muscle_group column, and that absence is load-bearing"), and because it turns a re-derivation into
+   stored state — the same move that would turn S-06's formula switch from a recomputation into a lie
+   about history. It also buys less than it appears to: the split would then be wrong in the log
+   forever, with no way to fix it, which is the failure the user is trying to correct.
+
+   **No edit path exists yet.** S-08 settled the semantics because its figures depend on them;
+   shipping `PATCH /api/exercises/[id]` is a separate slice, and it inherits this answer rather than
+   re-opening it.
 
 Resolved during shaping, recorded here so the reasoning is not lost:
 

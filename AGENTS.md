@@ -33,7 +33,7 @@ without changing the test and saying so.**
     A set of ten reads identically under either, so it proves nothing about the formula toggle —
     and it is the first thing to suspect when somebody reports that switching does nothing.
   - **The view reads the formula PER ROW, from the joined profile** — `coalesce(p.estimation_formula,
-    'brzycki')` in `set_estimates`. Nothing anywhere reads a hardcoded formula, which is why S-06
+'brzycki')` in `set_estimates`. Nothing anywhere reads a hardcoded formula, which is why S-06
     could make the column user-settable **with no migration at all**: changing it re-derives every
     estimate, every record and every impact warning on the next read, with no write and nothing to
     invalidate. A formula change is a re-derivation, never a data migration. Anyone who "optimises"
@@ -79,7 +79,18 @@ without changing the test and saying so.**
   from 1RM and from record detection**, and contribute zero — never a negative amount — to tonnage.
   - **Since S-07 that is one SQL term, not two branches**: `sum(s.reps * greatest(s.weight_kg, 0))`
     in `public.daily_tonnage`. `greatest` implements both halves at once. Removing it makes an
-    assisted set subtract — measured at **−160 kg** by the S-07 mutation protocol.
+    assisted set subtract — measured at **−160 kg** by the S-07 mutation protocol, and again by
+    S-08's.
+  - **Since S-08 that term has TWO copies IN MIGRATION FILES and they must agree** — `daily_tonnage`
+    and `daily_exercise_tonnage`. A third instance of the two-implementations hazard this file
+    already documents twice (the 1RM `case` expression, `0.45359237`), and **weaker than both, for
+    two stated reasons**: migration files are append-only and never edited, so nobody edits one live
+    definition out from under the other; and assertion 1 of `tests/integration/tonnage-breakdown.test.ts`
+    compares the two views' figures over the same window directly, so a divergence is a red assertion
+    rather than a reader's catch. **The rule: if the tonnage expression changes, both change in the
+    same migration.** The day something replaces a view rather than adding one, this stops being
+    weaker — the migration header is reachable only from the newer of the two files, which is why the
+    rule is restated here.
   - **`weight_kg`, never `weight`.** Since S-06 one account can hold both units at once, so summing
     the number typed produces a figure with no unit and no meaning. Nothing but a reader would catch
     it: assertion 3 of `tests/integration/weekly-tonnage.test.ts` is that reader.
@@ -90,7 +101,7 @@ without changing the test and saying so.**
   week is.** `trainingWeeksFor` in `src/lib/services/calendar.ts` is the single definition — pinned
   at both DST transitions, the Sunday boundary, and month and year ends. `public.daily_tonnage` is
   grouped by the raw `performed_on` and receives four date strings. **Never add `date_trunc('week',
-  …)` to SQL**: that is a second answer to the same question, the hazard this repository already
+…)` to SQL**: that is a second answer to the same question, the hazard this repository already
   carries twice (the 1RM `case` expression and `0.45359237`) and documents both times.
   - **The profile timezone decides what "today" is, and nothing else.** Turning an instant into a
     calendar date needs a zone; reinterpreting a stored `performed_on` through one invents an instant
@@ -130,6 +141,39 @@ without changing the test and saying so.**
     kilograms, and every figure derived from `weight_kg` would be wrong afterwards.
 - **Every exercise has exactly one primary muscle group**, so per-group tonnage sums exactly to
   the week's total. Never invent weighted multi-group splits.
+  - **Under `security_invoker`, a JOIN is a FILTER — and this is the trap S-08 was built around.**
+    The group lives on `public.exercises` and is reachable only by joining, and that table's select
+    policy is `user_id is null or (select auth.uid()) = user_id`. `exercise_entries.exercise_id` is a
+    **single-column** foreign key and is **not** ownership-scoped, foreign-key checks bypass RLS, and
+    `addExerciseEntry` inserts the id it is handed with no visibility check — so a row _can_ exist in
+    which account A's entry points at account B's private exercise. An **inner** join to `exercises`
+    inside `public.daily_exercise_tonnage` therefore drops that set's kilograms from **A's own**
+    breakdown, while `daily_tonnage` still counts them: the breakdown silently stops reconciling with
+    the total printed directly above it, no error anywhere and both figures plausible. The view uses
+    **`left join`**, an unreadable exercise keeps its kilograms as an `Unattributed` row, and
+    **assertion 9 of `tests/integration/tonnage-breakdown.test.ts` constructs that hazard row on
+    purpose** — it is the only thing here that would notice the `left` being "simplified" away.
+    Measured: under mutation it read `expected 500 to be close to 680`, short by exactly the hazard
+    set's `3 × 60 kg`.
+  - **A muscle-group correction is retroactive by construction, and it cannot move the weekly total.**
+    Nothing stores the group — not `sets`, not `exercise_entries` — so changing `exercises.muscle_group`
+    moves historical tonnage **between** buckets on the next read, with no write and nothing to
+    invalidate, and leaves the week's total bit-identical. That is PRD Open Question 2, **resolved by
+    the owner on 2026-08-14**; the rejected alternative was snapshotting the group onto the entry,
+    which would make corrections forward-only and contradict the load-bearing absence
+    `20260811005248_create_workout_log_with_row_ownership.sql:71-76` documents. **No edit path exists
+    yet** — `PATCH /api/exercises/[id]` is a separate slice.
+  - **A breakdown that does not reconcile is not shown at all.** `foldBreakdown`
+    (`src/lib/services/tonnage-breakdown.ts`) sums its own rows and throws when they differ from the
+    week total `weeklyTonnage` already produced by more than `RECONCILIATION_TOLERANCE_KG` (`0.001` —
+    a float artefact, not a data allowance: `numeric` in Postgres is exact, `double` in the Worker is
+    not, and the two summation orders are what differ). `/dashboard` catches that separately from the
+    tonnage read, so a breakdown failure costs the breakdown and **leaves both totals on screen**.
+  - **The printed column is rounded TOGETHER, not row by row** (`apportionedFigures` in
+    `tonnage-display.ts`). Rounded independently, a week of `100.5 kg` split three ways prints `101`
+    above and `102` below. The cost — a row can read one whole unit away from its own independently
+    rounded value — was accepted by the **owner on 2026-08-14**, because adding the rows up is the
+    only check the user can actually perform. Do not "fix" a row that looks one off.
   - **The groups are exactly six: `legs`, `back`, `chest`, `shoulders`, `arms`, `core`** (owner,
     2026-08-10). Do not add a seventh without asking — glutes and a biceps/triceps split were
     both considered and declined. Adding one later is cheap; merging or removing one means
@@ -284,7 +328,7 @@ grant select on public.<v> to authenticated;
   hands **every account's training to every account**, through a route that reads exactly like the
   safe ones. There is no error and no warning; the rows simply arrive.
 - **Only `select` is granted.** A view over aggregates is not writable and nothing should imply it is.
-- **The flag is per view and is NOT inherited — and the three views here are not equally protected by
+- **The flag is per view and is NOT inherited — and the four views here are not equally protected by
   it, and that was measured rather than assumed.** Removing it from `set_estimates` leaks
   immediately and assertion 2 of `tests/integration/personal-records.test.ts` fails. Removing it
   from `personal_records` alone changes nothing observable, because every row that view emits is
@@ -297,8 +341,11 @@ grant select on public.<v> to authenticated;
     because it reads `sets`, `exercise_entries` and `workouts` **directly**. Its flag is therefore
     load-bearing and **proven so**: assertion 7 of `tests/integration/weekly-tonnage.test.ts` fails
     when it is removed, and the S-07 mutation protocol confirmed it — with the flag off, account B
-    read **ten rows of account A's tonnage**. So of the three, two flags are guards and one is a
-    tripwire. **Which kind a new view gets is decided by what it reads, not by where it sits.**
+    read **ten rows of account A's tonnage**. `daily_exercise_tonnage` (S-08) stands in the same
+    place and for the same reason, pinned by assertion 7 of `tests/integration/tonnage-breakdown.test.ts`
+    — with the flag off, account B received A's row verbatim, name and muscle group included. So of
+    the four, three flags are guards and one is a tripwire. **Which kind a new view gets is decided
+    by what it reads, not by where it sits.**
 - **The explicit `.eq("user_id", …)` still belongs on every read of a view**, for the reason it
   belongs on a table: the policy is the guarantee, the filter is the index path.
 - **Generated types make every view column nullable.** `supabase gen types` cannot prove not-null
@@ -339,7 +386,7 @@ which is both a lie and an existence oracle.
   it **fails outright with a `500`**, because PostgREST refuses an `UPDATE` with no filter at all.
   Measured during S-06's mutation protocol. Two consequences worth carrying: the two cases look
   identical in the code and are not, so "the filter is only the index path" is false as a general
-  claim; and a mutation that fails for the *wrong reason* has not confirmed the guard — the S-06
+  claim; and a mutation that fails for the _wrong reason_ has not confirmed the guard — the S-06
   mutation had to be sharpened to "resolve the row from `supabase.auth.getUser()` instead of
   `locals.user.id`", which then failed correctly, answering `200` where the suite wanted `404` and
   writing the caller's payload onto a real account.
@@ -374,7 +421,7 @@ check write to.
 | `npm run db:push`          | applies every pending migration to **both**, `gymlog-test` first        |
 | `npm run db:types`         | regenerates `src/db/database.types.ts` from the **production** schema   |
 | `npm run test:integration` | the RLS check against `gymlog-test`; never runs inside `npm test`       |
-| `npm run test:render`      | renders pages through Astro's container and asserts on the HTML        |
+| `npm run test:render`      | renders pages through Astro's container and asserts on the HTML         |
 
 - **There is deliberately no single-target push.** Advancing one schema and forgetting the other is
   the only way the two drift, so forgetting is not an available mistake. If the production push
@@ -688,7 +735,7 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
       row, not to the account editing it: re-stamping it from the profile would turn 100 lb into
       100 kg the first time somebody fixed a typo after S-06 let them switch, silently corrupting
       every figure derived from `weight_kg`.
-- **Three views. Two added by S-04** — the first database objects here that are not tables.
+- **Four views. Two added by S-04** — the first database objects here that are not tables.
   `public.set_estimates` is one row per set with its estimated 1RM under the row owner's own
   formula; `public.personal_records` is one row per exercise the account has logged, with the best
   estimate and the heaviest weight, each backed by the set that still holds it. Both
@@ -706,6 +753,22 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
     CPU cap; folding two weeks of daily totals is work proportional to the number of DAYS, which is
     constant. The per-set arithmetic stays in SQL. The service header says this, and the service
     throws rather than silently folding a wider window.
+- **`public.daily_exercise_tonnage`, added by S-08** — the same sum one grain finer, at
+  `(user_id, performed_on, exercise_id)`, carrying the exercise's name and muscle group **joined at
+  read time** so neither is ever stored. Read only by `/dashboard`, through `weeklyBreakdown` in
+  `tonnage.ts` and `foldBreakdown` in `tonnage-breakdown.ts`. Its `security_invoker` flag is a
+  **guard, not a tripwire** — it reads `sets`, `exercise_entries`, `workouts` and `exercises`
+  directly, so it stands where `daily_tonnage` and `set_estimates` stand; with the flag off, account
+  B read account A's row verbatim, and assertion 7 of the S-08 suite fails.
+  - **The bound is no longer a constant, so it is asserted rather than assumed.** A week at this
+    grain is `days × distinct exercises per day` rows, bounded by training habit; `MAX_BREAKDOWN_ROWS`
+    (`7 * 30`) throws above that. **A throw, never a `.limit()`** — a limit is a silent truncation,
+    and here it would be worse, because a truncated breakdown fails its own reconciliation guard and
+    gets blamed on the arithmetic.
+  - **The range predicate descends to `workouts_user_performed_on_idx` only while the filter is on
+    GROUP BY columns.** `(user_id, performed_on, exercise_id)` keeps that property; grouping by
+    `(user_id, exercise_id)` and filtering by a date range would not. That is a property of this
+    grain, not a general one.
 - **Three enums**: `weight_unit`, `estimation_formula`, and `muscle_group` — the last with exactly
   six values, pinned in both directions by `MUSCLE_GROUPS` in `src/types.ts` and a compile-time
   assertion. Add a seventh to the database without adding it there and the build fails, rather than

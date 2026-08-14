@@ -931,13 +931,13 @@ group", the exercise row means "one exercise you cannot read". The exercise row 
 
 #### Automated
 
-- [x] 4.1 `npm run build` succeeds
-- [x] 4.2 `npx wrangler deploy` reports a new version at 100%, id recorded
+- [x] 4.1 `npm run build` succeeds — 5fdaadc
+- [x] 4.2 `npx wrangler deploy` reports a new version at 100%, id recorded — 5fdaadc
 
 #### Manual
 
-- [x] 4.3 The breakdown renders on the deployed `/dashboard` and reconciles on screen
-- [x] 4.4 An empty week still shows both totals
+- [x] 4.3 The breakdown renders on the deployed `/dashboard` and reconciles on screen — 5fdaadc
+- [x] 4.4 An empty week still shows both totals — 5fdaadc
 
 #### Phase 4 evidence
 
@@ -964,9 +964,41 @@ both blind to it.
 
 #### Automated
 
-- [ ] 5.1 `npm run lint` passes
-- [ ] 5.2 `grep -n "RESOLVED (owner, 2026-08-14)" context/foundation/prd.md` matches
+- [x] 5.1 `npm run lint` passes
+- [x] 5.2 `grep -n "RESOLVED (owner, 2026-08-14)" context/foundation/prd.md` matches
 
 #### Manual
 
-- [ ] 5.3 The owner confirms the PRD resolution says what they decided
+- [x] 5.3 The owner confirms the PRD resolution says what they decided
+
+#### Phase 5 evidence
+
+`npm run lint` clean; `npx prettier --check` clean on all four repository documents.
+`grep -n "RESOLVED (owner, 2026-08-14)" context/foundation/prd.md` → **`457:   — **RESOLVED (owner,
+2026-08-14).**`**.
+
+**Criterion 5.2 caught its own near-miss, which is the reason plan review F6 wrote it that way.**
+The stamp was first written wrapped across two lines (`**RESOLVED (owner,\n   2026-08-14).**`), and
+the grep answered **exit 1** — a criterion phrased as "Open Question 2 is resolved" would have passed
+on prose that was already there, while this one failed on a document that was in fact edited
+correctly. Rewrapped so the stamp sits on one line.
+
+Five documents, one decision per sentence:
+
+- **`AGENTS.md`** — `daily_exercise_tonnage` under § Known state with its `security_invoker` role
+  stated as a **guard** (three guards, one tripwire, now that there are four views); the join-as-filter
+  rule under § Domain rules with assertion 9 named and the mutation figure quoted; the retroactive
+  muscle-group correction; the reconciliation guard; the rounded-together column. **And the two-copies
+  rule for the tonnage expression here rather than only in the migration header** (plan review F8) —
+  the header is reachable only from the newer of the two files.
+- **`README.md`** — the `/dashboard` row, and a § "Where the week's work went" block covering the six
+  always-present groups, the two zero sentences, the enforced reconciliation, the reader's unit, the
+  `Unattributed` row and the retroactive group correction.
+- **`context/foundation/prd.md`** — Open Question 2 struck through and resolved, in the form #1 uses:
+  the decision, why it is retroactive **by construction** rather than by choice, where the consequence
+  stops (the weekly total cannot move), and the rejected snapshot alternative with its reason.
+- **`context/foundation/lessons.md`** — one entry: "Under `security_invoker`, a JOIN is a FILTER".
+- **`C:\10xdev\handoff\STATE.md`** — eleven of twelve delivery items, the test counts (240 / 112 / 24),
+  Worker `ea6318d6`, and § NASTĘPNY KROK rewritten to "close S-08, then S-09", including the fact that
+  **six commits are unpushed and CI has never run for S-08** — a green local gate is not a green CI
+  run and must not be recorded as one.

@@ -182,7 +182,7 @@
   "resolve the row from `supabase.auth.getUser()` instead", the mutation failed **correctly**:
   `200` where the suite wanted `404`, and the fabricated call's payload written onto a real account.
 - **Rule**: **when a mutation goes red, read the failure and check it is the failure the criterion
-  describes.** A guard is confirmed by the assertion failing *for its own reason* — the wrong value,
+  describes.** A guard is confirmed by the assertion failing _for its own reason_ — the wrong value,
   the wrong row, the wrong status — not merely by the suite turning red. Red for an unrelated reason
   is the mutation-testing twin of a test that cannot fail: it reads as evidence and is not.
 - **Applies to**: every mutation step. It is cheap to check and it is the only thing separating
@@ -226,7 +226,7 @@
   would write to refuse it** — name the guarantee, say plainly that no mutation available today
   breaks it, and name the specific future edit that would. That paragraph is the difference between
   a tripwire and decoration, and it is the only thing distinguishing them, because the code looks
-  identical. Deciding differently in two similar places is fine; deciding differently *silently* is
+  identical. Deciding differently in two similar places is fine; deciding differently _silently_ is
   what leaves the next reader guessing which one was the accident.
 - **Applies to**: any suite where some assertions are guards and others are tripwires — and to every
   pair of similar decisions inside one file, where an unexplained asymmetry reads as an oversight.
@@ -241,7 +241,7 @@
   because `finally` is application-level. A **process kill** (Ctrl-C, a cancelled CI job, an OOM)
   between the flip and the restore skips it, and so does a network failure inside the restore's own
   write. The closing tripwire never runs either, so the damage does not surface where it was caused:
-  it surfaces on the *next* run, in `workout-endpoints.test.ts`, which asserts a new set is stamped
+  it surfaces on the _next_ run, in `workout-endpoints.test.ts`, which asserts a new set is stamped
   `"kg"` and does not reset preferences itself. That is precisely the "a suite failing for reasons
   unrelated to the code under test" outcome the discipline exists to prevent — the prevention was
   one run short, and both suites' comments claimed otherwise.
@@ -292,6 +292,32 @@
   found a green test with the right name.
 - **Applies to**: every test whose name contains a domain claim, and to any document citing a test as
   evidence — cite the assertion, not the title.
+
+## Under `security_invoker`, a JOIN is a FILTER — an inner join to an RLS-protected table deletes rows from an aggregate and reports success
+
+- **Context**: `public.daily_exercise_tonnage`, S-08 Phase 1, 2026-08-14. The view breaks a week's
+  tonnage down per muscle group, which lives on `public.exercises` and is reachable only by joining.
+- **Problem**: a view marked `security_invoker = true` executes with the READER's permissions, so
+  **every relation it touches is filtered by that relation's policy** — including the one being
+  joined for a single descriptive column. `exercises` admits a row only when it is seeded or owned,
+  and `exercise_entries.exercise_id` is a single-column foreign key that is **not** ownership-scoped;
+  foreign-key checks bypass RLS, so a row can exist in which account A's entry points at account B's
+  private exercise. An **inner** join would then drop that set's kilograms from **A's own** breakdown
+  while the coarser view still counted them. No error, no warning, both figures plausible — and the
+  only symptom is that two numbers on the same screen stop agreeing. The join reads as a lookup and
+  behaves as a `where`.
+- **Rule**: **`left join` to any RLS-protected table inside a `security_invoker` view, and put a
+  reconciliation guard at read time.** Losing a descriptive column is an inconvenience the screen can
+  name ("Unattributed"); losing the row's numbers is a wrong total. Then **construct the hazard row
+  in the suite rather than describing it** — an account's entry naming another account's private
+  row — and assert both that the tonnage survives and that the two aggregates still agree, in that
+  assertion's **own** fixture window, so an access defect and an arithmetic defect stay
+  distinguishable. Measured under mutation: `expected 500 to be close to 680`, short by exactly the
+  hazard set's tonnage.
+- **Applies to**: every view joining a table that carries a select policy — not only aggregates — and
+  every figure claimed to reconcile with another figure derived by a different query. Two numbers
+  that must agree need a test that computes both from one fixture; "they are derived from the same
+  rows" is not the same claim once a policy sits between them.
 
 ## A guard can be inert because of the ENVIRONMENT it runs in, not because of what it asserts
 
