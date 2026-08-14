@@ -58,10 +58,18 @@ provably ends read access. Verified by a new suite that fails when the trigger i
   A trigger raising `foreign_key_violation` therefore lands on the chosen answer — the same code as
   "no such exercise", no existence oracle — with zero application code. **This is a finding that
   shrank Phase 2**; it was scoped as "map the trigger's error" before the endpoint was read.
-- **A composite foreign key cannot work here**, unlike every other nested table in this repository:
-  `exercises.user_id` is nullable for the 38 seeded rows, `exercise_entries.user_id` is `not null`, and
-  a policy admits a row only on `TRUE`. See `context/foundation/access-control.md` § the
-  shared-catalogue variant.
+- **A composite foreign key cannot work here in its ordinary form** — and the reason is NOT the one a
+  reader of this repository will reach for first. It has nothing to do with policies: a foreign key
+  does not evaluate them, and FK checks **bypass** RLS, which `AGENTS.md` and `lessons.md` both state.
+  The actual reason is `MATCH SIMPLE` matching: a referencing tuple whose `user_id` is `not null` can
+  never match a referenced row whose `user_id` is `null`, because FK matching is equality and
+  `NULL = NULL` is not `TRUE`. The 38 seeded rows are exactly those null-owner rows. **Write this
+  reason, not the policy one**, wherever it is repeated — see § Mechanism below.
+- **A `security invoker` trigger is not this repository's first trigger, and saying so would be
+  false.** `set_updated_at` (`20260810063450_create_profiles_with_row_ownership.sql:24-25`) already
+  fires on five tables including `exercise_entries`, and `handle_new_user` (`:61-62`) is
+  `security definer`. What is new is a trigger used as an **access-control mechanism**, which is why
+  it needs writing into `context/foundation/access-control.md`.
 - **A `security invoker` trigger function gets the visibility check for free.** Under PostgREST the
   role is `authenticated`, which does not own the tables, so RLS applies inside the function: a plain
   `select 1 from public.exercises where id = new.exercise_id` returns no row precisely when the
@@ -91,6 +99,29 @@ One migration adding a trigger function and a `before insert or update` trigger;
 suite that owns the whole of this slice's evidence; one assertion for the sign-out gap. The endpoint
 is expected to need no change — Phase 2 proves that rather than assuming it.
 
+## Mechanism: why a trigger, and what it beat
+
+`change.md` asked for options compared rather than one assumed. Two are viable; the owner chose the
+trigger on 2026-08-15, and the rejected option is recorded here so that "lost on cost after being
+weighed" is not confused with "never considered".
+
+**Chosen — `before insert or update` trigger.** No new column, no backfill, nothing for callers to
+supply. It reuses the `exercises` select policy instead of restating it, because RLS applies inside a
+`security invoker` function. Cost: enforcement is procedural rather than declarative, so it is
+invisible in the table definition a reader inspects first — which is why it goes into
+`access-control.md` as a named exception rather than being left for someone to find.
+
+**Rejected — a declarative composite key over a generated sentinel owner.** Add a stored generated
+`owner_key` on `exercises` (`coalesce(user_id, <nil uuid>)`) with `unique (id, owner_key)`, carry a
+matching column on `exercise_entries` constrained by
+`check (exercise_owner_key = user_id or exercise_owner_key = <nil uuid>)`, and point a composite
+foreign key at it. This is closer to how the repository closes nested ownership everywhere else, and
+it would be enforced by the constraint system rather than by a function. It loses on cost: a new
+column on both tables, a backfill over every existing row, a value every caller of `addExerciseEntry`
+must now supply correctly, and a sentinel uuid that means "shared" and will be mistaken for a real
+account by somebody. **It does not lose because "a policy admits a row only on `TRUE`"** — that
+sentence is about RLS and does not apply to foreign keys at all.
+
 ## Critical Implementation Details
 
 **The trigger's error message must not contain the workout-owner constraint name.**
@@ -104,17 +135,45 @@ so a violating row already stored stays and stays invisible. Phase 1 counts viol
 hosted projects before the migration is written, and the plan branches on the answer rather than
 assuming zero.
 
+**The trigger only guards `authenticated`.** `postgres` and `service_role` bypass RLS, so the
+visibility check admits anything on those paths. Say so in the migration header: it is the same
+asymmetry that makes the guard below unrecoverable by re-seeding the hazard row from a test.
+
 ---
 
 ## Phase 1: The trigger, and the proof that it bites
 
 ### Overview
 
-Measure existing violations, add the trigger, and build the suite that would notice its removal.
+Settle what happens to the existing guard this change destroys, measure, add the trigger, and build
+the suite that would notice its removal.
 
 ### Changes Required
 
-#### 1. Measurement (no file — a recorded step)
+#### 1. Retire `tonnage-breakdown` assertion 9, and record what stops being guarded
+
+**Files**: `tests/integration/tonnage-breakdown.test.ts`, `AGENTS.md`, `context/foundation/lessons.md`
+
+**Intent**: assertion 9 constructs the hazard row **on purpose**, through `logWorkout`, which throws
+when an insert is refused. Once the trigger exists that row cannot be built, so the assertion does not
+fail an expectation — it dies in setup, and `npm run test:integration` runs every suite, so the gate is
+red from the moment the migration lands. **This step comes first, before the migration, so the gate is
+never red in between.**
+
+The larger loss is what assertion 9 was holding: it is the only thing that would notice `left join`
+being "simplified" to `join` in `public.daily_exercise_tonnage`. **The `left join` must stay** — the
+trigger does not validate rows already stored, and does not apply to `postgres` or `service_role` — so
+after this change that guard is real and **unguarded**.
+
+**Contract**: rewrite assertion 9 to assert only what it can still construct, or retire it outright;
+either way do not delete it silently. In the same commit, amend `AGENTS.md` § Domain rules (which
+currently calls it "the only thing here that would notice the `left` being simplified away") and append
+to `lessons.md` in the shape that file prescribes for a guard that can no longer fail: name the
+guarantee, say plainly that no mutation available today breaks it, and name the exact future edit
+(`left join` → `join`) that would. This is `lessons.md` § "When a mutation does not break anything, fix
+the claim — never the test", applied to a guard that a different change removed the ability to test.
+
+#### 2. Measurement (no file — a recorded step)
 
 **Intent**: establish, before writing the migration, whether either hosted project already holds an
 `exercise_entries` row whose `exercise_id` names an exercise that is neither seeded nor owned by the
@@ -122,10 +181,17 @@ entry's `user_id`. The result decides whether the migration needs a data step.
 
 **Contract**: one read-only query run against `SUPABASE_DB_URL` and `SUPABASE_TEST_DB_URL`, joining
 `exercise_entries` to `exercises` on id and filtering `e.user_id is not null and e.user_id <>
-ee.user_id`. Record both counts in `## Progress`. **If either is non-zero, stop and escalate** — the
-choice between deleting somebody's logged sets and leaving a known hole is the owner's.
+ee.user_id`. Record both counts in `## Progress`.
 
-#### 2. The trigger
+**`gymlog-test` will almost always be non-zero, and that is not a defect.**
+`tonnage-breakdown.test.ts` resets its fixtures at the **start** of a run rather than the end, so
+assertion 9's cross-account entry survives from one integration run until the beginning of the next.
+Exclude that suite's `s08-` fixtures from the count, or take the measurement immediately after a clean
+run and re-check. **The escalation applies to `gymlog` only**: any non-zero count in **production** is
+the owner's decision, because the choice there is between deleting somebody's logged sets and leaving a
+known hole. A leftover test fixture is neither.
+
+#### 3. The trigger
 
 **File**: `supabase/migrations/<timestamp>_scope_exercise_entries_to_visible_exercises.sql`
 
@@ -133,17 +199,21 @@ choice between deleting somebody's logged sets and leaving a known hole is the o
 the row's owner — on insert and on update alike, because `exercise_entries` carries an UPDATE policy
 and re-pointing an entry is the same hazard through a second door.
 
-**Contract**: a `security invoker` trigger function in `public`, and a `before insert or update of
-exercise_id` trigger on `public.exercise_entries`. The function raises `foreign_key_violation`
-(`23503`) so the existing endpoint mapping applies unchanged; its message names the exercise and must
-not contain `exercise_entries_workout_owner_fkey`. Pin `search_path` on the function. The visibility
-check is a bare existence query against `public.exercises` — RLS supplies the predicate, so the select
-policy is not restated.
+**Contract**: a **`security invoker`** trigger function in `public` (the plpgsql default — state it
+explicitly anyway, because it is the whole design), and a `before insert or update of exercise_id`
+trigger on `public.exercise_entries`. `set search_path = ''` on the function, matching
+`set_updated_at` and `handle_new_user`, which means the body schema-qualifies everything —
+`public.exercises`. The function raises `foreign_key_violation` (`23503`) so the existing endpoint
+mapping applies unchanged; its message names the exercise and **must not contain**
+`exercise_entries_workout_owner_fkey`. The visibility check is a bare existence query against
+`public.exercises` — RLS supplies the predicate, so the select policy is not restated. End with
+`notify pgrst, 'reload schema';`, as six of the seven existing migrations do.
 
-The migration header states why a composite foreign key was not used, so the next reader meets the
-nullable-owner reason rather than assuming an oversight.
+The migration header states: why a composite key was not used (`MATCH SIMPLE` equality against a null
+owner — **not** the RLS policy rule), that the check binds `authenticated` only, and that
+`security definer` would silently disable it.
 
-#### 3. The suite
+#### 4. The suite
 
 **File**: `tests/integration/account-boundary.test.ts`
 
@@ -160,37 +230,51 @@ mark. Its own throwaway accounts; **never** `rls-owner-a/b`. Assertions:
 3. a **seeded** exercise is still insertable by both accounts (the trigger must not break the
    catalogue, which is the whole point of the nullable owner);
 4. an account's **own private** exercise is still insertable by that account;
-5. **the seam**: with the hazard row refused, account A's private exercise has no foreign reference
-   from another account, so the cascade that account deletion depends on is not blocked. Title this
-   assertion after what its body checks — `lessons.md` § "A test whose title claims more than its body
-   asserts becomes the citation";
-6. cross-account reads at all three levels still refused (a thin restatement citing
-   `workout-log-rls`, present so the dossier is readable on its own — and labelled as a restatement,
-   not as new coverage).
+5. an account can still **delete its own unused private exercise** — `on delete restrict` is not
+   tripped when nothing references it. This is the assertable neighbour of the seam, and it is titled
+   after exactly that, claiming nothing about account deletion.
+
+**The seam is NOT an assertion, and that is a deliberate reversal.** It was planned as one — "with
+the hazard row refused, the cascade account deletion depends on is not blocked" — and it cannot be
+written: deleting an account needs `auth.admin.deleteUser` and a `service_role` key, which
+`AGENTS.md` forbids and `vitest.integration.config.ts` actively strips from the process; and the
+weaker form is unreachable too, because under RLS the hazard row is by construction visible to
+neither account. It would have become a green body checking nothing, which `lessons.md` calls worse
+than an obvious gap. It goes in the **suite header as prose**, in the shape that file prescribes:
+name the guarantee, say that no mutation available today breaks it, and name the future edit that
+would — here, `account-deletion` landing a deletion path.
+
+Cross-account reads at all three levels are **not** restated here. They are proven in
+`workout-log-rls` and `workout-mutations-rls`; the header cites them by title text rather than by
+position, because `workout-endpoints` and `workout-page-access` do not number their `it` titles and a
+positional citation rots the moment somebody inserts a test.
 
 ### Success Criteria
 
 #### Automated Verification
 
-- Violation counts recorded for both projects, and both are zero (or escalated): the query in step 1
+- Assertion 9 settled and the `left join`'s new status recorded, **before** the migration exists — and
+  `npm run test:integration` green at that point, with no migration applied
+- Violation counts recorded for both projects, `s08-` fixtures excluded from the `gymlog-test` count;
+  any non-zero count on **`gymlog`** escalated to the owner
 - Migration applies to both projects: `npm run db:push`
-- The new suite passes: `npm run test:integration`
+- The new suite passes: `npm run test:integration` — **every suite, not only the new one**
 - The suite is repeatable: run `npm run test:integration` twice, second run green
 - Type checking passes: `npm run typecheck`
 - Linting passes: `npm run lint`
 - **Mutation (a)**: drop `or update of exercise_id` from the trigger → assertion 2 fails
 - **Mutation (b)**: remove the trigger entirely → assertions 1 and 2 fail
-- **Mutation (c)**: change the check to accept any exercise row (`user_id is not null` removed from
-  the reasoning — i.e. make the function `return new` unconditionally) → assertions 1 and 2 fail
-- **Mutation (d)**: make the function raise a code other than `23503` → Phase 2's endpoint assertion
-  fails, confirming the mapping is load-bearing rather than incidental
+- **Mutation (c)**: flip the function to `security definer` → assertions 1 and 2 **pass when they
+  should fail**, because the function then runs as `postgres`, which owns the tables and is not
+  subject to their RLS. This is the keystone of the whole design and the single most plausible future
+  edit — `security definer` is the reflex for trigger functions and this repository already has one.
 - Every mutation's failure is read, not just its colour: `lessons.md` § "A mutation that fails for the
   WRONG REASON has not confirmed the guard"
 
 #### Manual Verification
 
-- The migration header explains the nullable-owner reason a composite key was not used, and a reader
-  who has not seen this plan can tell why the trigger exists
+- The migration header gives the `MATCH SIMPLE` reason a composite key was not used — not the RLS
+  policy one — and a reader who has not seen this plan can tell why the trigger exists
 
 **Implementation Note**: pause after this phase for confirmation before proceeding.
 
@@ -228,6 +312,13 @@ pattern of `tests/integration/workout-endpoints.test.ts` — never through `astr
 `.dev.vars` point at production. Assert status and message code, then re-read as B to confirm nothing
 was stored.
 
+**A second suite now depends on the message-name rule.** A `BEFORE` trigger fires ahead of constraint
+checks, so once this lands it is the trigger — not the plain foreign key — that raises for a
+**genuinely missing** exercise too. `workout-endpoints`' assertion titled "tells a missing exercise
+apart from a workout that is not the caller's" therefore keeps passing **only** because the trigger's
+message does not contain `exercise_entries_workout_owner_fkey`. Confirm that suite is green and record
+that the constraint named in § Critical Implementation Details is now load-bearing in two places.
+
 ### Success Criteria
 
 #### Automated Verification
@@ -235,6 +326,12 @@ was stored.
 - Both assertions pass: `npm run test:integration`
 - The endpoint answers `404 exercise_not_found`, and the plan states whether a source change was
   needed — either outcome is recorded, neither is assumed
+- `workout-endpoints`' "tells a missing exercise apart from a workout that is not the caller's" is
+  still green after the trigger
+- **Mutation (d)**: make the function raise a code other than `23503` → the endpoint assertion above
+  fails with `500 unexpected` instead of `404 exercise_not_found`, confirming the mapping is
+  load-bearing rather than incidental. (Moved here from Phase 1, where the assertion it names did not
+  yet exist.)
 - The full gate passes: `npm run lint` → `npm run typecheck` → `npm test` → `npm run test:render` →
   `npm run test:integration` → `npm run build`
 
@@ -259,9 +356,14 @@ documents twice (§ Domain rules → "Under `security_invoker`, a JOIN is a FILT
 Both currently describe the hazard as open.
 
 **Contract**: amend those two places to say it is closed, by what, and name
-`account-boundary.test.ts` assertions 1 and 2 as what would notice the trigger being dropped. Add the
-trigger to `context/foundation/access-control.md` as the exception to "the composite key is how nested
-ownership is closed" — with the nullable-owner reason, so nobody re-derives it.
+`account-boundary.test.ts` assertions 1 and 2 as what would notice the trigger being dropped. **Say in
+the same breath what is NOT closed**: rows already stored, and anything acting as `postgres` or
+`service_role`. Phase 1 already amended the sentence about assertion 9 guarding the `left join`; this
+step must not contradict it.
+
+Add the trigger to `context/foundation/access-control.md` as a **fifth shape** — an access-control
+trigger, the exception to "nested ownership is closed by a composite key" — with the `MATCH SIMPLE`
+reason, and with `security definer` named as the edit that silently disables it.
 
 #### 2. `README.md`
 
@@ -311,6 +413,23 @@ wants a solo review first.
 Runs once, after both PRs merge, because `db:push` advances production and each branch carries its own
 migration. Recorded here and in `account-deletion`'s plan identically.
 
+**Between merge and `db:push` the documents on `main` are ahead of production**: `AGENTS.md` says the
+hazard is closed while the database has no trigger, and during exactly that window the `left join` in
+`daily_exercise_tonnage` is both load-bearing and — after Phase 1 — no longer test-guarded. Keep the
+window short, and do not start it on a day nobody can finish it.
+
+## Shared-resource hazards with the parallel branch
+
+Beyond the MARK, the throwaway accounts and the expected `AGENTS.md` conflict already recorded in
+`change.md`:
+
+- **The two integration runs must not overlap.** `fileParallelism: false` orders files **within** one
+  run; it does nothing about two worktrees running `npm run test:integration` against the same
+  `gymlog-test` at the same time — and the sibling suite deletes accounts. Own throwaway accounts stop
+  fixture damage, not `auth` contention.
+- **Migration timestamps**: whichever branch merges second needs the later one, and `db:push` advances
+  both hosted projects at once.
+
 ## Testing Strategy
 
 ### Integration Tests
@@ -347,21 +466,24 @@ near the 10 ms Worker CPU cap.
 
 #### Automated
 
-- [ ] 1.1 Violation counts recorded for both projects, and both zero (or escalated)
-- [ ] 1.2 Migration applies to both projects: `npm run db:push`
-- [ ] 1.3 The new suite passes: `npm run test:integration`
-- [ ] 1.4 The suite is repeatable: second consecutive run green
-- [ ] 1.5 Type checking passes: `npm run typecheck`
-- [ ] 1.6 Linting passes: `npm run lint`
-- [ ] 1.7 Mutation (a): dropping `or update of exercise_id` fails assertion 2
-- [ ] 1.8 Mutation (b): removing the trigger fails assertions 1 and 2
-- [ ] 1.9 Mutation (c): an unconditional `return new` fails assertions 1 and 2
-- [ ] 1.10 Mutation (d): a raised code other than `23503` fails Phase 2's endpoint assertion
+- [ ] 1.1 Assertion 9 settled, the `left join`'s unguarded status recorded in `AGENTS.md` and
+      `lessons.md`, and `npm run test:integration` green with no migration applied
+- [ ] 1.2 Violation counts recorded for both projects, `s08-` fixtures excluded on `gymlog-test`; any
+      non-zero count on `gymlog` escalated to the owner
+- [ ] 1.3 Migration applies to both projects: `npm run db:push`
+- [ ] 1.4 Every suite passes, not only the new one: `npm run test:integration`
+- [ ] 1.5 The suite is repeatable: second consecutive run green
+- [ ] 1.6 Type checking passes: `npm run typecheck`
+- [ ] 1.7 Linting passes: `npm run lint`
+- [ ] 1.8 Mutation (a): dropping `or update of exercise_id` fails assertion 2
+- [ ] 1.9 Mutation (b): removing the trigger fails assertions 1 and 2
+- [ ] 1.10 Mutation (c): flipping the function to `security definer` makes assertions 1 and 2 pass
+      when they should fail
 - [ ] 1.11 Every mutation's failure message read and confirmed to be the intended one
 
 #### Manual
 
-- [ ] 1.12 The migration header explains why a composite key was not used
+- [ ] 1.12 The migration header gives the `MATCH SIMPLE` reason, not the RLS policy one
 
 ### Phase 2: The sign-out gap, and proving the endpoint already answers correctly
 
@@ -369,7 +491,10 @@ near the 10 ms Worker CPU cap.
 
 - [ ] 2.1 Both assertions pass: `npm run test:integration`
 - [ ] 2.2 The endpoint answers `404 exercise_not_found`; the outcome is recorded, not assumed
-- [ ] 2.3 The full six-step gate passes
+- [ ] 2.3 `workout-endpoints`' "tells a missing exercise apart from a workout that is not the
+      caller's" still green after the trigger
+- [ ] 2.4 Mutation (d): a raised code other than `23503` makes the endpoint answer `500 unexpected`
+- [ ] 2.5 The full six-step gate passes
 
 ### Phase 3: Documents, and the pull request
 
@@ -382,4 +507,5 @@ near the 10 ms Worker CPU cap.
 #### Manual
 
 - [ ] 3.4 The PR body is readable by somebody who has not seen this plan
-- [ ] 3.5 `AGENTS.md` no longer describes the hazard as open anywhere
+- [ ] 3.5 `AGENTS.md` describes what the trigger closes **and** what it does not — stored rows,
+      `postgres`, `service_role` — without contradicting Phase 1's amendment about the `left join`
