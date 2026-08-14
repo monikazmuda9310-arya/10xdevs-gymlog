@@ -821,17 +821,17 @@ the whole statement, and verify what is INSTALLED rather than what was sent.
 
 #### Automated
 
-- [x] 2.1 `npm test` passes with `tonnage-breakdown.test.ts` and the `apportionedFigures` cases
-- [x] 2.2 `npm run lint` and `npm run typecheck` pass
-- [x] 2.3 Mutation (e): a `1000` kg tolerance fails the reconciliation assertion
-- [x] 2.4 Mutation (f): dropping six-groups-always and dropping `hasSets` each fail their assertion
+- [x] 2.1 `npm test` passes with `tonnage-breakdown.test.ts` and the `apportionedFigures` cases — 5a4f968
+- [x] 2.2 `npm run lint` and `npm run typecheck` pass — 5a4f968
+- [x] 2.3 Mutation (e): a `1000` kg tolerance fails the reconciliation assertion — 5a4f968
+- [x] 2.4 Mutation (f): dropping six-groups-always and dropping `hasSets` each fail their assertion — 5a4f968
 - [x] 2.5 Mutation (h): independent `tonnageFigure` rounding makes three `33.5` rows print `102`
-      against a total of `101`
-- [x] 2.6 `grep -rn "GROUP_LABELS" src/` shows one definition and its importers
+      against a total of `101` — 5a4f968
+- [x] 2.6 `grep -rn "GROUP_LABELS" src/` shows one definition and its importers — 5a4f968
 
 #### Manual
 
-- [x] 2.7 `/exercises`, `/records`, `/workouts/[id]` show the same capitalised group names
+- [x] 2.7 `/exercises`, `/records`, `/workouts/[id]` show the same capitalised group names — 5a4f968
 
 #### Phase 2 evidence
 
@@ -879,18 +879,53 @@ row and goes last only on a **tie**. Both facts are now pinned separately (`legs
 
 #### Automated
 
-- [ ] 3.1 `npm run test:render` passes, no-island and two-figure assertions retained
-- [ ] 3.2 `npm test`, `npm run lint`, `npm run typecheck` pass
-- [ ] 3.3 Mutation (g): a page-level failure flag fails the degrade assertion
-- [ ] 3.4 The six-step gate passes once before the commit
+- [x] 3.1 `npm run test:render` passes, no-island and two-figure assertions retained
+- [x] 3.2 `npm test`, `npm run lint`, `npm run typecheck` pass
+- [x] 3.3 Mutation (g): a page-level failure flag fails the degrade assertion
+- [x] 3.4 The six-step gate passes once before the commit
 
 #### Manual
 
-- [ ] 3.5 Group figures added by hand equal the "This week" figure exactly, in kg and in lb
-- [ ] 3.6 The bars read as a shape rather than as noise
-- [ ] 3.7 Switching to pounds moves totals and breakdown rows together
-- [ ] 3.8 A planks-only GROUP reads `0` with `Sets logged, no external load`; untrained groups read
+- [x] 3.5 Group figures added by hand equal the "This week" figure exactly, in kg and in lb
+- [x] 3.6 The bars read as a shape rather than as noise
+- [x] 3.7 Switching to pounds moves totals and breakdown rows together
+- [x] 3.8 A planks-only GROUP reads `0` with `Sets logged, no external load`; untrained groups read
       `0` with `No sets`
+
+#### Phase 3 evidence
+
+`npm run test:render`: **24 passed (2 files)**, up from 18 — six new assertions, and the three the
+plan required kept unchanged (`not.toContain("<astro-island")`, `FIGURE_CLASS` counted exactly twice,
+and the pounds guards). The six-step gate ran once in CI order before the commit:
+lint **0 errors** → typecheck **0 errors / 0 warnings over 118 files** → `npm test` **240 passed
+(14 files)** → `npm run test:render` **24 passed** → `npm run test:integration` **112 passed
+(13 files)**, 56.1 s → `npm run build` complete in 14.29 s.
+
+**Criteria 3.5–3.8, confirmed by the owner on 2026-08-14 in `astro dev`**, against a workout logged
+for the purpose: `Back Squat 5 × 102.5`, `Deadlift 5 × 100`, `Bench Press 5 × 62.5` — a week of
+`1325 kg` whose rows carry halves, chosen so the apportionment is **observable rather than merely
+correct**. Independently rounded, that column prints `513 + 500 + 313 = 1326` under a total of
+`1,325`; together it prints `513 + 500 + 312`. Checked again after switching to pounds, where the
+residuals are larger, and again after adding `Plank 1 × 0`: the `core` row read `0` with
+`Sets logged, no external load` while `shoulders` and `arms` read `0` with `No sets`, and the week's
+total did not move.
+
+**The stub's tripwire fired as designed.** S-07 wrote `throw new Error(\`unstubbed table: ${table}\`)`
+for exactly this moment, and adding the third read reddened this file before a single new assertion
+existed. A wanted failure, and the only one in the repository written a slice in advance.
+
+**Mutation (g), with the failure TEXT rather than the colour** (`lessons.md`).
+
+| Mutation                                                       | Assertion                                     | Failure text                                                                                                                                                                                                                                                                     |
+| -------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (g) the breakdown's `catch` also sets the page-level `tonnageFailed` | "degrades on its own, leaving both totals on screen" | `expected '<html lang="en" data-astro-cid-sckkx6…' to contain '12,346'` — and the received page is the proof: it carries `Your weekly tonnage could not be loaded` where the two figures were. A breakdown read failing costs the user S-07's proven feature, which is the defect |
+
+**One shape claim was wrong and the suite corrected it before the owner could see it.** The plan
+named `Unattributed` as the label for tonnage this account cannot name; rendered, that word appeared
+**twice** — once as the group row and once as the exercise row — and `groupRow()` matched two
+elements. Two different claims were wearing one word: the group row means "tonnage belonging to no
+group", the exercise row means "one exercise you cannot read". The exercise row now reads
+`Unattributed exercise`, and the assertion pins both separately.
 
 ### Phase 4: Deploy and prove it on the public URL
 

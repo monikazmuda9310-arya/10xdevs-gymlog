@@ -1,8 +1,10 @@
 ---
 import Layout from "@/layouts/Layout.astro";
-import { weeklyTonnage, type WeekTonnage } from "@/lib/services/tonnage";
-import { tonnageFigure } from "@/lib/services/tonnage-display";
-import type { WeightUnit } from "@/types";
+import { weeklyBreakdown, weeklyTonnage, type WeekTonnage } from "@/lib/services/tonnage";
+import type { WeekBreakdown } from "@/lib/services/tonnage-breakdown";
+import { apportionedFigures, tonnageFigure } from "@/lib/services/tonnage-display";
+import { MUSCLE_GROUP_LABELS } from "@/lib/validation/exercise";
+import type { MuscleGroup, WeightUnit } from "@/types";
 
 const { user, supabase } = Astro.locals;
 
@@ -50,11 +52,74 @@ if (supabase && user && profile) {
 }
 
 const weightUnit: WeightUnit = profile?.weight_unit ?? "kg";
+
+// **A third read, and it fails on its own** (FR-018, FR-019, US-03). Two things about this block are
+// deliberate and read as inconsistencies otherwise:
+//
+// 1. It runs only when the tonnage read SUCCEEDED. `foldBreakdown` reconciles the breakdown against
+//    the week total the screen is already printing, so with no total there is nothing to reconcile
+//    against — and a breakdown shown beside a failure sentence would be a figure nobody could check.
+// 2. It carries its OWN flag rather than setting `tonnageFailed`. This follows S-05's
+//    `impact_unavailable` ruling — the reliable thing stays on screen, the unknown one says it is
+//    unknown — rather than S-07's page-level flag. The two totals are S-07's proven feature and must
+//    survive a breakdown failure; `tests/render/dashboard-tonnage.test.ts` asserts exactly that.
+//
+// The throw is caught HERE for the reason the tonnage one is: an Astro frontmatter that throws
+// produces a 500, not a page.
+let breakdown: WeekBreakdown | null = null;
+let breakdownFailed = false;
+
+if (supabase && user && tonnage && !tonnageFailed) {
+  try {
+    breakdown = await weeklyBreakdown(supabase, user.id, tonnage.current, tonnage.current.kilograms);
+  } catch (readError) {
+    breakdownFailed = true;
+    // eslint-disable-next-line no-console -- deliberate server-side diagnostic
+    console.error("dashboard: weekly breakdown read failed", readError);
+  }
+}
+
+const weekTotalKg = tonnage?.current.kilograms ?? 0;
+
+// **Rounded TOGETHER against the week total, never one row at a time.** `tonnage-display.ts` states
+// what that costs — a row can read one whole unit away from its own independently rounded value —
+// and who decided it. Two calls, because each list sums to the whole week on its own: every exercise
+// belongs to exactly one muscle group. The two weekly totals above keep using `tonnageFigure`.
+const groupFigures = apportionedFigures(
+  breakdown?.groups.map((group) => group.kilograms) ?? [],
+  weekTotalKg,
+  weightUnit,
+);
+const exerciseFigures = apportionedFigures(
+  breakdown?.exercises.map((exercise) => exercise.kilograms) ?? [],
+  weekTotalKg,
+  weightUnit,
+);
+
+/** `Unattributed` is a claim about tonnage this account can no longer name — see the row's own note. */
+const groupLabel = (group: MuscleGroup | null): string =>
+  group === null ? "Unattributed" : MUSCLE_GROUP_LABELS[group];
+
+/**
+ * The bar is presentation, and the number on the row is the tonnage — no percentage is printed.
+ * Guarded against a zero total, which is an ordinary week (no sets, or planks only) and not an error.
+ */
+const barWidth = (kilograms: number): string => {
+  const share = weekTotalKg > 0 ? (kilograms / weekTotalKg) * 100 : 0;
+  return `${String(Math.max(0, Math.min(100, share)))}%`;
+};
+
+// One wording, used beside the weekly totals AND on a group row. The distinction it carries is the
+// one `hasSets` exists for: a week or a group of planks did train, it just moved no external load.
+const NO_EXTERNAL_LOAD = "Sets logged, no external load";
 ---
 
 <Layout title="Dashboard">
   <div class="bg-cosmic flex min-h-screen items-center justify-center p-4">
-    <div class="rounded-2xl border border-white/10 bg-white/10 p-8 text-center text-white backdrop-blur-xl">
+    {/* The card was shrink-to-fit until S-08. Six group rows and an exercise list need a width. */}
+    <div
+      class="w-full max-w-2xl rounded-2xl border border-white/10 bg-white/10 p-8 text-center text-white backdrop-blur-xl"
+    >
       <h1 class="mb-4 bg-gradient-to-r from-blue-200 to-purple-200 bg-clip-text text-3xl font-bold text-transparent">
         Dashboard
       </h1>
@@ -112,13 +177,105 @@ const weightUnit: WeightUnit = profile?.weight_unit ?? "kg";
                       decides: a week of planks has sets and rounds to 0, and must not be told it was
                       a rest week.
                     */}
-                    {!week.hasSets && (
+                    {!week.hasSets ? (
                       <span class="mt-1 block text-xs text-blue-100/50">No sets logged {label.toLowerCase()}</span>
+                    ) : (
+                      /*
+                        S-07 left this half of the distinction unwritten, and
+                        `tonnage-display.test.ts:46-51` already describes it as though it existed: a
+                        week of planks rendered a bare `0` and read as a rest week. A sentence, never
+                        a change to the figure — the figures themselves are S-07's and are untouched.
+                      */
+                      week.kilograms === 0 && (
+                        <span class="mt-1 block text-xs text-blue-100/50">{NO_EXTERNAL_LOAD}</span>
+                      )
                     )}
                   </dd>
                 </div>
               ))}
             </dl>
+          )
+        }
+      </section>
+
+      {
+        /*
+        FR-018 and FR-019. Static HTML, no island: a breakdown has no interaction, and the render
+        suite's no-island assertion is what keeps it that way.
+
+        **The rows must not reuse `text-2xl font-semibold text-purple-200`** — that class is how
+        `tests/render/dashboard-tonnage.test.ts` counts the figures on this page, and it expects
+        exactly two of them, the two weekly totals.
+      */
+      }
+      <section class="mt-6 border-t border-white/10 pt-5 text-left">
+        <h2 class="mb-3 text-center text-xs tracking-wide text-blue-100/50 uppercase">Where this week went</h2>
+        {
+          breakdownFailed || !breakdown ? (
+            <p class="rounded-lg border border-amber-400/30 bg-amber-900/20 px-4 py-4 text-center text-sm text-amber-100">
+              Your breakdown could not be loaded. The totals above are unaffected.
+            </p>
+          ) : (
+            <div class="space-y-5">
+              <div>
+                <h3 class="mb-2 text-xs tracking-wide text-blue-100/40 uppercase">By muscle group</h3>
+                <ul class="space-y-2">
+                  {breakdown.groups.map((group, index) => (
+                    <li class="rounded-lg border border-white/10 bg-white/5 px-4 py-2">
+                      <div class="flex items-baseline justify-between gap-3">
+                        <span class="text-sm text-blue-100/80">{groupLabel(group.group)}</span>
+                        <span class="text-sm font-medium text-purple-200">
+                          {groupFigures[index]}
+                          <span class="ml-1 text-xs text-purple-200/70">{weightUnit}</span>
+                        </span>
+                      </div>
+                      <div aria-hidden="true" class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          class="h-full rounded-full bg-purple-300/70"
+                          style={`width: ${barWidth(group.kilograms)}`}
+                        />
+                      </div>
+                      {/* `hasSets`, not the figure, decides — the same distinction the weekly totals
+                          carry. A group of planks has sets and no external load; an untrained group
+                          has neither, and the two must not read the same. */}
+                      {!group.hasSets ? (
+                        <p class="mt-1 text-xs text-blue-100/40">No sets</p>
+                      ) : (
+                        group.kilograms === 0 && <p class="mt-1 text-xs text-blue-100/40">{NO_EXTERNAL_LOAD}</p>
+                      )}
+                      {group.group === null && (
+                        <p class="mt-1 text-xs text-blue-100/40">
+                          An exercise behind this tonnage is no longer readable by your account.
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <h3 class="mb-2 text-xs tracking-wide text-blue-100/40 uppercase">By exercise</h3>
+                {breakdown.exercises.length === 0 ? (
+                  <p class="text-xs text-blue-100/40">No exercises logged this week.</p>
+                ) : (
+                  <ul class="space-y-1">
+                    {breakdown.exercises.map((exercise, index) => (
+                      <li class="flex items-baseline justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-2">
+                        {/* Not the bare `Unattributed` the group row carries. The two rows make
+                            different claims — one is tonnage belonging to no group, the other is a
+                            single exercise this account cannot read — and giving them the same label
+                            would put the same word on the same screen twice meaning two things. */}
+                        <span class="text-sm text-blue-100/80">{exercise.name ?? "Unattributed exercise"}</span>
+                        <span class="text-sm font-medium text-purple-200">
+                          {exerciseFigures[index]}
+                          <span class="ml-1 text-xs text-purple-200/70">{weightUnit}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
           )
         }
       </section>
