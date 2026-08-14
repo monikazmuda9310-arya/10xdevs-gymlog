@@ -964,12 +964,12 @@ both blind to it.
 
 #### Automated
 
-- [x] 5.1 `npm run lint` passes
-- [x] 5.2 `grep -n "RESOLVED (owner, 2026-08-14)" context/foundation/prd.md` matches
+- [x] 5.1 `npm run lint` passes — 1b2ce56
+- [x] 5.2 `grep -n "RESOLVED (owner, 2026-08-14)" context/foundation/prd.md` matches — 1b2ce56
 
 #### Manual
 
-- [x] 5.3 The owner confirms the PRD resolution says what they decided
+- [x] 5.3 The owner confirms the PRD resolution says what they decided — 1b2ce56
 
 #### Phase 5 evidence
 
