@@ -64,7 +64,7 @@ the primary success criterion, and it is placed as early as its prerequisites al
 | S-06 | unit-formula-timezone-preferences | choose kilograms or pounds, the estimation formula, and the timezone their week runs in | S-03, F-03                                                                                                                      | FR-016, FR-022, US-03, NFR §unit round-trip                                         | done     |
 | S-07 | weekly-tonnage                    | see this training week's total tonnage next to last week's                              | S-05, S-06, F-01                                                                                                                | US-03, FR-017                                                                       | done     |
 | S-08 | tonnage-breakdown                 | see where the week's work went, per exercise and per muscle group                       | S-07, F-01                                                                                                                      | US-03, FR-018, FR-019                                                               | done     |
-| S-09 | account-boundary                  | be certain no other account can reach their training, and delete their own account      | S-02, S-03, S-06, F-01, F-03                                                                                                    | US-04, NFR §no cross-account reach, NFR §own-data deletion                          | proposed |
+| S-09 | account-boundary                  | be certain no other account can reach their training, and delete their own account      | S-02, S-03, S-06, F-01, F-03                                                                                                    | US-04, NFR §no cross-account reach, NFR §own-data deletion                          | planning |
 
 ## Streams
 
@@ -257,7 +257,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 ### S-09: The account boundary, proven and reversible
 
 - **Outcome:** user's training is unreachable from any other account — reads, edits and deletes alike, including a request that names a workout, exercise entry or set identifier directly, verified against the stored rows — and the user can delete their own account together with all of its training data, after which none of it is retrievable.
-- **Change ID:** account-boundary
+- **Change ID:** account-boundary — **SPLIT (2026-08-15)** into `cross-account-isolation` (the boundary, and the unscoped `exercise_id` behind it) and `account-deletion` (own-data deletion). Two worktrees, two PRs: this is M2 deliverable 5, and S-09 was the last slice able to produce it.
 - **PRD refs:** US-04, NFR §no cross-account reach, NFR §own-data deletion
   — "no account's training data is obtainable by another account through any interface … for
   reads, modifications, and deletions alike", and "a user can delete their account together with
@@ -267,7 +267,7 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Blockers:** —
 - **Unknowns:** —
 - **Risk:** the enforcement itself is not deferred to this slice — the ownership policy is written in the same migration as every table from F-03 onwards, and a table that lands without one is a defect rather than a follow-up. What is sequenced here is the adversarial proof, which can only run once all three levels of the record exist, and which has to assert against stored rows rather than the status code the caller sees: a check that only reads the response passes happily against a broken boundary. Account deletion joins it because it is the same boundary read from the other side.
-- **Status:** proposed
+- **Status:** planning
 
 ## Backlog Handoff
 
