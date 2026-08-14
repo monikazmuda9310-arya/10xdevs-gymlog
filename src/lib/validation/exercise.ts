@@ -56,3 +56,30 @@ export function exerciseMessageForCode(code: string | null | undefined): string 
 export function isMuscleGroup(value: unknown): value is MuscleGroup {
   return typeof value === "string" && (MUSCLE_GROUPS as readonly string[]).includes(value);
 }
+
+/**
+ * What each muscle group is called on screen.
+ *
+ * **One name per group, in one place.** Until S-08 this map was private to `ExerciseCatalogue.tsx`
+ * and every other screen printed the raw lowercase enum, so the repository read "Shoulders" on
+ * `/exercises` and "shoulders" on `/records`, `/workouts/[id]` and the exercise picker. Rewiring all
+ * four call sites rather than only the new one is the **owner's decision, 2026-08-14**.
+ *
+ * Typed as a `Record` over the enum for the reason `WEIGHT_UNIT_LABELS` is
+ * (`src/lib/validation/profile.ts`): the tuple assertions in `@/types` guarantee a seventh group
+ * would be *offered*; this guarantees it would be offered **with a name**, rather than reaching a
+ * screen as the raw `core` the column happens to hold. Add one to the Postgres enum and the build
+ * stops here.
+ *
+ * It lives in this module, and not beside the tonnage code that now needs it, because two of the
+ * four call sites are `client:load` islands — and this module already imports nothing but the
+ * six-element tuple.
+ */
+export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
+  legs: "Legs",
+  back: "Back",
+  chest: "Chest",
+  shoulders: "Shoulders",
+  arms: "Arms",
+  core: "Core",
+};

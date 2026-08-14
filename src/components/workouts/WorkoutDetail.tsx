@@ -11,6 +11,7 @@ import type {
 import { bestEstimateOf, estimateForLoggedSet, roundForDisplay } from "@/lib/services/set-display";
 import type { SetEstimate } from "@/lib/services/set-estimate";
 import { workoutMessageForCode } from "@/lib/validation/workout";
+import { MUSCLE_GROUP_LABELS } from "@/lib/validation/exercise";
 import { useRecordImpact } from "@/components/hooks/useRecordImpact";
 import { AddSetForm } from "@/components/workouts/AddSetForm";
 import { EditSetForm } from "@/components/workouts/EditSetForm";
@@ -332,7 +333,7 @@ export default function WorkoutDetail({ workoutId, initialEntries, catalogue, we
                     {entry.exercises.is_bodyweight && (
                       <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-blue-200">bodyweight</span>
                     )}
-                    <span className="text-blue-100/50">{entry.exercises.muscle_group}</span>
+                    <span className="text-blue-100/50">{MUSCLE_GROUP_LABELS[entry.exercises.muscle_group]}</span>
                     <button
                       type="button"
                       aria-label={`Remove ${entry.exercises.name} from this workout`}

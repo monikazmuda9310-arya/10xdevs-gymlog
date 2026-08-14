@@ -3,7 +3,8 @@ import Layout from "@/layouts/Layout.astro";
 import { listPersonalRecords, type PersonalRecordListItem } from "@/lib/services/records";
 import { getProfile } from "@/lib/services/profiles";
 import { bestEstimateFigure, heaviestFigure } from "@/lib/services/record-display";
-import type { EstimationFormula, WeightUnit } from "@/types";
+import { MUSCLE_GROUP_LABELS } from "@/lib/validation/exercise";
+import type { EstimationFormula, MuscleGroup, WeightUnit } from "@/types";
 
 // FR-021. A plain Astro page with no island: the list is static, and AGENTS.md § Conventions puts
 // React only where interactivity is needed. Everything derived here is derived on the server.
@@ -32,6 +33,17 @@ if (supabase && user) {
     console.error("records: read failed", error);
   }
 }
+
+// **The one call site of MUSCLE_GROUP_LABELS that needs a narrowing.** The other three hold a
+// non-null `MuscleGroup` from the `exercises` table; this value comes through the
+// `personal_records` VIEW, and `supabase gen types` makes every view column nullable because
+// Postgres cannot prove not-null through one.
+//
+// **The fallback is the raw value, never "Unattributed".** A null here is a read anomaly — it says
+// nothing about the account's training — while "Unattributed" is a specific claim about tonnage
+// whose exercise this account can no longer read, and it belongs to the dashboard breakdown alone.
+// Printing it here would answer a question nobody asked with a fact that is not true.
+const groupLabel = (group: MuscleGroup | null): string => (group === null ? "" : MUSCLE_GROUP_LABELS[group]);
 ---
 
 <Layout title="Records">
@@ -71,7 +83,7 @@ if (supabase && user) {
                       {row.is_bodyweight && (
                         <span class="rounded-full bg-blue-500/20 px-2 py-0.5 text-blue-200">bodyweight</span>
                       )}
-                      <span class="text-blue-100/50">{row.muscle_group}</span>
+                      <span class="text-blue-100/50">{groupLabel(row.muscle_group)}</span>
                     </span>
                   </header>
 

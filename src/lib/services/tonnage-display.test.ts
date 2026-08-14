@@ -5,7 +5,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { kilogramsIn } from "@/lib/services/set-display";
-import { tonnageFigure } from "@/lib/services/tonnage-display";
+import { apportionedFigures, tonnageFigure } from "@/lib/services/tonnage-display";
+
+/** What the user actually checks: do the printed rows add up to the printed total? */
+function sumOf(figures: string[]): number {
+  return figures.reduce((total, figure) => total + Number(figure.replaceAll(",", "")), 0);
+}
 
 describe("kilogramsIn: the scalar converter", () => {
   it("leaves kilograms alone", () => {
@@ -91,5 +96,65 @@ describe("tonnageFigure: a week's total", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe("apportionedFigures: a column that adds up to the total above it", () => {
+  it("prints three equal halves so they sum to the total, where independent rounding would not", () => {
+    // **The exact arithmetic plan review F1 found.** `tonnageFigure` on each row answers
+    // 34 + 34 + 34 = 102 against a total that prints 101 — a column the user can add up and catch.
+    // Owner ruling, 2026-08-14: given a row that is individually truthful or a column that adds up,
+    // the column wins, because adding the rows up is the only check the user can perform.
+    const total = 100.5;
+    const rows = [33.5, 33.5, 33.5];
+
+    expect(tonnageFigure(total, "kg")).toBe("101");
+    expect(apportionedFigures(rows, total, "kg")).toEqual(["34", "34", "33"]);
+    expect(sumOf(apportionedFigures(rows, total, "kg"))).toBe(101);
+    // The defect this replaces, stated so the assertion above cannot be read as arbitrary.
+    expect(sumOf(rows.map((value) => tonnageFigure(value, "kg")))).toBe(102);
+  });
+
+  it("still adds up in pounds, where the conversion multiplies every residual", () => {
+    // 100.5 kg is 221.56 lb → "222"; each 33.5 kg row is 73.85 lb, so all three floors are short by
+    // most of a unit and every one of them takes a remainder.
+    const figures = apportionedFigures([33.5, 33.5, 33.5], 100.5, "lb");
+
+    expect(tonnageFigure(100.5, "lb")).toBe("222");
+    expect(figures).toEqual(["74", "74", "74"]);
+    expect(sumOf(figures)).toBe(222);
+  });
+
+  it("leaves a column that already rounds exactly alone", () => {
+    // No remainder to hand out. The apportionment must not perturb rows that were already right —
+    // otherwise it would trade one visible error for another.
+    expect(apportionedFigures([50, 30, 20], 100, "kg")).toEqual(["50", "30", "20"]);
+  });
+
+  it("gives the whole remainder to a single row", () => {
+    expect(apportionedFigures([100.5], 100.5, "kg")).toEqual(["101"]);
+  });
+
+  it("reads as zero for a week worth nothing, without inventing a unit from nowhere", () => {
+    // A week of planks, broken down. Every group is zero and the total is zero, so there is nothing
+    // to apportion — and no row may be rounded up to 1 to satisfy a total of 0.
+    expect(apportionedFigures([0, 0, 0, 0, 0, 0], 0, "kg")).toEqual(["0", "0", "0", "0", "0", "0"]);
+    expect(apportionedFigures([], 0, "kg")).toEqual([]);
+  });
+
+  it("keeps the thousands separator a real week's rows need", () => {
+    const figures = apportionedFigures([8000.4, 4345.3], 12345.7, "kg");
+
+    expect(tonnageFigure(12345.7, "kg")).toBe("12,346");
+    expect(figures).toEqual(["8,001", "4,345"]);
+    expect(sumOf(figures)).toBe(12346);
+  });
+
+  it("hands the remainder to the largest fractional parts, not to the first rows", () => {
+    // 10.9 + 10.05 + 10.05 = 31 exactly; floors give 30, so one unit is left. It belongs to the
+    // row that lost the most by flooring, which is the first here — and to prove that is a decision
+    // rather than an accident, the mirrored list gives it to the last.
+    expect(apportionedFigures([10.9, 10.05, 10.05], 31, "kg")).toEqual(["11", "10", "10"]);
+    expect(apportionedFigures([10.05, 10.05, 10.9], 31, "kg")).toEqual(["10", "10", "11"]);
   });
 });

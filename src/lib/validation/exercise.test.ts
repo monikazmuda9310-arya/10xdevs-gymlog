@@ -7,6 +7,7 @@ import { MUSCLE_GROUPS } from "@/types";
 import {
   MAX_EXERCISE_NAME_LENGTH,
   EXERCISE_MESSAGES,
+  MUSCLE_GROUP_LABELS,
   exerciseMessageForCode,
   isMuscleGroup,
 } from "@/lib/validation/exercise";
@@ -34,6 +35,26 @@ describe("isMuscleGroup", () => {
     expect(isMuscleGroup(undefined)).toBe(false);
     expect(isMuscleGroup(7)).toBe(false);
     expect(isMuscleGroup({})).toBe(false);
+  });
+});
+
+describe("MUSCLE_GROUP_LABELS", () => {
+  it("names every one of the six", () => {
+    // The `Record<MuscleGroup, string>` type already makes a missing key a build failure; this
+    // catches the other half — a key present but empty, which type-checks and renders as a gap on
+    // four screens.
+    for (const group of MUSCLE_GROUPS) {
+      expect(MUSCLE_GROUP_LABELS[group]).toBeTruthy();
+    }
+    expect(Object.keys(MUSCLE_GROUP_LABELS)).toHaveLength(MUSCLE_GROUPS.length);
+  });
+
+  it("capitalises the label rather than handing back the raw enum value", () => {
+    // The defect the promotion fixed: until S-08 only `/exercises` had this map, so the repository
+    // read "Shoulders" on one screen and "shoulders" on three others.
+    for (const group of MUSCLE_GROUPS) {
+      expect(MUSCLE_GROUP_LABELS[group]).not.toBe(group);
+    }
   });
 });
 

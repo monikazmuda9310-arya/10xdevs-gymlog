@@ -2,20 +2,12 @@ import { useMemo, useState } from "react";
 import { Search, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MUSCLE_GROUPS, type Exercise, type MuscleGroup } from "@/types";
+import { MUSCLE_GROUP_LABELS } from "@/lib/validation/exercise";
 import { ExerciseForm } from "@/components/exercises/ExerciseForm";
 
 // Filtering and search run HERE, over the catalogue the page already rendered, rather than as a
 // request per keystroke. The catalogue is 38 seeded rows plus whatever one person adds, so a round
 // trip would be slower and would spend Worker CPU the free plan caps at 10 ms per invocation.
-
-const GROUP_LABELS: Record<MuscleGroup, string> = {
-  legs: "Legs",
-  back: "Back",
-  chest: "Chest",
-  shoulders: "Shoulders",
-  arms: "Arms",
-  core: "Core",
-};
 
 interface Props {
   initialExercises: Exercise[];
@@ -82,7 +74,8 @@ export default function ExerciseCatalogue({ initialExercises }: Props) {
                   : "border-white/20 bg-white/5 text-blue-100/80 hover:bg-white/10",
               )}
             >
-              {value === "all" ? "All" : GROUP_LABELS[value]} <span className="text-white/50">{countFor(value)}</span>
+              {value === "all" ? "All" : MUSCLE_GROUP_LABELS[value]}{" "}
+              <span className="text-white/50">{countFor(value)}</span>
             </button>
           ))}
         </div>
@@ -110,7 +103,7 @@ export default function ExerciseCatalogue({ initialExercises }: Props) {
                   // The one distinction worth showing: which rows are this account's own.
                   <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-purple-200">yours</span>
                 )}
-                <span className="text-blue-100/50">{GROUP_LABELS[exercise.muscle_group]}</span>
+                <span className="text-blue-100/50">{MUSCLE_GROUP_LABELS[exercise.muscle_group]}</span>
               </span>
             </li>
           ))}

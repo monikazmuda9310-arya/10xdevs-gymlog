@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { CircleAlert, Dumbbell, Search } from "lucide-react";
 import type { Exercise } from "@/types";
+import { MUSCLE_GROUP_LABELS } from "@/lib/validation/exercise";
 
 // The catalogue was fetched once by the page; filtering runs HERE rather than as a request per
 // keystroke. Tens of rows, so a round trip would be slower and would spend Worker CPU the free plan
@@ -82,7 +83,7 @@ export function ExercisePicker({ catalogue, presentExerciseIds, onPick, pending,
                       // choosing it again moves to that entry instead of refusing.
                       <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-purple-200">in workout</span>
                     )}
-                    <span className="text-blue-100/50">{exercise.muscle_group}</span>
+                    <span className="text-blue-100/50">{MUSCLE_GROUP_LABELS[exercise.muscle_group]}</span>
                   </span>
                 </button>
               </li>

@@ -22,12 +22,25 @@
  * TypeScript and compares — the role `personal-records.test.ts` assertion 4 plays for the 1RM
  * formula. That TypeScript sum lives in the test and must never move into `src/`: a second
  * production implementation is how the 1RM two-implementations hazard was created.
+ *
+ * **S-08 adds a second read, `weeklyBreakdown`, and both exemptions carry over with one change.**
+ * The breakdown reads `public.daily_exercise_tonnage` at `(day, exercise)` grain, so the number of
+ * rows crossing into the Worker is no longer the constant fourteen — it is `days × distinct
+ * exercises per day`, bounded by training habit rather than by arithmetic. The bound is therefore
+ * asserted rather than assumed: `MAX_BREAKDOWN_ROWS` in `tonnage-breakdown.ts`, a `throw` and never
+ * a `.limit()`. The per-set arithmetic still stays in SQL, which is the rule's actual subject. And
+ * the compensating control for the displayed figures is assertion 2 of
+ * `tests/integration/tonnage-breakdown.test.ts`, which plays for the breakdown the role assertion 1
+ * of `weekly-tonnage.test.ts` plays for the total — and lives in the test, for the same reason.
+ *
+ * **The read is here; every decision is in `tonnage-breakdown.ts`.** This module does I/O.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/db/database.types";
 import { trainingWeeksFor, type DateRange } from "@/lib/services/calendar";
+import { foldBreakdown, type WeekBreakdown } from "@/lib/services/tonnage-breakdown";
 
 type Client = SupabaseClient<Database>;
 
@@ -45,6 +58,9 @@ export interface WeekTonnage extends DateRange {
 
 /** The number of days the read spans: two whole weeks. */
 const DAYS_IN_TWO_WEEKS = 14;
+
+/** What `weeklyBreakdown` spans: one week, because US-03 breaks down the current week only. */
+const DAYS_IN_A_WEEK = 7;
 
 /**
  * This week's and last week's tonnage for `userId`, as a reader in `timeZone` counts weeks.
@@ -106,6 +122,50 @@ export async function weeklyTonnage(
     current: fold(current, data),
     previous: fold(previous, data),
   };
+}
+
+/**
+ * One week's tonnage broken down per muscle group and per exercise (FR-018, FR-019, US-03).
+ *
+ * `week` is a range `trainingWeeksFor` produced and `weekTotalKg` is the figure `weeklyTonnage`
+ * already returned for that same range — the number the screen is printing above the breakdown.
+ * Handing both in is what lets `foldBreakdown` reconcile against what the user can actually see,
+ * rather than against a second read of the same data.
+ *
+ * Throws on a read failure rather than answering an empty breakdown, for the reason `weeklyTonnage`
+ * throws rather than answering zero: an empty list is a positive claim — "you trained nothing this
+ * week" — and it is the same claim S-05 refused to make with `impact_unavailable`. `/dashboard`
+ * catches this separately from the tonnage read, so a breakdown failure costs the breakdown and
+ * leaves both totals on screen.
+ */
+export async function weeklyBreakdown(
+  supabase: Client,
+  userId: string,
+  week: DateRange,
+  weekTotalKg: number,
+): Promise<WeekBreakdown> {
+  // Asserted for the reason above: a wider range would be unbounded work under a 10 ms CPU cap.
+  // `MAX_BREAKDOWN_ROWS` guards the other axis — how many exercises a day may hold.
+  const span = daysBetween(week.start, week.end) + 1;
+  if (span !== DAYS_IN_A_WEEK) {
+    throw new Error(`weeklyBreakdown: expected a ${String(DAYS_IN_A_WEEK)}-day window, got ${String(span)}`);
+  }
+
+  const { data, error } = await supabase
+    .from("daily_exercise_tonnage")
+    .select("performed_on, exercise_id, exercise_name, muscle_group, tonnage_kg")
+    // The policy is the guarantee, the filter is the index path (AGENTS.md § Access control). Both
+    // columns are GROUP BY columns of the view, which is what keeps the range on
+    // `workouts_user_performed_on_idx`.
+    .eq("user_id", userId)
+    .gte("performed_on", week.start)
+    .lte("performed_on", week.end);
+
+  if (error) {
+    throw error;
+  }
+
+  return foldBreakdown(data, week, weekTotalKg);
 }
 
 interface DailyRow {

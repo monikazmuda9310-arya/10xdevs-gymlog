@@ -36,7 +36,7 @@ does not. So the new view groups by day and the Worker folds, exactly as S-07 do
   single-column and **not** ownership-scoped
   (`20260811005248_create_workout_log_with_row_ownership.sql:59`), foreign-key checks do not go
   through RLS, and `addExerciseEntry` (`src/lib/services/workouts.ts:150-154`) inserts the id with
-  no visibility check. So a row *can* exist pointing at another account's private exercise. Under
+  no visibility check. So a row _can_ exist pointing at another account's private exercise. Under
   `security_invoker = true` an **inner** join to `exercises` — whose select policy is
   `user_id is null or (select auth.uid()) = user_id` — drops that set's tonnage for the account that
   logged it, while `daily_tonnage` still counts it. The breakdown then fails to reconcile, with no
@@ -48,7 +48,7 @@ does not. So the new view groups by day and the Worker folds, exactly as S-07 do
 - **Reconciling the kilograms does not reconcile the SCREEN, and the screen is where the user checks
   it.** `tonnageFigure` (`src/lib/services/tonnage-display.ts:37-41`) rounds to **whole units**, pinned
   by `tonnage-display.test.ts`. Rounded independently, a week of `100.5 kg` split as `33.5 / 33.5 /
-  33.5` prints `101` above and `34 + 34 + 34 = 102` below; across seven rows the visible drift reaches
+33.5` prints `101` above and `34 + 34 + 34 = 102` below; across seven rows the visible drift reaches
   ±3–4 units and is larger in pounds, where conversion multiplies the residuals. **Found by plan
   review (F1); the owner ruled on 2026-08-14 that the column must add up** — the rows are apportioned
   by largest remainder against the rounded total.
@@ -87,7 +87,7 @@ a signed-in look at the deployed URL.
 - **No edit path for `muscle_group`** (owner decision, 2026-08-14 — PRD Open Question 2). The
   semantics are settled and recorded: a correction is **retroactive by construction**, moving tonnage
   **between** buckets and leaving the weekly total bit-identical. Shipping `PATCH
-  /api/exercises/[id]` is a separate slice.
+/api/exercises/[id]` is a separate slice.
 - **No snapshot of `muscle_group` onto `exercise_entries`** — the option that would make corrections
   forward-only. It was considered and declined: it contradicts
   `20260811005248…:71-76` ("No muscle_group column, and that absence is load-bearing") and turns a
@@ -230,15 +230,15 @@ reason (plan review F3; `weekly-tonnage.test.ts` needed seven anchors for eight 
 reason). All Wednesdays, exactly 4 weeks apart, in months no other suite writes to — 2024 is entirely
 free and `weekly-tonnage` holds June–December 2025:
 
-| Anchor | Assertion(s) |
-|---|---|
+| Anchor       | Assertion(s)                                                                                                                  |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | `2024-12-11` | 7 and 8 — both access probes over one fixture, sharing deliberately: neither mutates, and separating them would prove nothing |
-| `2025-01-08` | 1 and 2 — the same fixture is the subject of both by design: SQL reconciliation and the independent TypeScript sum |
-| `2025-02-05` | 3 — mixed units in one workout |
-| `2025-03-05` | 4 — zero-load and assisted sets |
-| `2025-04-02` | 5 — two workouts, one date, one exercise |
-| `2025-04-30` | 6 — the moved workout. **Its own window, non-negotiable**: it mutates `performed_on` |
-| `2025-05-28` | 9 — the unreadable-exercise hazard. **Its own window**, so that mutation (a) reddens this assertion and nothing else |
+| `2025-01-08` | 1 and 2 — the same fixture is the subject of both by design: SQL reconciliation and the independent TypeScript sum            |
+| `2025-02-05` | 3 — mixed units in one workout                                                                                                |
+| `2025-03-05` | 4 — zero-load and assisted sets                                                                                               |
+| `2025-04-02` | 5 — two workouts, one date, one exercise                                                                                      |
+| `2025-04-30` | 6 — the moved workout. **Its own window, non-negotiable**: it mutates `performed_on`                                          |
+| `2025-05-28` | 9 — the unreadable-exercise hazard. **Its own window**, so that mutation (a) reddens this assertion and nothing else          |
 
 Fixtures write **directly to the tables** (the
 `/api/sets` endpoint stamps the unit from the profile, and one assertion needs both units in one
@@ -259,7 +259,7 @@ Nine assertions:
 4. **Zero-load and assisted sets** — an exercise logged only at zero and negative load emits a row
    with `tonnage_kg === 0`, never a negative amount, and its group row is `0` rather than absent.
 5. **Two workouts on the same date with the same exercise fold into one row** — `unique
-   (workout_id, exercise_id)` permits this and grouping (not "one entry per day") is what handles it.
+(workout_id, exercise_id)` permits this and grouping (not "one entry per day") is what handles it.
 6. **Moving a workout across a Monday moves its tonnage between weeks in the breakdown**, and both
    weeks still reconcile — US-03's recompute criterion at the new grain.
 7. **The `security_invoker` guard** — account B naming account A's `user_id` **directly against the
@@ -294,7 +294,7 @@ becomes decoration.
 - `npm run test:integration` passes, and passes again on an immediate second run (fixture
   repeatability)
 - Mutation (a): `left join` → `join` fails **assertion 9 and only assertion 9**, and the failure text
-  shows that assertion's breakdown sum *below* its own window's `daily_tonnage` total by exactly the
+  shows that assertion's breakdown sum _below_ its own window's `daily_tonnage` total by exactly the
   hazard set's tonnage — not merely a red suite. **Assertion 1 must stay green**: its window holds no
   unreadable exercise, and forcing the hazard fixture into it would make an access defect and an
   arithmetic defect indistinguishable, which is what `weekly-tonnage.test.ts:344-347` says never to do
@@ -335,9 +335,22 @@ injected rows.
 **Contract**:
 
 ```ts
-export interface ExerciseTonnage { exerciseId: string; name: string | null; muscleGroup: MuscleGroup | null; kilograms: number; }
-export interface GroupTonnage { group: MuscleGroup | null; kilograms: number; hasSets: boolean; }
-export interface WeekBreakdown { groups: GroupTonnage[]; exercises: ExerciseTonnage[]; kilograms: number; }
+export interface ExerciseTonnage {
+  exerciseId: string;
+  name: string | null;
+  muscleGroup: MuscleGroup | null;
+  kilograms: number;
+}
+export interface GroupTonnage {
+  group: MuscleGroup | null;
+  kilograms: number;
+  hasSets: boolean;
+}
+export interface WeekBreakdown {
+  groups: GroupTonnage[];
+  exercises: ExerciseTonnage[];
+  kilograms: number;
+}
 
 export function foldBreakdown(rows: BreakdownRow[], week: DateRange, weekTotalKg: number): WeekBreakdown;
 ```
@@ -493,12 +506,12 @@ adds up; the two weekly totals keep using `tonnageFigure`. A derived headline ta
 
 Sentences this phase introduces or fixes:
 
-| State | Sentence |
-|---|---|
-| breakdown read failed | `Your breakdown could not be loaded. The totals above are unaffected.` |
-| group with no sets this week | `No sets` |
-| week or group with sets but no external load | `Sets logged, no external load` |
-| tonnage that cannot be attributed | row label `Unattributed`, with a one-line explanation that an exercise behind it is no longer readable by this account |
+| State                                        | Sentence                                                                                                               |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| breakdown read failed                        | `Your breakdown could not be loaded. The totals above are unaffected.`                                                 |
+| group with no sets this week                 | `No sets`                                                                                                              |
+| week or group with sets but no external load | `Sets logged, no external load`                                                                                        |
+| tonnage that cannot be attributed            | row label `Unattributed`, with a one-line explanation that an exercise behind it is no longer readable by this account |
 
 The third row closes a gap S-07 left and that `tonnage-display.test.ts:46-51` already claims exists:
 today a week of planks renders a bare `0` and the sentence that comment describes does not exist. It
@@ -542,7 +555,7 @@ a group with rows and zero kilograms reads `0` with `Sets logged, no external lo
 - Mutation (g): making the breakdown failure set the page-level `tonnageFailed` flag fails the
   degrade assertion — both totals disappear where the suite requires them
 - The full six-step gate passes once, before the commit: `lint → typecheck → test → test:render →
-  test:integration → build`
+test:integration → build`
 
 #### Manual Verification:
 
@@ -710,7 +723,7 @@ aggregate whose figure is claimed to reconcile with another).
    and so must the exercise rows.
 3. Switch `/settings` to pounds; every figure on the page changes together.
 4. Add a plank at zero load to today's workout; the `core` row reads `0` with `Sets logged, no
-   external load`, while every untrained group reads `0` with `No sets`.
+external load`, while every untrained group reads `0` with `No sets`.
 5. Delete the workout; the breakdown empties and both totals stay on screen.
 
 ## Performance Considerations
@@ -789,12 +802,12 @@ substitution; production was never addressed. After the last one the view was re
 projects' `md5(pg_get_viewdef(…))` compared: **identical (`0141edc8…`)**, `reloptions
 {security_invoker=true}`, `authenticated` holding `SELECT` only and `anon` zero grants. No drift.
 
-| Mutation | Assertion | Failure text |
-|---|---|---|
-| (a) `left join` → `join` | **9, and only 9** | `expected 500 to be close to 680, received difference is 180` — the breakdown short by exactly the hazard set's `3 × 60 kg`, against its own window's `daily_tonnage`. **Assertion 1 stayed green**, which is the half that matters: its window holds no unreadable exercise, so an access defect and an arithmetic defect stay distinguishable |
+| Mutation                    | Assertion               | Failure text                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (a) `left join` → `join`    | **9, and only 9**       | `expected 500 to be close to 680, received difference is 180` — the breakdown short by exactly the hazard set's `3 × 60 kg`, against its own window's `daily_tonnage`. **Assertion 1 stayed green**, which is the half that matters: its window holds no unreadable exercise, so an access defect and an arithmetic defect stay distinguishable               |
 | (b) drop `security_invoker` | 7 (and 9 as collateral) | `expected [] to have a length of 1` — account B received account A's row verbatim: `{exercise_name: "s08-access-legs-…", muscle_group: "legs", tonnage_kg: 500}`. 9 fails too, for the same defect at a second site: with the flag off the view reads the whole catalogue, so B's private exercise becomes attributable and the `Unattributed` row disappears |
-| (c) drop `greatest(…)` | 4 | `expected -160 to be +0` — the same −160 kg S-07's protocol measured, from `60 × 0` plus `8 × −20` |
-| (d) `weight_kg` → `weight` | 3 | `expected 1000 to be close to 726.796185` — the naive sum of the numbers typed, across one kg set and one lb set |
+| (c) drop `greatest(…)`      | 4                       | `expected -160 to be +0` — the same −160 kg S-07's protocol measured, from `60 × 0` plus `8 × −20`                                                                                                                                                                                                                                                            |
+| (d) `weight_kg` → `weight`  | 3                       | `expected 1000 to be close to 726.796185` — the naive sum of the numbers typed, across one kg set and one lb set                                                                                                                                                                                                                                              |
 
 **One process finding, recorded because it nearly cost the run.** Mutations (c) and (d) first
 matched on `greatest(s.weight_kg, 0)` alone. That string appears in the migration's HEADER COMMENT
@@ -808,17 +821,59 @@ the whole statement, and verify what is INSTALLED rather than what was sent.
 
 #### Automated
 
-- [ ] 2.1 `npm test` passes with `tonnage-breakdown.test.ts` and the `apportionedFigures` cases
-- [ ] 2.2 `npm run lint` and `npm run typecheck` pass
-- [ ] 2.3 Mutation (e): a `1000` kg tolerance fails the reconciliation assertion
-- [ ] 2.4 Mutation (f): dropping six-groups-always and dropping `hasSets` each fail their assertion
-- [ ] 2.5 Mutation (h): independent `tonnageFigure` rounding makes three `33.5` rows print `102`
+- [x] 2.1 `npm test` passes with `tonnage-breakdown.test.ts` and the `apportionedFigures` cases
+- [x] 2.2 `npm run lint` and `npm run typecheck` pass
+- [x] 2.3 Mutation (e): a `1000` kg tolerance fails the reconciliation assertion
+- [x] 2.4 Mutation (f): dropping six-groups-always and dropping `hasSets` each fail their assertion
+- [x] 2.5 Mutation (h): independent `tonnageFigure` rounding makes three `33.5` rows print `102`
       against a total of `101`
-- [ ] 2.6 `grep -rn "GROUP_LABELS" src/` shows one definition and its importers
+- [x] 2.6 `grep -rn "GROUP_LABELS" src/` shows one definition and its importers
 
 #### Manual
 
-- [ ] 2.7 `/exercises`, `/records`, `/workouts/[id]` show the same capitalised group names
+- [x] 2.7 `/exercises`, `/records`, `/workouts/[id]` show the same capitalised group names
+
+#### Phase 2 evidence
+
+`npm test`: **240 passed (14 files)**, up from 221 — `tonnage-breakdown.test.ts` contributes 19,
+`tonnage-display.test.ts` gains 7 `apportionedFigures` cases, `exercise.test.ts` gains 2.
+`npm run lint` clean, `npm run typecheck` 0 errors / 0 warnings over 118 files, `npm run test:render`
+**18 passed** — the label rewire touches three of the four call sites the render suite renders and
+moved nothing it asserts on.
+
+`grep -rn "GROUP_LABELS" src/` (criterion 2.6): one definition at
+`src/lib/validation/exercise.ts:78`, four importers (`ExerciseCatalogue.tsx`, `ExercisePicker.tsx`,
+`WorkoutDetail.tsx`, `records.astro`), and the test file. The private `GROUP_LABELS` is gone rather
+than left beside it.
+
+Criterion 2.7, confirmed by the owner on 2026-08-14 in `astro dev`: all four label sites — the
+`/exercises` filter chips and rows, `/records`, the `/workouts/[id]` entry headers and the exercise
+picker inside it — read capitalised. Three of them printed the raw lowercase enum before this phase.
+
+The six-step gate was also run here rather than only at Phase 3, and passed in CI order:
+lint → typecheck → `npm test` 240 → `npm run test:render` 18 → `npm run test:integration`
+**112 passed (13 files)** → `npm run build` complete in 14.12 s.
+
+**The mutation protocol, with the failure TEXT rather than the colour** (`lessons.md`).
+
+| Mutation                                                     | Assertion                                                                                     | Failure text                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (e) `RECONCILIATION_TOLERANCE_KG` → `1000`                   | "refuses a breakdown that does not add up to the total the user can see" and the constant pin | `expected [Function] to throw an error` — 100 kg of rows against a 100.5 kg total sails through; plus `expected 1000 to be 0.001`. **The threshold test stayed green on purpose**: it is written in terms of the constant (half passes, double throws), so it pins the WIRING and is insensitive to the value. The value is pinned by the two assertions that did fail — said here because an untouched test beside two red ones reads as a gap |
+| (f₁) drop the six-groups seeding loop                        | 8 assertions, headed by the shape one                                                         | `expected [ { group: 'legs', …(2) } ] to have a length of 6 but got 1` — an account that trained legs is told nothing about the five groups it did not, which is the whole of FR-019                                                                                                                                                                                                                                                            |
+| (f₂) drop `group.hasSets = true`                             | "marks a group that has rows but no external load as having sets", **and only it**            | `- "hasSets": true` / `+ "hasSets": false` — a week of planks would be told "you did not train it". The blast radius of one is the evidence the two rules are independently pinned                                                                                                                                                                                                                                                              |
+| (h) `apportionedFigures` → independent `tonnageFigure` calls | the `33.5` case and the thousands-separator case                                              | `expected [ '34', '34', '34' ] to deeply equal [ '34', '34', '33' ]` — 102 printed under a total of 101, **the exact arithmetic plan review F1 found**; and `expected [ '8,000', '4,345' ] to deeply equal [ '8,001', '4,345' ]`, the same defect at five digits                                                                                                                                                                                |
+
+**One assertion was rewritten after it failed for the wrong reason**, recorded because it is the
+lesson this repository already carries. The threshold test first asserted the boundary itself —
+`100 + RECONCILIATION_TOLERANCE_KG` must pass — and it went red on unmutated code:
+`off by 0.0010000000000047748`. `100 + 0.001` does not differ from `100` by exactly `0.001` in binary
+floating point, so the assertion was testing IEEE 754 rather than the guard. Rewritten to half and
+double the constant, with the reason in the test body.
+
+**And one shape claim was wrong before the suite corrected it.** The `Unattributed` row was asserted
+to sort last unconditionally; it does not, and should not — it is ranked by tonnage like any other
+row and goes last only on a **tie**. Both facts are now pinned separately (`legs, null, back, …` at
+300 kg against the zeros; `legs, core, null, …` when it ties with `core`, the last of the six).
 
 ### Phase 3: The section on the home screen
 
