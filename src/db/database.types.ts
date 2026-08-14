@@ -183,6 +183,25 @@ export type Database = {
       };
     };
     Views: {
+      daily_exercise_tonnage: {
+        Row: {
+          exercise_id: string | null;
+          exercise_name: string | null;
+          muscle_group: Database["public"]["Enums"]["muscle_group"] | null;
+          performed_on: string | null;
+          tonnage_kg: number | null;
+          user_id: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "exercise_entries_exercise_id_fkey";
+            columns: ["exercise_id"];
+            isOneToOne: false;
+            referencedRelation: "exercises";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       daily_tonnage: {
         Row: {
           performed_on: string | null;

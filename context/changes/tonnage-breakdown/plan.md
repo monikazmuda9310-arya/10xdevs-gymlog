@@ -751,18 +751,58 @@ the next read.
 
 #### Automated
 
-- [ ] 1.1 `npm run db:push` applies to both projects; `npm run db:status` shows one version
-- [ ] 1.2 `npm run db:types` emits the new view under `Views`
-- [ ] 1.3 `npm run lint` and `npm run typecheck` pass
-- [ ] 1.4 `npm run test:integration` passes, twice in a row
-- [ ] 1.5 Mutation (a): `left join` → `join` fails assertion 9 and only 9, sum below its own total
-- [ ] 1.6 Mutation (b): removing `security_invoker` fails assertion 7
-- [ ] 1.7 Mutation (c): removing `greatest(…)` fails assertion 4 with a negative figure
-- [ ] 1.8 Mutation (d): `weight_kg` → `weight` fails assertion 3
+- [x] 1.1 `npm run db:push` applies to both projects; `npm run db:status` shows one version
+- [x] 1.2 `npm run db:types` emits the new view under `Views`
+- [x] 1.3 `npm run lint` and `npm run typecheck` pass
+- [x] 1.4 `npm run test:integration` passes, twice in a row
+- [x] 1.5 Mutation (a): `left join` → `join` fails assertion 9 and only 9, sum below its own total
+- [x] 1.6 Mutation (b): removing `security_invoker` fails assertion 7
+- [x] 1.7 Mutation (c): removing `greatest(…)` fails assertion 4 with a negative figure
+- [x] 1.8 Mutation (d): `weight_kg` → `weight` fails assertion 3
 
 #### Manual
 
-- [ ] 1.9 `npm run db:status` output recorded in Progress
+- [x] 1.9 `npm run db:status` output recorded in Progress
+
+#### Phase 1 evidence
+
+`npm run db:status`, both projects at `20260814090000`:
+
+```
+— gymlog-test —            — gymlog (production) —
+20260810063450             20260810063450
+20260810174840             20260810174840
+20260810180526             20260810180526
+20260811005248             20260811005248
+20260811143000             20260811143000
+20260813150000             20260813150000
+20260814090000             20260814090000
+```
+
+`npm run test:integration`: **112 passed (13 files)**, run twice back to back — 53.8 s then 55.1 s.
+`tonnage-breakdown.test.ts` contributes 9.
+
+**The mutation protocol, with the failure TEXT rather than the colour** (`lessons.md` — "a mutation
+that fails for the wrong reason has confirmed nothing"). Each mutation was applied to `gymlog-test`
+alone, by re-creating the view through the Management API from the real migration file with one
+substitution; production was never addressed. After the last one the view was restored and both
+projects' `md5(pg_get_viewdef(…))` compared: **identical (`0141edc8…`)**, `reloptions
+{security_invoker=true}`, `authenticated` holding `SELECT` only and `anon` zero grants. No drift.
+
+| Mutation | Assertion | Failure text |
+|---|---|---|
+| (a) `left join` → `join` | **9, and only 9** | `expected 500 to be close to 680, received difference is 180` — the breakdown short by exactly the hazard set's `3 × 60 kg`, against its own window's `daily_tonnage`. **Assertion 1 stayed green**, which is the half that matters: its window holds no unreadable exercise, so an access defect and an arithmetic defect stay distinguishable |
+| (b) drop `security_invoker` | 7 (and 9 as collateral) | `expected [] to have a length of 1` — account B received account A's row verbatim: `{exercise_name: "s08-access-legs-…", muscle_group: "legs", tonnage_kg: 500}`. 9 fails too, for the same defect at a second site: with the flag off the view reads the whole catalogue, so B's private exercise becomes attributable and the `Unattributed` row disappears |
+| (c) drop `greatest(…)` | 4 | `expected -160 to be +0` — the same −160 kg S-07's protocol measured, from `60 × 0` plus `8 × −20` |
+| (d) `weight_kg` → `weight` | 3 | `expected 1000 to be close to 726.796185` — the naive sum of the numbers typed, across one kg set and one lb set |
+
+**One process finding, recorded because it nearly cost the run.** Mutations (c) and (d) first
+matched on `greatest(s.weight_kg, 0)` alone. That string appears in the migration's HEADER COMMENT
+before it appears in the SELECT, `String.replace` takes the first match, and the result was an
+**unmutated view that passed 9/9** — a mutation reporting green is the same failure as an assertion
+that cannot fail, wearing the opposite colour. It was caught only because the harness reads
+`pg_get_viewdef` back after every apply and prints whether `GREATEST` survived. Anchor a mutation on
+the whole statement, and verify what is INSTALLED rather than what was sent.
 
 ### Phase 2: The fold, its guards, and one label map
 

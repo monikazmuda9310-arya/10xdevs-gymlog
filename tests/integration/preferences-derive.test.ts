@@ -340,10 +340,20 @@ describe("changing the timezone moves no workout", () => {
     // `personal_records`' date columns, so this assertion would not have noticed it either. The real
     // guard on that rule is the grep over the migration file.
     //
-    // The plausible next author of the edit is **S-08**, widening `daily_tonnage` to derive a week in
-    // SQL. Keeping the name current is the only thing separating a tripwire from decoration
-    // (`context/foundation/lessons.md` — "An assertion you keep because it cannot fail YET must say
-    // so in the same words you'd use to refuse one").
+    // **RE-AIMED 2026-08-14, when S-08 landed.** This comment used to name S-08 as the plausible next
+    // author, on the theory that a breakdown would widen `daily_tonnage` to derive a week in SQL. It
+    // did not: `public.daily_exercise_tonnage` regroups at `(user_id, performed_on, exercise_id)`,
+    // still receives four plain date strings, and its header repeats the same two prohibitions —
+    // no `date_trunc('week', …)`, no reference to `profiles.timezone`. Naming a slice that has since
+    // shipped without making the edit is worse than naming nobody: it reads as covered.
+    //
+    // The plausible author now is **any future screen showing a HISTORICAL week** — a month view, a
+    // trend line, a "same week last year" comparison. Each of those wants many weeks at once, which is
+    // the first requirement that makes deriving the boundary in SQL genuinely tempting rather than
+    // merely possible; the moment one converts `performed_on` through the profile zone to do it, this
+    // assertion bites. Keeping the name current is the only thing separating a tripwire from
+    // decoration (`context/foundation/lessons.md` — "An assertion you keep because it cannot fail YET
+    // must say so in the same words you'd use to refuse one").
     await freshEntry(ownerA, "tz-today", TODAY);
     await freshEntry(ownerA, "tz-newyear", "2026-01-01");
     await freshEntry(ownerA, "tz-leap", "2024-02-29");
