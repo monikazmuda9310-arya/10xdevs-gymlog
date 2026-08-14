@@ -2,6 +2,13 @@
 
 > Append-only register of recurring rules and patterns. Re-read at start by /10x-frame,
 > /10x-research, /10x-plan, /10x-plan-review, /10x-implement, /10x-impl-review.
+>
+> **Planning anything that creates a table or a view: read
+> `context/foundation/access-control.md` first.** It holds the four RLS shapes and the reason each
+> line of them is there. It is not auto-loaded and `AGENTS.md` only summarises it, so this pointer
+> is where a planning skill meets it. The pointer lives in the header rather than in an entry
+> because it is not a lesson — it is a reading instruction, and the register below stays
+> append-only.
 
 ## A slice that ends in a screen needs a deployment phase
 
