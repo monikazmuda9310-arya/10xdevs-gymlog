@@ -6,6 +6,11 @@ GymLog is a training log: the user records workouts (date, exercises, sets of re
 the app derives estimated one-rep max, weekly tonnage, and personal records. Product contract:
 `context/foundation/prd.md`.
 
+**This file holds rules. The measurements and incidents that produced them live in
+`context/foundation/lessons.md`** — read that when you need to know how a rule was proven, or before
+planning work that would change one. Every rule here that a test defends names the test file and the
+assertion number; those pointers are load-bearing and move with the rule.
+
 ## Domain rules that are easy to get wrong
 
 These are not style preferences. Getting any of them wrong produces a number the user will
@@ -15,85 +20,76 @@ without changing the test and saying so.**
 - **1RM estimates are valid for 1–12 repetitions only.** Outside that range, show no estimate —
   never a fabricated one — and exclude the set from record detection. Brzycki (`w × 36 / (37 − r)`)
   divides by zero at 37 reps and goes negative beyond.
-- **At exactly 1 repetition the estimate equals the weight lifted.** Brzycki yields this
-  naturally; Epley (`w × (1 + r/30)`) does not — it returns `1.033 × w` — so Epley must be pinned
-  at `r == 1`.
-- **The 1RM formula has exactly TWO implementations and they must agree.** `estimateOneRepMax` in
+- **At exactly 1 repetition the estimate equals the weight lifted.** Brzycki yields this naturally;
+  Epley (`w × (1 + r/30)`) returns `1.033 × w`, so Epley must be pinned at `r == 1`.
+- **The 1RM formula has exactly TWO implementations and they must agree**: `estimateOneRepMax` in
   `src/lib/services/one-rep-max.ts`, and the `case` expression inside `public.set_estimates`
   (`20260811143000_derive_personal_records_from_surviving_sets.sql`). The SQL copy exists because the
   records list walks every set the account has ever logged, which cannot run in the Worker under the
-  10 ms CPU cap. This is the same hazard as `0.45359237` below and **weaker**, because a constant can
-  be grepped and a `case` expression cannot: assertion 4 of `tests/integration/personal-records.test.ts`
-  is the only thing that would notice them drifting apart. Do not delete it as redundant.
+  10 ms CPU cap. Same hazard as `0.45359237` below and **weaker**, because a constant can be grepped
+  and a `case` expression cannot: assertion 4 of `tests/integration/personal-records.test.ts` is the
+  only thing that would notice them drifting apart. Do not delete it as redundant.
   - **In SQL, `reps::numeric / 30` needs the cast.** `reps` is `smallint`, so `reps / 30` is integer
     division and evaluates to `0` across the entire 1–12 range — Epley silently degenerates to
     `estimate = weight`, with plausible numbers and a green pipeline. Brzycki is safe only by
-    accident, which is worse: the defect would surface only for accounts that switch formula.
-  - **The two formulas cross at exactly 10 repetitions** (`36/27` and `1 + 10/30` are both `4/3`).
-    A set of ten reads identically under either, so it proves nothing about the formula toggle —
-    and it is the first thing to suspect when somebody reports that switching does nothing.
-  - **The view reads the formula PER ROW, from the joined profile** — `coalesce(p.estimation_formula,
-'brzycki')` in `set_estimates`. Nothing anywhere reads a hardcoded formula, which is why S-06
-    could make the column user-settable **with no migration at all**: changing it re-derives every
-    estimate, every record and every impact warning on the next read, with no write and nothing to
-    invalidate. A formula change is a re-derivation, never a data migration. Anyone who "optimises"
-    this by storing an estimate turns it back into one.
-  - **A formula switch can change WHICH SET HOLDS a record, not merely the number on it** — because
-    the two formulas rank differently on either side of ten repetitions. With `100 kg × 5` and
-    `82 kg × 12` logged: Brzycki puts the twelve-rep set first (118.08 vs 112.5) and Epley the
-    five-rep set (116.67 vs 114.80). `tests/integration/preferences-derive.test.ts` assertion 1 pins
-    this, deciding by **`best_estimate_set_id`** rather than by comparing numbers across the SQL/TS
-    boundary. Value parity for both formulas is a different claim and lives in
-    `personal-records.test.ts` assertions 4 and 4b.
+    accident, which is worse: the defect surfaces only for accounts that switch formula.
+  - **The two formulas cross at exactly 10 repetitions** (`36/27` and `1 + 10/30` are both `4/3`), so
+    a set of ten proves nothing about the formula toggle — and is the first thing to suspect when
+    somebody reports that switching does nothing.
+  - **The view reads the formula PER ROW, from the joined profile** —
+    `coalesce(p.estimation_formula, 'brzycki')` in `set_estimates`. Nothing anywhere reads a
+    hardcoded formula, which is why the column became user-settable with no migration at all.
+    **A formula change is a re-derivation, never a data migration.** Anyone who "optimises" this by
+    storing an estimate turns it back into one.
+  - **A formula switch can change WHICH SET HOLDS a record, not merely the number on it**, because
+    the formulas rank differently either side of ten repetitions: with `100 kg × 5` and `82 kg × 12`
+    logged, Brzycki puts the twelve-rep set first and Epley the five-rep set.
+    `tests/integration/preferences-derive.test.ts` assertion 1 pins this, deciding by
+    **`best_estimate_set_id`** rather than by comparing numbers across the SQL/TS boundary. Value
+    parity for both formulas is a different claim: `personal-records.test.ts` assertions 4 and 4b.
 - **Records are derived, never stored as trophies.** A record is always the best _surviving_ set,
-  recomputed when the underlying sets change. A record may therefore go _down_ after an edit or
-  delete, and the user is warned by how much before confirming. Never write a record row that can
-  outlive the set that justifies it.
-  - Since S-04 they are derived by two views — `public.set_estimates` and
-    `public.personal_records` — and **nothing is stored**, which is what keeps S-06's formula change
-    a re-derivation instead of a contradiction. See § Access control → the derived-view variant.
+  recomputed when the underlying sets change — so it may go _down_ after an edit or delete, and the
+  user is warned by how much before confirming. Never write a record row that can outlive the set
+  that justifies it. Two views derive them (`public.set_estimates`, `public.personal_records`) and
+  **nothing is stored**; see the derived-view variant in `context/foundation/access-control.md`.
   - **The two records have different exclusion rules, deliberately** (owner, 2026-08-10). The
     estimate record takes sets of 1–12 repetitions with `weight_kg > 0`; the heaviest-weight record
     takes **every** set with `weight_kg > 0`, at any repetition count, because "heaviest ever
     handled" is a fact about the load rather than an estimate. US-02's "sets outside the range never
     trigger a record" governs the save-time **announcement**, of which there is exactly one, on the
     estimate record.
-  - **A warning about a falling record must therefore cover BOTH rankings, and this is the trap.**
-    The estimate ranking alone is silent on exactly the common case: with `100 kg × 1` (estimate 100)
-    and `90 kg × 10` (estimate 120) logged, the heaviest record belongs to the first set and the
-    estimate record to the second, so deleting the `100 kg × 1` drops a real record while the
-    estimate ranking correctly reports "this set is not the leader". Two rankings, two queries —
-    `bestSurvivingEstimate` and `bestSurvivingHeaviest` in `src/lib/services/records.ts`.
-  - **And "the runner-up" is only the right answer for removing ONE set.** `topTwoEstimatesForExercise`
-    is exact there because exactly one row disappears. Removing an exercise entry takes every set of
-    that exercise in that workout, and deleting a workout can take the leader **and** the runner-up
-    together, after which the record falls to the third-best — which a two-row query cannot see. The
-    shape that answers all three levels is "the best surviving candidate, excluding what is about to
-    disappear": one ordered query, one `.neq(…)`, `.limit(1)`. `set_estimates` carries `set_id`,
-    `exercise_entry_id` and `workout_id`, which is what lets one query serve all three.
-- **A personal record is decided on estimated 1RM**, not raw weight. The heaviest absolute weight
-  is tracked separately as a second, distinct record.
+  - **A warning about a falling record must cover BOTH rankings, and this is the trap.** The estimate
+    ranking alone is silent on the common case: with `100 kg × 1` (estimate 100) and `90 kg × 10`
+    (estimate 120) logged, the heaviest record belongs to the first set and the estimate record to the
+    second, so deleting the `100 kg × 1` drops a real record while the estimate ranking correctly
+    reports "this set is not the leader". Two rankings, two queries — `bestSurvivingEstimate` and
+    `bestSurvivingHeaviest` in `src/lib/services/records.ts`.
+  - **"The runner-up" is only the right answer for removing ONE set.** `topTwoEstimatesForExercise`
+    is exact there because exactly one row disappears; removing an exercise entry or a whole workout
+    can take the leader **and** the runner-up together, after which the record falls to a third-best
+    a two-row query cannot see. The shape that answers all three levels is "the best surviving
+    candidate, excluding what is about to disappear": one ordered query, one `.neq(…)`, `.limit(1)`.
+    `set_estimates` carries `set_id`, `exercise_entry_id` and `workout_id` so one query serves all
+    three.
+- **A personal record is decided on estimated 1RM**, not raw weight. The heaviest absolute weight is
+  tracked separately as a second, distinct record.
 - **A training week is Monday–Sunday in the user's own timezone** (stored on their profile), not
   UTC. A Sunday-evening session belongs to that week.
 - **Zero-weight sets contribute reps but no tonnage. Negative-weight (assisted) sets are excluded
   from 1RM and from record detection**, and contribute zero — never a negative amount — to tonnage.
-  - **Since S-07 that is one SQL term, not two branches**: `sum(s.reps * greatest(s.weight_kg, 0))`
-    in `public.daily_tonnage`. `greatest` implements both halves at once. Removing it makes an
-    assisted set subtract — measured at **−160 kg** by the S-07 mutation protocol, and again by
-    S-08's.
-  - **Since S-08 that term has TWO copies IN MIGRATION FILES and they must agree** — `daily_tonnage`
-    and `daily_exercise_tonnage`. A third instance of the two-implementations hazard this file
-    already documents twice (the 1RM `case` expression, `0.45359237`), and **weaker than both, for
-    two stated reasons**: migration files are append-only and never edited, so nobody edits one live
-    definition out from under the other; and assertion 1 of `tests/integration/tonnage-breakdown.test.ts`
-    compares the two views' figures over the same window directly, so a divergence is a red assertion
-    rather than a reader's catch. **The rule: if the tonnage expression changes, both change in the
-    same migration.** The day something replaces a view rather than adding one, this stops being
-    weaker — the migration header is reachable only from the newer of the two files, which is why the
-    rule is restated here.
-  - **`weight_kg`, never `weight`.** Since S-06 one account can hold both units at once, so summing
-    the number typed produces a figure with no unit and no meaning. Nothing but a reader would catch
-    it: assertion 3 of `tests/integration/weekly-tonnage.test.ts` is that reader.
+  - **That is one SQL term, not two branches**: `sum(s.reps * greatest(s.weight_kg, 0))`. Removing
+    `greatest` makes an assisted set subtract.
+  - **That term has TWO copies IN MIGRATION FILES and they must agree** — `daily_tonnage` and
+    `daily_exercise_tonnage`. **If the tonnage expression changes, both change in the same
+    migration.** Third instance of the two-implementations hazard (after the 1RM `case` expression
+    and `0.45359237`) and the weakest, because migration files are append-only and because
+    assertion 1 of `tests/integration/tonnage-breakdown.test.ts` compares the two views' figures over
+    the same window directly. **The day something replaces a view rather than adding one it stops being
+    weaker** — the migration header is then reachable only from the newer file, which is why the rule
+    is restated here.
+  - **`weight_kg`, never `weight`.** One account can hold both units at once, so summing the number
+    typed produces a figure with no unit and no meaning. Nothing but a reader would catch it:
+    assertion 3 of `tests/integration/weekly-tonnage.test.ts` is that reader.
   - **A week with sets but zero tonnage is not an empty week.** A week of planks has `hasSets: true`
     and `kilograms: 0`, and the screen must say "no external load" rather than "you did not train".
     The figure cannot carry that distinction; `hasSets` does.
@@ -101,66 +97,58 @@ without changing the test and saying so.**
   week is.** `trainingWeeksFor` in `src/lib/services/calendar.ts` is the single definition — pinned
   at both DST transitions, the Sunday boundary, and month and year ends. `public.daily_tonnage` is
   grouped by the raw `performed_on` and receives four date strings. **Never add `date_trunc('week',
-…)` to SQL**: that is a second answer to the same question, the hazard this repository already
-  carries twice (the 1RM `case` expression and `0.45359237`) and documents both times.
+…)` to SQL**: that is a second answer to the same question.
   - **The profile timezone decides what "today" is, and nothing else.** Turning an instant into a
     calendar date needs a zone; reinterpreting a stored `performed_on` through one invents an instant
     that never existed and moves dates by a day at the edges. **No SQL in this repository may
     reference `profiles.timezone`.**
   - **Week arithmetic must not subtract milliseconds.** `Europe/Warsaw` has two DST transitions a
     year, so a week is sometimes 167 or 169 hours. `calendar.ts` works on the `getUTC*` accessors of
-    a zoneless date — which is not "converting through UTC", because there is no zone to convert
-    from; UTC is simply the frame with no DST.
+    a zoneless date — not "converting through UTC", because there is no zone to convert from; UTC is
+    simply the frame with no DST.
   - **A zero or negative load requires the exercise's `is_bodyweight` flag** (FR-014). A plank at 0
-    is honest; a squat at 0 is a typo that would silently zero out a week's tonnage. **This rule
-    cannot be a check constraint** — the answer lives in `exercises.is_bodyweight`, a different
-    table, and copying the flag onto the set would be the snapshot forbidden above. It is therefore
-    enforced in the endpoint, which already loads the entry to verify ownership, and pre-checked by
-    the form through the same `isWeightAllowed` in `src/lib/validation/workout.ts`. One definition,
-    two callers.
+    is honest; a squat at 0 is a typo that would silently zero out a week's tonnage. **This cannot be
+    a check constraint** — the answer lives in `exercises.is_bodyweight`, a different table, and
+    copying the flag onto the set would be the snapshot forbidden above. Enforced in the endpoint,
+    which already loads the entry to verify ownership, and pre-checked by the form through the same
+    `isWeightAllowed` in `src/lib/validation/workout.ts`. One definition, two callers.
 - **Unit round-trip is exact.** A weight entered in lb and read back in lb must be the number the
   user typed. Rounding or conversion must never create or erase a record.
   - **The storage shape is what makes that true, not a precision argument.** `sets` holds `weight`
-    exactly as typed, `weight_unit` as it was typed in, and a **generated** `weight_kg` derived from
-    both. Read `weight` for anything shown back to the user; read `weight_kg` for every comparison
-    and every total. **Never write `weight_kg`** — Postgres refuses a non-DEFAULT value for a
-    generated column, and the generated types cannot express that, so they list it as optional on
-    Insert.
+    exactly as typed, `weight_unit` as typed in, and a **generated** `weight_kg` derived from both.
+    Read `weight` for anything shown back to the user; read `weight_kg` for every comparison and
+    every total. **Never write `weight_kg`** — Postgres refuses a non-DEFAULT value for a generated
+    column, and the generated types cannot express that, so they list it as optional on Insert.
   - **The conversion factor `0.45359237` has exactly two copies IN PRODUCTION CODE and they must
     agree**: the generated column in `20260811005248_create_workout_log_with_row_ownership.sql` and
-    `KG_PER_LB` in `src/lib/services/set-display.ts`. A third, rounder one written elsewhere makes
-    two answers possible for the same set. Convert scalars through `kilogramsIn` and sets through
-    `weightInUnit`, both in that module — never with a literal at a call site.
-    - **Three integration suites restate the constant on purpose and are not copies in this sense**
-      (`preferences-derive`, `weekly-tonnage`, `workout-mutations-rls`). Each is checking the
-      generated column from OUTSIDE, so sharing the production constant would make the check
-      circular. **Say "two in production" rather than a bare count** — this line has been "corrected"
-      to three and then to four by readers grepping the literal, and both corrections were wrong.
+    `KG_PER_LB` in `src/lib/services/set-display.ts`. Convert scalars through `kilogramsIn` and sets
+    through `weightInUnit`, both in that module — never with a literal at a call site.
+    **`preferences-derive`, `weekly-tonnage` and `workout-mutations-rls` restate the constant on
+    purpose and are not copies in this sense**: each checks the generated column from OUTSIDE, so
+    sharing the production constant would make the check circular. **Say "two in production" rather
+    than a bare count** — a bare count invites a reader grepping the literal to "correct" it, and
+    every such correction so far has been wrong.
   - **The stored unit comes from `profiles.weight_unit` on the server, never from a request body.**
     A client that could name the unit could store `100` marked as pounds while the user typed
     kilograms, and every figure derived from `weight_kg` would be wrong afterwards.
-- **Every exercise has exactly one primary muscle group**, so per-group tonnage sums exactly to
-  the week's total. Never invent weighted multi-group splits.
-  - **Under `security_invoker`, a JOIN is a FILTER — and this is the trap S-08 was built around.**
-    The group lives on `public.exercises` and is reachable only by joining, and that table's select
-    policy is `user_id is null or (select auth.uid()) = user_id`. `exercise_entries.exercise_id` is a
-    **single-column** foreign key and is **not** ownership-scoped, foreign-key checks bypass RLS, and
-    `addExerciseEntry` inserts the id it is handed with no visibility check — so a row _can_ exist in
-    which account A's entry points at account B's private exercise. An **inner** join to `exercises`
-    inside `public.daily_exercise_tonnage` therefore drops that set's kilograms from **A's own**
-    breakdown, while `daily_tonnage` still counts them: the breakdown silently stops reconciling with
-    the total printed directly above it, no error anywhere and both figures plausible. The view uses
-    **`left join`**, an unreadable exercise keeps its kilograms as an `Unattributed` row, and
-    **assertion 9 of `tests/integration/tonnage-breakdown.test.ts` constructs that hazard row on
-    purpose** — it is the only thing here that would notice the `left` being "simplified" away.
-    Measured: under mutation it read `expected 500 to be close to 680`, short by exactly the hazard
-    set's `3 × 60 kg`.
+- **Every exercise has exactly one primary muscle group**, so per-group tonnage sums exactly to the
+  week's total. Never invent weighted multi-group splits.
+  - **Under `security_invoker`, a JOIN is a FILTER.** The group lives on `public.exercises`, whose
+    select policy is `user_id is null or (select auth.uid()) = user_id`;
+    `exercise_entries.exercise_id` is a **single-column** foreign key, is **not** ownership-scoped,
+    and foreign-key checks bypass RLS — so a row can exist in which account A's entry points at
+    account B's private exercise. An **inner** join inside `public.daily_exercise_tonnage` would drop
+    that set's kilograms from **A's own** breakdown while `daily_tonnage` still counted them, with no
+    error and both figures plausible. The view uses **`left join`**, and an unreadable exercise keeps
+    its kilograms as an `Unattributed` row. **Assertion 9 of
+    `tests/integration/tonnage-breakdown.test.ts` constructs that hazard row on purpose** — it is the
+    only thing here that would notice the `left` being "simplified" away.
   - **A muscle-group correction is retroactive by construction, and it cannot move the weekly total.**
-    Nothing stores the group — not `sets`, not `exercise_entries` — so changing `exercises.muscle_group`
-    moves historical tonnage **between** buckets on the next read, with no write and nothing to
-    invalidate, and leaves the week's total bit-identical. That is PRD Open Question 2, **resolved by
-    the owner on 2026-08-14**; the rejected alternative was snapshotting the group onto the entry,
-    which would make corrections forward-only and contradict the load-bearing absence
+    Nothing stores the group — not `sets`, not `exercise_entries` — so changing
+    `exercises.muscle_group` moves historical tonnage **between** buckets on the next read, with no
+    write and nothing to invalidate, and leaves the week's total bit-identical. PRD Open Question 2,
+    **resolved by the owner on 2026-08-14**; the rejected alternative was snapshotting the group onto
+    the entry, which would make corrections forward-only and contradict the load-bearing absence
     `20260811005248_create_workout_log_with_row_ownership.sql:71-76` documents. **No edit path exists
     yet** — `PATCH /api/exercises/[id]` is a separate slice.
   - **A breakdown that does not reconcile is not shown at all.** `foldBreakdown`
@@ -175,16 +163,15 @@ without changing the test and saying so.**
     rounded value — was accepted by the **owner on 2026-08-14**, because adding the rows up is the
     only check the user can actually perform. Do not "fix" a row that looks one off.
   - **The groups are exactly six: `legs`, `back`, `chest`, `shoulders`, `arms`, `core`** (owner,
-    2026-08-10). Do not add a seventh without asking — glutes and a biceps/triceps split were
-    both considered and declined. Adding one later is cheap; merging or removing one means
-    re-tagging every exercise and rewriting every historical per-group figure.
+    2026-08-10). Do not add a seventh without asking — glutes and a biceps/triceps split were both
+    considered and declined. Adding one later is cheap; merging or removing one means re-tagging
+    every exercise and rewriting every historical per-group figure.
   - **A multi-joint lift is filed under the group the lifter has in mind when they programme it**,
-    not under its primary anatomical mover. So **deadlift → `back`** (not `legs`), pull-up →
-    `back`, dip → `chest`, overhead press → `shoulders`, squat → `legs`, row → `back`, skull
-    crusher → `arms`. The rule exists because the per-group chart's only job is to show whether a
-    real training week is unbalanced, and people plan in splits: filing the deadlift anatomically
-    makes `back` read as neglected for someone who trains it on pull day. Reasoning and the two
-    rejected alternatives: `context/foundation/prd.md` § Open Questions #1.
+    not under its primary anatomical mover: **deadlift → `back`** (not `legs`), pull-up → `back`,
+    dip → `chest`, overhead press → `shoulders`, squat → `legs`, row → `back`, skull crusher →
+    `arms`. The chart's only job is to show whether a real training week is unbalanced, and people
+    plan in splits: filing the deadlift anatomically makes `back` read as neglected for someone who
+    trains it on pull day. Rejected alternatives: `context/foundation/prd.md` § Open Questions #1.
 
 ## Access control is a hard guardrail
 
@@ -195,204 +182,58 @@ an identifier directly. This is enforced in the database, not only in the UI.
   per-operation, per-role policies. A table without RLS is a defect, not a follow-up.
 - Tests for this must assert against **persisted state**, not just the response status code.
 
-### The table template — copy this, do not improvise
+### The four shapes live in `context/foundation/access-control.md` — read it before writing a migration
 
-Established by `supabase/migrations/20260810063450_create_profiles_with_row_ownership.sql` and
-proven by `tests/integration/profiles-rls.test.ts`. Every data-bearing table copies it, with
-`user_id` in place of `profiles`' `id`:
+**Creating a table, or a view over one, without opening that file is how this guardrail breaks.** It
+carries the SQL to copy and the reason each line is there. They are not interchangeable, and each has
+one thing that bites in silence:
 
-```sql
-alter table public.<t> enable row level security;
+| Shape                            | Use it when                                                                                         | What bites, silently                                                                                                                                                          |
+| -------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The table template**           | every data-bearing table                                                                            | Supabase's implicit `ALL` grant to `anon`/`authenticated` — **revoke before granting**. `UPDATE` needs both `using` and `with check`                                          |
+| **The shared-catalogue variant** | some rows belong to everybody (`public.exercises`)                                                  | only the **select** policy changes; the ordinary owner check is what makes seeded rows unwritable, and that protection is invisible in the policy text                        |
+| **The nested-ownership variant** | the row hangs off another owned row (`exercise_entries`, `sets`)                                    | **the plain template alone is a defect at depth 2** — a policy never looks at the parent. Closed by a composite foreign key, which must be the **only** key between each pair |
+| **The derived-view variant**     | the read is a view (`set_estimates`, `personal_records`, `daily_tonnage`, `daily_exercise_tonnage`) | **without `security_invoker = true` a view executes as its OWNER** and hands every account's training to every account, with no error                                         |
 
--- Supabase grants ALL on new public tables to anon and authenticated by default. Revoke first,
--- then grant exactly what is allowed: an implicit grant is how a delete path or an anonymous
--- read path arrives without anybody deciding on it.
-revoke all on public.<t> from anon, authenticated;
-grant select, insert, update, delete on public.<t> to authenticated;
-
-create policy "<t> are selectable by their owner" on public.<t>
-  for select to authenticated using ((select auth.uid()) = user_id);
-create policy "<t> are insertable by their owner" on public.<t>
-  for insert to authenticated with check ((select auth.uid()) = user_id);
-create policy "<t> are updatable by their owner" on public.<t>
-  for update to authenticated using ((select auth.uid()) = user_id)
-                                with check ((select auth.uid()) = user_id);
-create policy "<t> are deletable by their owner" on public.<t>
-  for delete to authenticated using ((select auth.uid()) = user_id);
-```
-
-- **One policy per operation, each `to authenticated`.** `anon` gets no policy and no grant.
-- **`(select auth.uid())`, never bare `auth.uid()`.** The subselect is evaluated once as an
-  InitPlan instead of once per row. This is required, not stylistic — see § Cloudflare traps.
-- **UPDATE needs both `using` and `with check`.** `using` alone lets a caller rewrite someone
-  else's row onto themselves.
-- **Grant only what the table actually allows.** `profiles` has _no_ delete policy and _no_ delete
-  grant on purpose: deleting it while the account survives leaves a live account with no timezone.
-  Copy the delete pair for tables where deletion is a real operation.
-- **The policy is the guarantee; `.eq("user_id", user.id)` in the query is the index path.** Later
-  tables carry **both**. Without the explicit filter, every read leans on the policy predicate to
-  do the filtering, which on `workouts` and `sets` is a full scan under the 10 ms CPU cap — the
-  exact trap § Cloudflare traps warns about. (`profiles` is the one table where the unfiltered read
-  is honest, because it is a single-row primary-key lookup and the dashboard's demonstration is
-  precisely that RLS returns one row.)
-
-### The shared-catalogue variant — when some rows belong to everybody
-
-`public.exercises` holds two kinds of row in one table: a **seeded catalogue** every signed-in
-account reads and none may write, and **custom rows** private to their owner. The difference is one
-nullable column, and **only the select policy changes**:
-
-```sql
-user_id uuid references auth.users (id) on delete cascade,  -- NULL = seeded, shared
-
-create policy "<t> are selectable when seeded or owned" on public.<t>
-  for select to authenticated
-  using (user_id is null or (select auth.uid()) = user_id);
-```
-
-The insert, update and delete policies stay **exactly** as the template above — and understanding
-why is the point of this section. On a seeded row `user_id` is null, so `(select auth.uid()) =
-user_id` evaluates to `NULL`, not `TRUE`, and **a policy admits a row only on `TRUE`**. The ordinary
-owner check therefore makes the shared rows unwritable by everyone without ever naming them.
-
-- **That protection is invisible in the policy text**, which is what makes it dangerous. Anyone
-  "simplifying" the insert policy with `coalesce(user_id, auth.uid())` or `is not distinct from`
-  hands every account write access to the catalogue every other account reads, and no other test
-  would notice. `tests/integration/exercises-rls.test.ts` assertion 4 exists solely to fail when
-  that happens. **Do not delete it as redundant.**
-- **`unique (user_id, name)` does not work on a nullable owner.** Postgres treats two `NULL`s as
-  distinct, so it would admit two seeded rows with the same name. Use two partial unique indexes —
-  one `where user_id is null`, one `where user_id is not null` — over `lower(name)`, since a name
-  differing only in case is the same exercise to somebody typing on a phone.
-- **Use this variant only when rows are genuinely shared.** `workouts`, `exercise_entries` and
-  `sets` are not: their `user_id` is `not null` and they take the plain template — plus the
-  composite key in the next section, because they hang off each other.
-
-### The nested-ownership variant — when a row hangs off another owned row
-
-**The four-policy template does not protect a nested record, and nothing in the policy text says
-so.** Every policy here reads `(select auth.uid()) = user_id` **on the row in front of it and
-nothing else**. So an account inserting an `exercise_entries` row with **its own** `user_id` and
-**somebody else's** `workout_id` passes the insert policy — the policy never looks at the parent —
-and the result is a row grafted onto another account's workout, invisible to both of them.
-
-That is not theoretical. Replacing the key below with a plain `references workouts (id)` in
-`gymlog-test` let account B attach a row to account A's workout, and **the row persisted**:
-restoring the key failed until it was deleted by hand.
-
-A trigger would close it. A **composite foreign key** closes it declaratively, and is what this
-repository uses:
-
-```sql
--- parent: redundant against the primary key, and present solely as the child's FK target
-unique (id, user_id)
-
--- child: carries its own user_id AND references the parent BY OWNER
-foreign key (workout_id, user_id) references public.workouts (id, user_id) on delete cascade
-```
-
-The graft now looks for a parent row owned by the grafter and does not find one. `sets` does the
-same against `exercise_entries (id, user_id)`. The duplicate index on the parent is the price and it
-is cheap.
-
-- **The composite key must be the ONLY foreign key between each pair of tables.** PostgREST builds
-  its embed from the foreign-key columns and handles composite keys natively, so
-  `select("*, exercise_entries(...)")` resolves with no hint syntax — **but only while exactly one
-  path exists.** A well-meant plain `workout_id references workouts (id)` added later "for clarity"
-  creates a second constraint between the same pair, and every nested read starts failing with
-  `PGRST201`, demanding `exercise_entries!<constraint_name>(…)` at each call site. The migration
-  says so in a comment; no test would catch it before the pages did.
-- **The tripwire is assertion 4 of `tests/integration/workout-log-rls.test.ts`** — account B, using
-  its own `user_id`, attempting to attach an entry to account A's workout. It is the only thing in
-  the repository that would notice a migration "simplifying" the composite key away. **Do not
-  delete it as redundant**, for the same reason as `exercises-rls` assertion 4.
-- **Copy this for every future nested table.** The plain template alone is a defect at depth 2.
-
-### The derived-view variant — when the read is a view rather than a table
-
-`public.set_estimates` and `public.personal_records` (S-04) derive personal records from the sets
-that survive. A view has **no RLS of its own**: it is protected — or not — by which role its
-underlying relations are checked as.
-
-```sql
-create view public.<v> with (security_invoker = true) as select ...;
-
--- Same order as a table: revoke before granting. PostgreSQL's TABLES default privileges cover
--- VIEWS, so Supabase's implicit grant reaches them too.
-revoke all on public.<v> from anon, authenticated;
-grant select on public.<v> to authenticated;
-```
-
-- **Without `security_invoker = true` a view executes as its OWNER.** Migrations run as `postgres`,
-  which owns every table here, and a table owner is not subject to its own RLS. So an unmarked view
-  hands **every account's training to every account**, through a route that reads exactly like the
-  safe ones. There is no error and no warning; the rows simply arrive.
-- **Only `select` is granted.** A view over aggregates is not writable and nothing should imply it is.
-- **The flag is per view and is NOT inherited — and the four views here are not equally protected by
-  it, and that was measured rather than assumed.** Removing it from `set_estimates` leaks
-  immediately and assertion 2 of `tests/integration/personal-records.test.ts` fails. Removing it
-  from `personal_records` alone changes nothing observable, because every row that view emits is
-  drawn through `set_estimates`, whose own flag hands the decision back to the real caller partway
-  down the chain. **No assertion can catch that second case** — `authenticated` has no `pg_class`
-  access through PostgREST. The flag stays anyway: point `personal_records` at `public.sets`
-  directly — an edit somebody will plausibly make "for performance" — and it becomes the only thing
-  standing between one account and another's log. Treat it as a tripwire for a human reviewer.
-  - **`daily_tonnage` (S-07) stands where `set_estimates` does, not where `personal_records` does**,
-    because it reads `sets`, `exercise_entries` and `workouts` **directly**. Its flag is therefore
-    load-bearing and **proven so**: assertion 7 of `tests/integration/weekly-tonnage.test.ts` fails
-    when it is removed, and the S-07 mutation protocol confirmed it — with the flag off, account B
-    read **ten rows of account A's tonnage**. `daily_exercise_tonnage` (S-08) stands in the same
-    place and for the same reason, pinned by assertion 7 of `tests/integration/tonnage-breakdown.test.ts`
-    — with the flag off, account B received A's row verbatim, name and muscle group included. So of
-    the four, three flags are guards and one is a tripwire. **Which kind a new view gets is decided
-    by what it reads, not by where it sits.**
-- **The explicit `.eq("user_id", …)` still belongs on every read of a view**, for the reason it
-  belongs on a table: the policy is the guarantee, the filter is the index path.
-- **Generated types make every view column nullable.** `supabase gen types` cannot prove not-null
-  through a view. Narrow once, in the service (`src/lib/services/records.ts`), so the accident stays
-  out of the endpoints and the pages.
-- **A view is the shape that keeps a derived number from being stored, and that is the point.**
-  There is no record column, no record row and no cache anywhere: delete the set behind a record and
-  the next read simply returns a different one, with no write and nothing to invalidate. So whoever
-  builds editing and deleting **recomputes by re-reading, never by patching a stored figure** — and
-  the warning US-02 requires ("what will this record fall to") is the runner-up of the same ranking
-  `/api/sets` already asks for, not a new number to keep. Adding an `estimated_1rm` or a
-  `personal_records` table would undo this and turn S-06's formula change from a re-derivation into
-  a lie. See § Domain rules → "Records are derived, never stored as trophies".
+- **`(select auth.uid())`, never bare `auth.uid()`.** The subselect is evaluated once as an InitPlan
+  instead of once per row. Required, not stylistic — see § Cloudflare traps.
+- **The policy is the guarantee; `.eq("user_id", user.id)` in the query is the index path.** Every
+  table and every view carries **both**. Without the explicit filter, a read leans on the policy
+  predicate to do the filtering, which on `workouts` and `sets` is a full scan under the 10 ms CPU
+  cap. (`profiles` is the one table where the unfiltered read is honest: a single-row primary-key
+  lookup whose whole demonstration is that RLS returns one row.) This is not a general licence to
+  drop the filter — see the next section for where it is load-bearing and where it is not.
+- **Three assertions carry "do not delete it as redundant"** — `exercises-rls` assertion 4 and
+  `workout-log-rls` assertion 4, both stated in that file, plus `personal-records` assertion 4 in
+  § Domain rules above. Each is the only thing in the repository that would notice one specific
+  "simplification". Do not treat a green suite without them as equivalent.
 
 ### A zero-row UPDATE or DELETE is a SUCCESS — turning it into a 404 is the application's job
 
-RLS filters rows; it does not raise. An `update` or a `delete` naming **another account's** row
-therefore does not error — it matches **zero rows** and reports success, exactly like a delete that
-worked. A handler that answers `204` to that has told one account it just deleted another's data,
-which is both a lie and an existence oracle.
+RLS filters rows; it does not raise. An `update` or a `delete` naming **another account's** row does
+not error — it matches **zero rows** and reports success, exactly like a delete that worked. A
+handler that answers `204` to that has told one account it just deleted another's data: a lie and an
+existence oracle in one.
 
 - **Every mutation `.select()`s what it touched**, and the handler answers `404` when nothing came
   back. `src/lib/services/workouts.ts` returns `null` / `false` for the zero-row case and the six
   routes under `src/pages/api/{sets,workouts,exercise-entries}/[id]/` map that to the resource's own
   message code. The same code answers "absent" and "somebody else's", so neither is distinguishable.
-- **`tests/integration/workout-mutations-rls.test.ts` is what makes this load-bearing**, and it is
-  the first thing in this repository to exercise the twelve update/delete policies S-03 created.
-  Every cross-account attempt is paired with a **read back as the row's owner** — the failure worth
-  catching is a caller told "nothing happened" while the write landed.
-- **Measured, not assumed: dropping `.eq("user_id", …)` from `deleteSet` breaks nothing.** The DELETE
-  policy's own predicate is `(select auth.uid()) = user_id`, read from `pg_policies` rather than
-  believed, so the policy alone matches zero rows for account B. The application filter is the index
-  path, as above — and **no assertion writable from that suite can catch its removal.** The edit that
-  would make it load-bearing is RLS being disabled on `sets`, which `workout-log-rls.test.ts` covers
-  from the other side. Named here rather than papered over (`lessons.md`).
-- **But on `profiles` the same filter IS load-bearing, and for a reason that has nothing to do with
-  RLS.** `updateProfile` carries `.eq("id", userId)`; removing it does not quietly widen the update,
-  it **fails outright with a `500`**, because PostgREST refuses an `UPDATE` with no filter at all.
-  Measured during S-06's mutation protocol. Two consequences worth carrying: the two cases look
-  identical in the code and are not, so "the filter is only the index path" is false as a general
-  claim; and a mutation that fails for the _wrong reason_ has not confirmed the guard — the S-06
-  mutation had to be sharpened to "resolve the row from `supabase.auth.getUser()` instead of
-  `locals.user.id`", which then failed correctly, answering `200` where the suite wanted `404` and
-  writing the caller's payload onto a real account.
+- **`tests/integration/workout-mutations-rls.test.ts` is what makes this load-bearing** — the first
+  thing here to exercise the twelve update/delete policies. Every cross-account attempt is paired
+  with a **read back as the row's owner**: the failure worth catching is a caller told "nothing
+  happened" while the write landed.
+- **"The application filter is only the index path" is FALSE as a general claim.** On `sets`,
+  dropping `.eq("user_id", …)` from `deleteSet` breaks nothing, because the DELETE policy's own
+  predicate already matches zero rows for account B; no assertion writable from that suite can catch
+  its removal, and the edit that would make it load-bearing is RLS being disabled on `sets`, covered
+  from the other side by `workout-log-rls.test.ts`. On `profiles`, `updateProfile`'s
+  `.eq("id", userId)` **is** load-bearing for a reason unrelated to RLS: PostgREST refuses an
+  `UPDATE` with no filter at all, so removing it fails outright with a `500`. Both measured:
+  `lessons.md`.
 - **A malformed `[id]` must never reach a query.** Postgres answers `22P02` for a uuid column handed
-  something that is not one, which surfaces as a `500` for what is really "no such row" — and a 500
-  is a different fact about the system than a 404. `resolve()` in
+  something that is not one, surfacing as a `500` for what is really "no such row" — and a 500 is a
+  different fact about the system than a 404. `resolve()` in
   `src/pages/api/_shared/mutation-route.ts` checks `UUID_PATTERN` first, for all six routes.
 
 ## Commands
@@ -402,18 +243,15 @@ Scripts, local Supabase setup, and deploy steps: @README.md
 The gate, in the order CI runs it: `npm run lint` → `npm run typecheck` → `npm test` →
 `npm run test:render` → `npm run test:integration` → `npm run build`. Run all **six** before claiming
 a change is done — the integration check needs network and the test project's credentials, so it is
-the one that fails first on a fresh clone. `npm run typecheck` is
-`astro check`, which covers `.astro` and `.ts` alike; `npm test` is a single non-interactive
-Vitest run, `npm run test:watch` is the local loop.
+the one that fails first on a fresh clone. `npm run typecheck` is `astro check`, covering `.astro`
+and `.ts` alike; `npm test` is a single non-interactive Vitest run.
 
 **There are three Vitest projects and they cannot see each other's files** — deliberately, by
-include glob: `src/**` for `npm test`, `tests/integration/**`, `tests/render/**`. See § Testing for
-what each is for and why `test:render` needs its own config at all.
+include glob: `src/**` for `npm test`, `tests/integration/**`, `tests/render/**`. See § Testing.
 
 **There is no local database stack and none is wanted.** Every migration and every data-touching
-check runs against a hosted project through `--db-url`. There are **two** projects: `gymlog` is
-production and is what the deployed Worker serves; `gymlog-test` is what CI and the integration
-check write to.
+check runs against a hosted project through `--db-url`. There are **two**: `gymlog` is production and
+is what the deployed Worker serves; `gymlog-test` is what CI and the integration check write to.
 
 | Command                    | What it does                                                            |
 | -------------------------- | ----------------------------------------------------------------------- |
@@ -424,84 +262,75 @@ check write to.
 | `npm run test:render`      | renders pages through Astro's container and asserts on the HTML         |
 
 - **There is deliberately no single-target push.** Advancing one schema and forgetting the other is
-  the only way the two drift, so forgetting is not an available mistake. If the production push
-  fails after the test push succeeded, the wrapper says so by name; the recovery is to fix the
-  cause and re-run `npm run db:push`, which is idempotent per database.
+  the only way the two drift, so forgetting is not an available mistake. If the production push fails
+  after the test push succeeded, the wrapper says so by name; fix the cause and re-run `db:push`,
+  which is idempotent per database.
 - **The dashboard SQL editor is an emergency path only.** It does not write
-  `supabase_migrations.schema_migrations`, so the next `db push` re-applies everything. Recover
-  with `npx supabase migration repair --status applied <version>` **against whichever database it
-  was used on**, then confirm with `npm run db:status`.
+  `supabase_migrations.schema_migrations`, so the next `db push` re-applies everything. Recover with
+  `npx supabase migration repair --status applied <version>` **against whichever database it was used
+  on**, then confirm with `npm run db:status`.
 - **`supabase gen types --db-url` needs a container runtime**, which this machine does not have.
-  `db:types` therefore goes through the Management API with `--project-id`, authenticated by
+  `db:types` goes through the Management API with `--project-id`, authenticated by
   `SUPABASE_ACCESS_TOKEN`. The project ref is derived from `SUPABASE_URL`, so types cannot be
   generated from anything but production.
 - `src/db/database.types.ts` is **generated and exempt from ESLint**. Never hand-edit it — not even
-  to satisfy a lint rule. Change the schema and regenerate.
-- **Since S-04 `db:types` also emits the `Views` block, and every view column comes back `T | null`**
-  — Postgres cannot guarantee not-null through a view and the generator will not guess. That is not
-  a defect to work around with assertions; narrow it once in the service that reads the view.
-
-Two things README does not cover:
-
-- `npx astro sync` — regenerate types. Run it after changing `astro.config.mjs` or any content
-  schema, otherwise type errors will be stale and misleading.
-- Pre-commit (husky + lint-staged) runs `eslint --fix` on `*.{ts,tsx,astro}` and
-  `prettier --write` on `*.{json,css,md}`. A commit that fails lint will not land.
+  to satisfy a lint rule. Change the schema and regenerate. **Every view column comes back
+  `T | null`**, because Postgres cannot guarantee not-null through a view; narrow it once in the
+  service that reads the view, not with assertions.
+- `npx astro sync` regenerates types — run it after changing `astro.config.mjs` or any content
+  schema, or type errors will be stale and misleading. Pre-commit (husky + lint-staged) runs
+  `eslint --fix` on `*.{ts,tsx,astro}` and `prettier --write` on `*.{json,css,md}`; a commit that
+  fails lint will not land.
 
 ## Architecture
 
 Astro 6 SSR + React 19 islands + Tailwind 4 + Supabase auth + shadcn/ui, deployed to Cloudflare.
 
-**Rendering**: `output: "server"` — every page is server-rendered by default. API routes must
-export `const prerender = false`.
+**Rendering**: `output: "server"` — every page is server-rendered by default. API routes must export
+`const prerender = false`.
 
-**Auth wiring** (already built by the starter — read it before adding to it):
+**Auth wiring** (already built by the starter — read it before adding to it). `src/lib/supabase.ts`
+is the SSR client via `@supabase/ssr`, cookie-based sessions, reading `SUPABASE_URL` / `SUPABASE_KEY`
+through `astro:env/server`. Endpoints are `src/pages/api/auth/{signin,signup,signout}.ts`; pages are
+`src/pages/auth/{signin,signup,confirm-email}.astro`.
 
-- `src/lib/supabase.ts` — Supabase SSR client via `@supabase/ssr`, cookie-based sessions. Reads
-  `SUPABASE_URL` / `SUPABASE_KEY` through `astro:env/server` (declared in `astro.config.mjs`
-  under `env.schema`).
-- `src/middleware.ts` — runs on every request, resolves the current user onto
-  `context.locals.user`, and guards **two** lists. `PROTECTED_ROUTES` sends a request with no user
-  to `/auth/signin`; `AUTH_ROUTES` sends a request that _has_ a user away from `/auth/signin` and
-  `/auth/signup` to `/dashboard`. **Route protection lives here in both directions**, never in
-  per-page checks. `/auth/confirm-email` is deliberately in neither list: with confirmation on,
-  `signUp` returns no session, so somebody who has just signed up is not authenticated and the
-  guard would never fire on them — bouncing them off the page that explains what to do next would
+- **Route protection lives in `src/middleware.ts`, in both directions**, never in per-page checks.
+  `PROTECTED_ROUTES` sends a request with no user to `/auth/signin`; `AUTH_ROUTES` sends a request
+  that _has_ a user away from `/auth/signin` and `/auth/signup` to `/dashboard`. The middleware also
+  resolves the current user onto `context.locals.user`. `/auth/confirm-email` is deliberately in
+  **neither** list: with confirmation on, `signUp` returns no session, so somebody who has just
+  signed up is not authenticated, and bouncing them off the page that explains what to do next would
   be actively unhelpful.
-- API endpoints: `src/pages/api/auth/{signin,signup,signout}.ts`. **Every one validates through the
-  shared schema before touching Supabase, and no provider error text ever reaches a response.** They
-  read `context.locals.supabase` — the client the middleware already built — rather than calling
-  `createClient` a second time.
-  - `src/lib/validation/auth.ts` is the single definition of each credential rule
-    (`MIN_PASSWORD_LENGTH`, `MAX_EMAIL_LENGTH`, `MAX_PASSWORD_LENGTH`, `isValidEmail`) **and of
-    `AUTH_MESSAGES`, the catalogue of every sentence an auth screen can show**. It **imports
-    nothing**, on purpose: both auth forms are `client:load` islands, so everything reachable from
-    it is bundled for the browser. Measured — moving the zod schemas into it costs ~59 KB.
-  - **The redirect carries a message CODE, never text.** `?error=sign_in_failed`, resolved by
-    `messageForCode()` on the page. Passing prose through the query string turns every auth page
-    into a phishing kit: `?error=Account+locked.+Call+500-123-456` rendered as a genuine system
-    message on our own domain. Not XSS — React escapes it — which is exactly why it was easy to
-    miss. An unrecognised code resolves to the generic message, never to the visitor's own words.
-  - `src/lib/validation/auth-schemas.ts` builds the zod schemas _from_ those rules and turns
-    `FormData` into a parse result carrying a code. **Server-only.** Nothing hydrated may import it.
-  - `src/lib/validation/auth-errors.ts` maps a Supabase `AuthError` onto one of those codes,
-    matching on `error.code` rather than on its prose (the prose changes between releases; the codes
-    are the contract). Every sign-in _identity_ failure collapses to `sign_in_failed`; rate limiting
-    is reported honestly because Supabase throttles per IP, not per address, so it is not an
-    account-existence oracle. **Validation failures are NOT routed through it** — "password is too
-    short" is caused by the user and must stay specific, or the form becomes unusable.
-  - `src/lib/validation/auth-outcomes.ts` holds `signUpDestination()` — where a _successful_ signup
-    is sent. It is a separate, unit-tested function because the decision is load-bearing and one
-    line long: **it reads `session`, never `user`.** With confirmation on, Supabase returns an
-    obfuscated `user` and no session, so reading `user` sends unconfirmed accounts to `/dashboard`,
-    where the middleware bounces them back — an endless loop on production that a green pipeline
-    cannot see. There is a mutation test pinning exactly that.
+- **Every endpoint validates through the shared schema before touching Supabase, and no provider
+  error text ever reaches a response.** They read `context.locals.supabase` — the client the
+  middleware already built — rather than calling `createClient` a second time.
+- `src/lib/validation/auth.ts` — the single definition of each credential rule
+  (`MIN_PASSWORD_LENGTH`, `MAX_EMAIL_LENGTH`, `MAX_PASSWORD_LENGTH`, `isValidEmail`) **and of
+  `AUTH_MESSAGES`, the catalogue of every sentence an auth screen can show**. It **imports nothing**,
+  on purpose: both auth forms are `client:load` islands, so everything reachable from it ships to the
+  browser.
+- **The redirect carries a message CODE, never text.** `?error=sign_in_failed`, resolved by
+  `messageForCode()` on the page. Passing prose through the query string turns every auth page into a
+  phishing kit — `?error=Account+locked.+Call+500-123-456` rendered as a genuine system message on
+  our own domain. Not XSS (React escapes it), which is why it was easy to miss. An unrecognised code
+  resolves to the generic message, never to the visitor's own words.
+- `src/lib/validation/auth-schemas.ts` builds the zod schemas _from_ those rules and turns `FormData`
+  into a parse result carrying a code. **Server-only.** Nothing hydrated may import it.
+- `src/lib/validation/auth-errors.ts` maps a Supabase `AuthError` onto one of those codes, matching
+  on `error.code` rather than on its prose (the prose changes between releases; the codes are the
+  contract). Every sign-in _identity_ failure collapses to `sign_in_failed`; rate limiting is reported
+  honestly because Supabase throttles per IP, not per address, so it is not an account-existence
+  oracle. **Validation failures are NOT routed through it** — "password is too short" is caused by
+  the user and must stay specific, or the form becomes unusable.
+- `src/lib/validation/auth-outcomes.ts` holds `signUpDestination()`, separate and unit-tested because
+  the decision is load-bearing and one line long: **it reads `session`, never `user`.** With
+  confirmation on, Supabase returns an obfuscated `user` and no session, so reading `user` sends
+  unconfirmed accounts to `/dashboard`, where the middleware bounces them back — an endless loop on
+  production that a green pipeline cannot see. A mutation test pins exactly that.
 - **`signup.ts` branches on whether `signUp` returned a session**, which is the real outcome. Do not
-  reintroduce a config flag, an env var or `import.meta.env.DEV` for this — all three can disagree
-  with what the Supabase project is set to right now, and that is exactly the bug S-01 removed.
-- Pages: `src/pages/auth/{signin,signup,confirm-email}.astro`, `src/pages/dashboard.astro`.
-  `confirm-email.astro` is unconditional: it is reached only when a confirmation email is genuinely
-  on its way.
+  reintroduce a config flag, an env var or `import.meta.env.DEV` — all three can disagree with what
+  the Supabase project is set to right now. `confirm-email.astro` is unconditional: it is reached
+  only when a confirmation email is genuinely on its way.
 
 ## Conventions
 
@@ -512,12 +341,11 @@ export `const prerender = false`.
   `npx shadcn@latest add [name]`.
 - **API routes** export uppercase `GET` / `POST` / `PATCH` / `DELETE`; validate every input with zod.
 - **A large collection is rendered by Astro and slotted into an island, never passed as a prop.**
-  Astro serialises island props into an `<astro-island props="…">` attribute in the HTML, so a prop
-  is a wire, not a reference: S-06's 418-entry timezone list would have shipped ~7 KB of zone names
-  to the browser to be parsed at hydration, for a `<select>` that needs no JavaScript at all.
-  `settings.astro` emits the `<option>` elements and slots the `<select>` into `PreferencesForm`,
-  which reads its value from the form on submit. **A check against `dist/client/` cannot see this
-  mistake** — server-rendered HTML does not live there — which is why the guard is
+  Astro serialises island props into an `<astro-island props="…">` attribute, so a prop is a wire,
+  not a reference. `settings.astro` emits the `<option>` elements for the 418-entry timezone list and
+  slots the `<select>` into `PreferencesForm`, which reads its value from the form on submit — a
+  `<select>` needs no JavaScript at all. **A check against `dist/client/` cannot see this mistake**,
+  because server-rendered HTML does not live there, which is why the guard is
   `tests/render/settings-island.test.ts` instead.
 - **Migrations**: `supabase/migrations/YYYYMMDDHHmmss_short_description.sql`.
 - **React**: no Next.js directives (`"use client"` and friends). Hooks go in
@@ -528,30 +356,27 @@ export `const prerender = false`.
 
 ## Testing
 
-- **Unit tests are the primary defence for the domain rules above.** Cover the boundaries
-  explicitly: 1-rep sets, the 12-rep edge, zero and negative loads, kg↔lb round-trip, week
-  boundaries across timezones.
-- **Unit tests run on Vitest and live beside the code** as `src/**/*.test.ts` (`vitest.config.ts`
-  at the repository root). Import the subject through the `@/` alias, and import `describe` / `it` /
-  `expect` from `"vitest"` — globals are off on purpose.
+- **Unit tests are the primary defence for the domain rules above.** Cover the boundaries explicitly:
+  1-rep sets, the 12-rep edge, zero and negative loads, kg↔lb round-trip, week boundaries across
+  timezones.
+- **Unit tests live beside the code** as `src/**/*.test.ts` (`vitest.config.ts` at the root). Import
+  the subject through the `@/` alias, and import `describe` / `it` / `expect` from `"vitest"` —
+  globals are off on purpose.
 - **`vitest.config.ts` pins `TZ` to `America/New_York`, and both properties of that zone are
-  load-bearing.** `calendar.ts` computes week boundaries in a frame with no zone and no DST, and two
-  different reflexes break it: local-`Date` millisecond arithmetic (caught only where the ambient
-  zone HAS daylight saving) and `getDay()` for `getUTCDay()` (caught only where the ambient offset is
-  NEGATIVE, since only there is midnight-UTC the previous day locally). **CI runners are UTC, so
-  without the pin neither guard bites where it matters** — measured in S-07, where both mutations
-  passed under UTC. The first pin tried was `Europe/Warsaw`, the product's own default, which read as
-  principled and left the second guard inert. That the pinned zone is nobody's real zone is the
-  point: the value under test is supposed to be zone-independent. **The config setting overrides a
-  `TZ` prefix on the command line**, so mutating either guard means editing the config.
+  load-bearing**: `calendar.ts`'s week boundaries are broken by local-`Date` millisecond arithmetic
+  only where the ambient zone HAS daylight saving, and by `getDay()` for `getUTCDay()` only where the
+  ambient offset is NEGATIVE. CI runners are UTC, so without the pin neither guard bites where it
+  matters. That the pinned zone is nobody's real zone is the point: the value under test is supposed
+  to be zone-independent. **The config setting overrides a `TZ` prefix on the command line**, so
+  mutating either guard means editing the config. Measurement: `lessons.md`.
 - **The harness deliberately does not load Astro's Vite pipeline.** Anything under test must not
-  import an `astro:*` virtual module (`astro:env/server` and friends) — it will fail to resolve.
-  That is the guardrail that keeps the domain calculations plain and dependency-free.
+  import an `astro:*` virtual module (`astro:env/server` and friends) — it will fail to resolve. That
+  guardrail is what keeps the domain calculations plain and dependency-free.
 - **Render checks live in `tests/render/`**, under `vitest.render.config.ts`, run by
-  `npm run test:render`. This is the **only** suite that loads Astro's Vite pipeline, and it exists
-  for the one question neither other project can ask: _what does the rendered HTML actually
-  contain?_ It renders a real page through Astro's container with fake `locals` — no server, no
-  session, no network — which is what makes it usable on pages behind `PROTECTED_ROUTES`.
+  `npm run test:render`. The **only** suite that loads Astro's Vite pipeline, and it exists for the
+  one question neither other project can ask: _what does the rendered HTML actually contain?_ It
+  renders a real page through Astro's container with fake `locals` — no server, no session, no
+  network — which is what makes it usable on pages behind `PROTECTED_ROUTES`.
   - **`configFile: false` in that config is not a preference.** Loading `astro.config.mjs` pulls in
     `@astrojs/cloudflare`, which brings `@cloudflare/vite-plugin` and hands Vitest's runner to
     workerd, where it dies with `ReferenceError: exports is not defined` before a test runs. The
@@ -561,39 +386,34 @@ export `const prerender = false`.
     measured in workerd (`src/lib/services/timezones.ts`).
 - **Integration checks that touch stored data live in `tests/integration/`**, under
   `vitest.integration.config.ts`, run by `npm run test:integration` — never by `npm test`, whose
-  include glob is `src/**` so it cannot match them. Keep it that way: a network-dependent test
-  inside `npm test` makes the whole gate flaky and untrustworthy.
+  include glob is `src/**` so it cannot match them. Keep it that way: a network-dependent test inside
+  `npm test` makes the whole gate flaky and untrustworthy.
   - They run against **`gymlog-test` only**, with that project's publishable key. Never a
     `service_role` key — a check that bypasses RLS proves nothing — and never a production
     credential, so the suite is _incapable_ of reaching production rather than merely disinclined.
-  - **Assert against re-read rows.** Every negative assertion is paired with a read back as the
-    row's owner: the failure mode worth catching is a caller told "nothing happened" while the
-    write landed.
+  - **Assert against re-read rows.** Every negative assertion is paired with a read back as the row's
+    owner: the failure mode worth catching is a caller told "nothing happened" while the write landed.
   - **Pick a MARK that is not a prefix of, and not prefixed by, an existing one.** `s03-` is a strict
     prefix of `s03-endpoints-` and `s03-page-`, so `workout-log-rls` deletes two other suites'
-    fixtures. Benign only because `fileParallelism: false` orders them, and a live trap for the next
-    suite.
-  - **Never mutate the column your own cleanup keys on.** S-07's moved-workout assertion PATCHed
-    `note: null` — and `updateWorkoutSchema` is a full replacement, so it cleared the very column
-    `beforeAll` deletes by. The moved row survived every later teardown and poisoned its date window
-    permanently; the orphan had to be deleted by hand. Re-send the mark instead, and prove the suite
-    repeatable by running it twice.
-  - **A suite that filters by DATE RANGE cannot rely on a name prefix at all**, because the range
-    does not care what anything is called. `weekly-tonnage.test.ts` gives every test its own pair of
-    weeks, anchored in a year no other suite writes to, and passes an explicit `now` to get there.
-  - **Fixture discipline**: reset the fixture rows in `beforeAll`, write run-unique values, restore
-    in a `finally`. Shared rows plus an interrupted run is how a suite starts failing for reasons
+    fixtures. Benign only because `fileParallelism: false` orders them, and a live trap.
+  - **Never mutate the column your own cleanup keys on.** A full-replacement PATCH that clears the
+    column `beforeAll` deletes by leaves a row no later teardown can reach. Re-send the mark instead,
+    and prove the suite repeatable by running it twice.
+  - **A suite that filters by DATE RANGE cannot rely on a name prefix at all**, because the range does
+    not care what anything is called. `weekly-tonnage.test.ts` gives every test its own pair of weeks,
+    anchored in a year no other suite writes to, and passes an explicit `now` to get there.
+  - **Fixture discipline**: reset the fixture rows in `beforeAll`, write run-unique values, restore in
+    a `finally`. Shared rows plus an interrupted run is how a suite starts failing for reasons
     unrelated to the code, repairable only by hand-written SQL.
   - **Auth flows are covered in `tests/integration/auth-flows.test.ts`**, which creates its own
-    account per run (`s01-signup-<run>@gymlog-test.dev`) rather than reusing the RLS suite's
-    `rls-owner-a/b` — a signup test must own the account it asserts about. Two of its assertions
-    look redundant and are not:
-    - **"a fresh signup returns a session"** is the tripwire for email confirmation being switched
-      on for the wrong project. It is the only automated signal that would catch it; the other
-      outcome — production left unprotected — is silent.
-    - **"an address with no account is indistinguishable from a wrong password"** compares the
-      provider's `status`, `code` _and_ `message` across both cases. Asserting only that both fail
-      would pass against a real account-existence oracle sitting underneath a neutral message.
+    account per run (`s01-signup-<run>@gymlog-test.dev`) rather than reusing `rls-owner-a/b` — a
+    signup test must own the account it asserts about. Two of its assertions look redundant and are
+    not: **"a fresh signup returns a session"** is the only automated signal that would catch email
+    confirmation being switched on for the wrong project (the other outcome, production left
+    unprotected, is silent); and **"an address with no account is indistinguishable from a wrong
+    password"** compares the provider's `status`, `code` _and_ `message` across both cases, because
+    asserting only that both fail would pass against a real account-existence oracle sitting
+    underneath a neutral message.
 - **E2E locators**: `getByRole` / `getByLabel` / `getByText` first. `getByTestId` only when
   accessibility attributes are genuinely ambiguous. Never CSS selectors, XPath, or DOM structure.
 - **Never `page.waitForTimeout()`.** Wait on state: `toBeVisible()`, `waitForURL()`,
@@ -623,27 +443,25 @@ Node version, secrets and deployment: @README.md. **Never commit a real key** �
   so any step that needs a new key must be handed to the owner or it silently cannot be done.
   `.env.example` is _not_ denied and documents every key with placeholders.
 - **No test-project credential and no database URL ever becomes a Worker secret.** The Worker holds
-  exactly `SUPABASE_URL` and `SUPABASE_KEY`. A running application has no business holding a
-  database password, and no business being able to reach the test project.
+  exactly `SUPABASE_URL` and `SUPABASE_KEY`. A running application has no business holding a database
+  password, and no business being able to reach the test project.
 - Repository secrets are five: the production pair (build-time) plus `SUPABASE_TEST_URL`,
-  `SUPABASE_TEST_KEY` and `GYMLOG_TEST_PASSWORD` for the integration step. **CI never holds a
-  production database credential** — migrations are applied by hand from the machine, deliberately,
-  so no merge can rewrite the schema the owner trains against.
+  `SUPABASE_TEST_KEY` and `GYMLOG_TEST_PASSWORD`. **CI never holds a production database
+  credential** — migrations are applied by hand from the machine, deliberately, so no merge can
+  rewrite the schema the owner trains against.
 - **Supavisor caches credentials after a database password rotation.** For a few minutes the _old_
-  password still works while the _new_ one is rejected (`SQLSTATE 28P01`). Both signals at once
-  look exactly like "the owner did not confirm the reset" and it is not that. Poll every 60 s
-  before concluding anything.
+  password still works while the _new_ one is rejected (`SQLSTATE 28P01`). Both signals at once look
+  exactly like "the owner did not confirm the reset" and it is not that. Poll every 60 s before
+  concluding anything.
 
 ### The two projects differ on email confirmation, deliberately
 
-**`gymlog` has Confirm email ON. `gymlog-test` has it OFF.** This is the concrete return on running
-two projects, and making them uniform in either direction breaks something:
-
-- **Turning it OFF for `gymlog`** lets anybody create an account on an address they do not own —
-  the thing FR-001 and US-04 exist to prevent.
-- **Turning it ON for `gymlog-test`** breaks `npm run test:integration` immediately, because
-  `signUp` stops returning a session and both suites depend on bootstrapping accounts without an
-  inbox. `auth-flows.test.ts`'s first assertion exists to fail loudly the moment this happens.
+**`gymlog` has Confirm email ON. `gymlog-test` has it OFF.** Making them uniform in either direction
+breaks something: OFF for `gymlog` lets anybody create an account on an address they do not own (the
+thing FR-001 and US-04 exist to prevent); ON for `gymlog-test` breaks `npm run test:integration`
+immediately, because `signUp` stops returning a session and both suites depend on bootstrapping
+accounts without an inbox. `auth-flows.test.ts`'s first assertion exists to fail loudly the moment
+that happens.
 
 Read the current state instead of trusting this paragraph — no dashboard needed:
 
@@ -654,15 +472,13 @@ node -e "process.loadEnvFile();const t=process.env.SUPABASE_ACCESS_TOKEN;const r
 `mailer_autoconfirm: false` means confirmation is **on** — the field names the bypass, not the
 feature.
 
-**`site_url` is the trap that no test can see.** It is where Supabase sends a user after they click
-a confirmation link, and it lives in project config, not in this repository. It shipped as
-`http://localhost:3000` — a Next.js port from the starter template, which `astro dev` does not even
-use — and stayed wrong until a human clicked a real link during S-01. The failure is silent in
-exactly the worst way: **the account is confirmed correctly, the database looks right, every test
-passes, and the user sees "site unreachable" and concludes the signup failed.** It is now
+**`site_url` is the trap that no test can see.** It decides where Supabase sends a user after they
+click a confirmation link, it lives in project config rather than in this repository, and getting it
+wrong is silent in the worst way: the account is confirmed correctly, the database looks right, every
+test passes, and the user sees "site unreachable" and concludes the signup failed. It is
 `https://gymlog.10x-astro-starter.workers.dev/auth/signin`, with `uri_allow_list` covering that host
-and `http://localhost:4321/**`. If the deployed URL ever changes, this must change with it, and the
-only way to verify is to click a real link.
+and `http://localhost:4321/**`. **If the deployed URL ever changes, this must change with it, and
+the only way to verify is to click a real link.**
 
 Line endings are LF, pinned by `.gitattributes`. Do not disable this: the machine has
 `core.autocrlf=true`, and without the pin every file checks out as CRLF and prettier fails all
@@ -675,11 +491,10 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
 `wrangler deploy`; `wrangler pages deploy` does not read this config shape.
 
 - **Missing secrets fail silently, not loudly.** `src/lib/supabase.ts` returns `null` when
-  `SUPABASE_URL` / `SUPABASE_KEY` are absent, and `src/middleware.ts` then sets
-  `locals.user = null`. The app builds, deploys, serves 200s, and nobody can sign in. GitHub
-  repository secrets are **build-time only** — the Worker needs its own
-  `wrangler secret put`. No pipeline can catch this; check it by signing in against the
-  deployed URL.
+  `SUPABASE_URL` / `SUPABASE_KEY` are absent, and `src/middleware.ts` then sets `locals.user = null`.
+  The app builds, deploys, serves 200s, and nobody can sign in. GitHub repository secrets are
+  **build-time only** — the Worker needs its own `wrangler secret put`. No pipeline can catch this;
+  check it by signing in against the deployed URL.
 - **`astro dev` already runs the real workerd runtime** (adapter v13 bundles
   `@cloudflare/vite-plugin`). Do not add a `wrangler dev` step — it is legacy for this stack, and
   `platformProxy` was removed.
@@ -689,112 +504,91 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
     the database the owner trains against. Verify write paths by calling the exported handlers from
     an integration suite instead (`tests/integration/workout-endpoints.test.ts` is the pattern);
     reserve the dev server for read-only probes and for a human clicking through.
-- Adapter v13 also removed `Astro.locals.runtime` and `cloudflareModules`, and flipped
-  `imageService` to default `cloudflare-binding`. Guidance written for v12 or earlier is wrong.
+- Adapter v13 also removed `Astro.locals.runtime` and `cloudflareModules`, and flipped `imageService`
+  to default `cloudflare-binding`. Guidance written for v12 or earlier is wrong.
 - **The Workers Free plan caps CPU at 10 ms per invocation** — a hard kill (Error 1102), not a
-  throttle. Weekly tonnage and per-muscle-group rollups must be aggregated in Postgres, not
-  looped over every set inside the Worker. Doing it in the Worker passes in week one and fails
-  once the log grows.
+  throttle. Weekly tonnage and per-muscle-group rollups must be aggregated in Postgres, not looped
+  over every set inside the Worker. Doing it in the Worker passes in week one and fails once the log
+  grows.
 
 ## Known state
 
+Routes, endpoints and payload shapes are documented in @README.md; this section carries only what a
+reader could not infer from there.
+
 - **Astro is held at 6.x.** Astro 7 resolves the four outstanding `npm audit` advisories but its
-  build fails against the Cloudflare adapter (`Could not find the prerender entry point`),
-  reproduced on 7.1.6 and 7.2.0. Do not "helpfully" bump it; see
-  `context/changes/bootstrap-verification/verification.md` for the full record.
-- CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit tests, **the render check**, the
-  integration check (against `gymlog-test`) and build, in that order, on every push and PR to
-  `main`. It carries a `concurrency` group so two runs cannot race the shared fixture rows. The
-  browser test is not wired yet.
-- **Five tables exist.**
-  - `public.profiles` — one row per account, created by a trigger on `auth.users` and backfilled.
-  - `public.exercises` — the catalogue: **38 seeded rows** with `user_id is null`, readable by every
-    account and writable by none, plus custom rows private to their owner (see § Access control →
-    the shared-catalogue variant).
-  - `public.workouts` → `public.exercise_entries` → `public.sets` — the training record, three
-    levels deep, added by S-03. Every one carries its own `user_id` **and** a composite foreign key
-    to its parent's `(id, user_id)` (see § Access control → the nested-ownership variant).
-    `performed_on` is a `date` the user states, not an instant; `exercise_id` carries
-    `on delete restrict`, so **an exercise with logged history can no longer be deleted at all** —
-    whoever builds catalogue editing will meet that.
-  - Reachable at `/workouts` and `/workouts/[id]`, written through `/api/workouts`,
-    `/api/exercise-entries` and `/api/sets`.
-  - **Corrected through six more routes, added by S-05**: `PATCH`/`DELETE` on
-    `/api/sets/[id]` and `/api/workouts/[id]`, `DELETE` on `/api/exercise-entries/[id]`, and a
-    `GET …/impact` preflight beside each of the three, answering `{ impact: FallingRecord[] }` — what
-    the confirmation dialog needs before an irreversible action (US-02). The three S-03 `POST`
-    endpoints are untouched; the shared preamble is `src/pages/api/_shared/mutation-route.ts`. See
-    § Access control → "A zero-row UPDATE or DELETE is a SUCCESS".
-    - **A failed impact read answers a non-2xx `impact_unavailable`, never `{ impact: [] }`.** An
-      empty list is a positive claim — "no record is at stake" — and the screen renders it as
-      reassurance. This is the **opposite** of the rule `/api/sets` follows for the save-time badge,
-      and deliberately: there the verdict decorated a write that had already committed, so losing it
-      cost nothing; here the preflight **is** the guarantee US-02 asks for. The action stays
-      available and the dialog says the consequence is unknown.
-    - **The update payload carries no `weight_unit` and no `weight_kg`.** The unit belongs to the
-      row, not to the account editing it: re-stamping it from the profile would turn 100 lb into
-      100 kg the first time somebody fixed a typo after S-06 let them switch, silently corrupting
-      every figure derived from `weight_kg`.
-- **Four views. Two added by S-04** — the first database objects here that are not tables.
-  `public.set_estimates` is one row per set with its estimated 1RM under the row owner's own
-  formula; `public.personal_records` is one row per exercise the account has logged, with the best
-  estimate and the heaviest weight, each backed by the set that still holds it. Both
-  `security_invoker = true` (see § Access control → the derived-view variant), both read-only, and
-  **neither stores anything**. Read at `/records` and by `/api/sets`, which returns the record
-  verdict beside the set it just saved. An exercise logged only at zero load still gets a row, with
-  both records null, so the screen can say why rather than omitting a lift the user logged.
-- **`public.daily_tonnage`, added by S-07** — one row per account per day with that day's tonnage,
-  `sum(reps * greatest(weight_kg, 0))`. **It emits no row for a day with no sets**, so the zero a
-  screen shows for an empty week is synthesised in `src/lib/services/tonnage.ts` and must never be
-  produced by a failed read — that read throws instead, and `/dashboard` catches it in the
-  frontmatter and shows its failure sentence with no figure at all. Read only by `/dashboard`.
-  - **The Worker folds at most 14 rows and that is not a violation of "aggregate in Postgres".** The
-    rule exists because work proportional to the number of SETS grows without bound under the 10 ms
-    CPU cap; folding two weeks of daily totals is work proportional to the number of DAYS, which is
-    constant. The per-set arithmetic stays in SQL. The service header says this, and the service
-    throws rather than silently folding a wider window.
-- **`public.daily_exercise_tonnage`, added by S-08** — the same sum one grain finer, at
-  `(user_id, performed_on, exercise_id)`, carrying the exercise's name and muscle group **joined at
-  read time** so neither is ever stored. Read only by `/dashboard`, through `weeklyBreakdown` in
-  `tonnage.ts` and `foldBreakdown` in `tonnage-breakdown.ts`. Its `security_invoker` flag is a
-  **guard, not a tripwire** — it reads `sets`, `exercise_entries`, `workouts` and `exercises`
-  directly, so it stands where `daily_tonnage` and `set_estimates` stand; with the flag off, account
-  B read account A's row verbatim, and assertion 7 of the S-08 suite fails.
-  - **The bound is no longer a constant, so it is asserted rather than assumed.** A week at this
-    grain is `days × distinct exercises per day` rows, bounded by training habit; `MAX_BREAKDOWN_ROWS`
-    (`7 * 30`) throws above that. **A throw, never a `.limit()`** — a limit is a silent truncation,
-    and here it would be worse, because a truncated breakdown fails its own reconciliation guard and
-    gets blamed on the arithmetic.
-  - **The range predicate descends to `workouts_user_performed_on_idx` only while the filter is on
-    GROUP BY columns.** `(user_id, performed_on, exercise_id)` keeps that property; grouping by
-    `(user_id, exercise_id)` and filtering by a date range would not. That is a property of this
-    grain, not a general one.
-- **Three enums**: `weight_unit`, `estimation_formula`, and `muscle_group` — the last with exactly
-  six values, pinned in both directions by `MUSCLE_GROUPS` in `src/types.ts` and a compile-time
-  assertion. Add a seventh to the database without adding it there and the build fails, rather than
-  the group existing in storage and silently missing from every filter on screen.
-  - **All three now have that pinning**, not just `muscle_group`: S-06 added `WEIGHT_UNITS` and
-    `ESTIMATION_FORMULAS` beside it, because the settings form has to iterate both. Each carries its
-    own `Assert<MutuallyAssignable<…>>`, and both were mutated to confirm they fail
-    (`ts(2344) Type 'false' does not satisfy the constraint 'true'`). `WEIGHT_UNIT_LABELS` and
-    `ESTIMATION_FORMULA_LABELS` in `src/lib/validation/profile.ts` are typed as `Record` over the
-    enum for the same reason one step further on: a new value cannot reach the screen unnamed.
-- **The account's three preferences are settable, added by S-06 — with no migration.** F-03 created
-  the columns, the grant and the update policy; S-04's view already read the formula per row. The
-  slice is a screen, an endpoint, and the branches those two make reachable.
-  - `/settings` and `PATCH /api/profile`, which replaces all three at once. **A partial patch is
-    refused on purpose**: "absent" and "explicitly set" are indistinguishable in JSON, so one Save
-    sends every value the user was looking at.
+  build fails against the Cloudflare adapter (`Could not find the prerender entry point`), reproduced
+  on 7.1.6 and 7.2.0. Do not "helpfully" bump it; full record in
+  `context/changes/bootstrap-verification/verification.md`.
+- CI (`.github/workflows/ci.yml`) runs the six gate steps in order on every push and PR to `main`,
+  with a `concurrency` group so two runs cannot race the shared fixture rows. The browser test is not
+  wired yet.
+- **Five tables.** `public.profiles` (one row per account, created by a trigger on `auth.users` and
+  backfilled); `public.exercises` (the catalogue — **38 seeded rows** with `user_id is null` plus
+  custom rows private to their owner, § shared-catalogue variant in `context/foundation/access-control.md`); and `public.workouts` →
+  `public.exercise_entries` → `public.sets`, three levels deep, each carrying its own `user_id`
+  **and** a composite foreign key to its parent's `(id, user_id)` (§ nested-ownership variant, same file).
+  - `performed_on` is a `date` the user states, not an instant.
+  - `exercise_id` carries `on delete restrict`, so **an exercise with logged history can no longer be
+    deleted at all** — whoever builds catalogue editing will meet that.
+  - **A failed impact read answers a non-2xx `impact_unavailable`, never `{ impact: [] }`.** An empty
+    list is a positive claim — "no record is at stake" — and the screen renders it as reassurance.
+    The **opposite** of the rule `/api/sets` follows for the save-time badge, and deliberately: there
+    the verdict decorated a write that had already committed, so losing it cost nothing; here the
+    preflight **is** the guarantee US-02 asks for. The action stays available and the dialog says the
+    consequence is unknown.
+  - **The update payload carries no `weight_unit` and no `weight_kg`.** The unit belongs to the row,
+    not to the account editing it: re-stamping it from the profile would turn 100 lb into 100 kg the
+    first time somebody fixed a typo after the unit became switchable.
+- **Four views, all `security_invoker = true`, all read-only, none storing anything** (§ derived-view
+  variant in `context/foundation/access-control.md`).
+  - `public.set_estimates` — one row per set with its estimated 1RM under the row owner's own
+    formula. `public.personal_records` — one row per exercise the account has logged, with the best
+    estimate and the heaviest weight, each backed by the set that still holds it. Read at `/records`
+    and by `/api/sets`. An exercise logged only at zero load still gets a row with both records null,
+    so the screen can say why rather than omitting a lift the user logged.
+  - `public.daily_tonnage` — one row per account per day, `sum(reps * greatest(weight_kg, 0))`. **It
+    emits no row for a day with no sets**, so the zero a screen shows for an empty week is
+    synthesised in `src/lib/services/tonnage.ts` and must never be produced by a failed read — that
+    read throws instead, and `/dashboard` catches it and shows its failure sentence with no figure at
+    all. **The Worker folds at most 14 rows, and that is not a violation of "aggregate in
+    Postgres"**: the rule exists because work proportional to the number of SETS is unbounded, and
+    folding daily totals is work proportional to DAYS. The service throws rather than folding a wider
+    window.
+  - `public.daily_exercise_tonnage` — the same sum at `(user_id, performed_on, exercise_id)`,
+    carrying the exercise's name and muscle group **joined at read time** so neither is ever stored.
+    Read only by `/dashboard`, through `weeklyBreakdown` in `tonnage.ts` and `foldBreakdown` in
+    `tonnage-breakdown.ts`.
+    - **The bound is no longer a constant, so it is asserted rather than assumed.** A week at this
+      grain is `days × distinct exercises per day` rows; `MAX_BREAKDOWN_ROWS` (`7 * 30`) throws above
+      that. **A throw, never a `.limit()`** — a limit is a silent truncation, and here it would fail
+      the reconciliation guard and get blamed on the arithmetic. The read asks for
+      `MAX_BREAKDOWN_ROWS + 1` rows, so the refusal costs no unbounded transfer.
+    - **The range predicate descends to `workouts_user_performed_on_idx` only while the filter is on
+      GROUP BY columns.** `(user_id, performed_on, exercise_id)` keeps that property; grouping by
+      `(user_id, exercise_id)` and filtering by a date range would not. A property of this grain, not
+      a general one.
+- **Three enums**: `weight_unit`, `estimation_formula`, `muscle_group` (exactly six values). **All
+  three are pinned in both directions** by `MUSCLE_GROUPS`, `WEIGHT_UNITS` and `ESTIMATION_FORMULAS`
+  in `src/types.ts`, each carrying its own `Assert<MutuallyAssignable<…>>`. Add a value to the
+  database without adding it there and the build fails, rather than the value existing in storage and
+  silently missing from every filter on screen. `WEIGHT_UNIT_LABELS` and `ESTIMATION_FORMULA_LABELS`
+  in `src/lib/validation/profile.ts` are typed as `Record` over the enum for the same reason one step
+  further on: a new value cannot reach the screen unnamed.
+- **The account's three preferences are settable, and needed no migration** — the columns, the grant
+  and the update policy already existed, and the view already read the formula per row.
+  - `PATCH /api/profile` replaces all three at once. **A partial patch is refused on purpose**:
+    "absent" and "explicitly set" are indistinguishable in JSON, so one Save sends every value the
+    user was looking at.
   - **Nothing stored is converted, ever.** Changing `weight_unit` changes what NEW sets are stamped
     with; every set already logged keeps the unit it was typed in, and **editing one must not
     re-stamp it** — `updateSet` takes no unit, and `preferences-derive.test.ts` assertion 2 fails if
     it ever does. Changing `estimation_formula` re-derives. Changing `timezone` moves no
     `performed_on`, because that column is a calendar date the user stated rather than an instant.
-  - **`Intl.supportedValuesOf("timeZone")` is available in workerd and answers 418 zones**
-    (measured through `astro dev`, which runs the real runtime; `hasWarsaw`, `hasKiritimati`, 6825
-    bytes of joined names). `src/lib/services/timezones.ts` is the single source the `<select>` and
-    the validator both read — if they came from two places the form could offer a value the server
-    then refused. Its small hardcoded fallback is a **tripwire, not a supported mode**.
+  - **`Intl.supportedValuesOf("timeZone")` is available in workerd and answers 418 zones.**
+    `src/lib/services/timezones.ts` is the single source the `<select>` and the validator both read —
+    if they came from two places the form could offer a value the server then refused. Its small
+    hardcoded fallback is a **tripwire, not a supported mode**.
   - **An unknown timezone is refused server-side**, by membership rather than by shape. `todayIn`
     catches the `RangeError` a bad zone raises and answers in UTC (`calendar.ts:29`), deliberately —
     so `Europe/Warsawa` would produce a wrong week boundary with nothing on screen saying so. That

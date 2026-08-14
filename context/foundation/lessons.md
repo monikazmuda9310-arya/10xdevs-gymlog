@@ -339,3 +339,126 @@
   environment-independent.
 - **Applies to**: timezones, locales, filesystem case-sensitivity, line endings, and any other
   ambient setting that differs between a developer's machine and CI.
+
+## Measurement record — the evidence behind the rules in `AGENTS.md`
+
+> **These entries are not rules and must not be read as ones.** They are the measurements and
+> incidents that made the rules in `AGENTS.md` believable, moved here on 2026-08-14 so that file
+> could hold rules alone (it is auto-loaded every session; this one is not). Each entry names the
+> rule it backs. **The rule is the thing to follow — read these when you need to know how it was
+> proven, or before planning work that would change it.** Nothing here was edited in substance;
+> nothing here is a new decision.
+
+### Tonnage: what removing `greatest(weight_kg, 0)` costs
+
+- **Backs**: `AGENTS.md` § Domain rules → "Zero-weight sets contribute reps but no tonnage".
+- **Measured**: under the S-07 mutation protocol, dropping `greatest` made an assisted set subtract
+  rather than contribute zero, at **−160 kg** over the fixture window. S-08's protocol reproduced
+  the same figure against `daily_exercise_tonnage`.
+
+### The conversion constant has been miscounted twice, in the same direction
+
+- **Backs**: `AGENTS.md` § Domain rules → the `0.45359237` bullet, and its instruction to say "two
+  in production" rather than a bare count.
+- **Incident**: the sentence stating how many copies of `0.45359237` exist has been "corrected" to
+  three, and later to four, by readers who grepped the literal and counted the hits. **Both
+  corrections were wrong**: `preferences-derive`, `weekly-tonnage` and `workout-mutations-rls`
+  restate the constant on purpose, because each checks the generated column from OUTSIDE and sharing
+  the production constant would make the check circular. A bare count invites exactly this edit,
+  which is why the rule names the category rather than the number alone.
+
+### The graft is real: a plain foreign key let account B attach a row to account A's workout
+
+- **Backs**: `context/foundation/access-control.md` § the nested-ownership variant.
+- **Measured**: replacing the composite key with a plain `references workouts (id)` in
+  `gymlog-test`, account B inserted an `exercise_entries` row carrying its **own** `user_id` and
+  account A's `workout_id`. The insert passed the policy — which never looks at the parent — and
+  **the row persisted**. Restoring the composite key then failed, because the orphan violated it;
+  the row had to be deleted by hand before the migration would apply.
+- **Why it matters to a planner**: the four-policy template reads as complete and is a defect at
+  depth 2. The tripwire that would notice the key being "simplified" away is assertion 4 of
+  `tests/integration/workout-log-rls.test.ts`.
+
+### `security_invoker`: which of the four flags leak, measured one at a time
+
+- **Backs**: `context/foundation/access-control.md` § the derived-view variant ("three flags are guards and
+  one is a tripwire").
+- **Measured**, each by removing the flag from one view alone:
+  - `set_estimates` — leaks immediately; assertion 2 of `tests/integration/personal-records.test.ts`
+    fails.
+  - `daily_tonnage` — with the flag off, account B read **ten rows of account A's tonnage**;
+    assertion 7 of `tests/integration/weekly-tonnage.test.ts` fails.
+  - `daily_exercise_tonnage` — with the flag off, account B received A's row **verbatim, exercise
+    name and muscle group included**; assertion 7 of `tests/integration/tonnage-breakdown.test.ts`
+    fails.
+  - `personal_records` — **nothing observable changes**, because every row it emits is drawn through
+    `set_estimates`, whose own flag hands the permission decision back to the real caller partway
+    down the chain. No assertion writable from the integration suite can catch it: `authenticated`
+    has no `pg_class` access through PostgREST. See also "When a mutation does not break anything,
+    fix the claim — never the test" above.
+
+### The application filter is the index path on `sets` and load-bearing on `profiles`
+
+- **Backs**: `AGENTS.md` § Access control → "A zero-row UPDATE or DELETE is a SUCCESS", the bullet
+  refusing "the application filter is only the index path" as a general claim.
+- **Measured on `sets`**: dropping `.eq("user_id", …)` from `deleteSet` breaks **nothing**. The
+  DELETE policy's own predicate is `(select auth.uid()) = user_id` — read from `pg_policies` rather
+  than believed — so the policy alone matches zero rows for account B. No assertion writable from
+  `workout-mutations-rls.test.ts` can catch the removal. The edit that would make it load-bearing is
+  RLS being disabled on `sets`, which `workout-log-rls.test.ts` covers from the other side. Named
+  rather than papered over.
+- **Measured on `profiles`**: removing `.eq("id", userId)` from `updateProfile` does **not** quietly
+  widen the update — it fails outright with a `500`, because PostgREST refuses an `UPDATE` carrying
+  no filter at all. The two cases look identical in the code and are not. This is also the origin of
+  "A mutation that fails for the WRONG REASON has not confirmed the guard" above.
+
+### Two island-size measurements that decided a shape
+
+- **Backs**: `AGENTS.md` § Architecture → `src/lib/validation/auth.ts` "imports nothing", and
+  § Conventions → "A large collection is rendered by Astro and slotted into an island".
+- **Measured**: moving the zod schemas into `auth.ts` costs **~59 KB** in the browser bundle, because
+  both auth forms are `client:load` islands and everything reachable from that module ships with
+  them. Separately, passing S-06's 418-entry timezone list as an island prop would have serialised
+  **~7 KB** of zone names into the `<astro-island props="…">` attribute, to be parsed at hydration,
+  for a `<select>` that needs no JavaScript at all.
+- **Why the guard is a render check**: server-rendered HTML does not live in `dist/client/`, so a
+  bundle check cannot see the island-prop mistake at all. `tests/render/settings-island.test.ts` is
+  the only thing that would.
+
+### A full-replacement PATCH cleared the column its own suite cleaned up by
+
+- **Backs**: `AGENTS.md` § Testing → "Never mutate the column your own cleanup keys on".
+- **Incident**: S-07's moved-workout assertion PATCHed `note: null`. `updateWorkoutSchema` is a full
+  replacement, so the write cleared the very `note` column `beforeAll` deletes fixtures by. The moved
+  row survived every later teardown and **poisoned its date window permanently**; the orphan had to
+  be deleted by hand. The fix is to re-send the mark instead of clearing it, and to prove the suite
+  repeatable by running it twice.
+
+### `site_url` shipped wrong and no test could see it
+
+- **Backs**: `AGENTS.md` § Environment → "`site_url` is the trap that no test can see".
+- **Incident**: the value shipped as `http://localhost:3000` — a Next.js port inherited from the
+  starter template, which `astro dev` does not even use — and stayed wrong until a human clicked a
+  real confirmation link during S-01. The failure is silent in exactly the worst way: the account is
+  confirmed correctly, the database looks right, every test passes, and the user sees "site
+  unreachable" and concludes the signup failed. It lives in Supabase project config, not in this
+  repository, so nothing in the gate can reach it.
+
+### Two runtime facts measured in workerd rather than assumed
+
+- **Backs**: `AGENTS.md` § Known state → the timezone bullet, and § Testing → "do not assert anything
+  runtime-specific" in the render config.
+- **Measured through `astro dev`**, which runs the real workerd runtime:
+  `Intl.supportedValuesOf("timeZone")` **is** available and answers **418 zones** — `hasWarsaw` and
+  `hasKiritimati` both true, **6825 bytes** of joined names. Whether workerd has full ICU is exactly
+  the kind of question the render suite cannot answer, because `configFile: false` drops the
+  Cloudflare adapter.
+
+### The three enum assertions were mutated to confirm they fail
+
+- **Backs**: `AGENTS.md` § Known state → "Three enums … pinned in both directions".
+- **Measured**: `MUSCLE_GROUPS` already had its `Assert<MutuallyAssignable<…>>`; S-06 added
+  `WEIGHT_UNITS` and `ESTIMATION_FORMULAS` beside it and mutated **both** to confirm the build
+  breaks — `ts(2344) Type 'false' does not satisfy the constraint 'true'`. This is the same discipline
+  as "A guard you have not mutated may not guard" above, applied at the type level, where F-03's
+  first attempt had resolved to `never` and silently passed.
