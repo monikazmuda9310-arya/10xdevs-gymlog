@@ -89,8 +89,9 @@ provably ends read access. Verified by a new suite that fails when the trigger i
 - **Not handling the deletion failure path.** A blocked cascade answering honestly belongs to
   `account-deletion`; this slice owns whether the blocking row can exist. Stated once, in both
   `change.md` files, because `lessons.md` records what happens when a handover merges two decisions.
-- **Not deploying.** Production is served from `main`; both branches carry a migration, so `db:push`
-  and `wrangler deploy` run once after both PRs merge.
+- **Not deploying the application.** `npx wrangler deploy` runs once, after both PRs merge, because
+  production is served from `main` and the user must never get code from an unmerged branch.
+  **`npm run db:push` is a different thing and runs normally, in Phase 1** — see below.
 - **No E2E.** Phase 3 of the course owns the browser level.
 
 ## Implementation Approach
@@ -138,6 +139,18 @@ assuming zero.
 **The trigger only guards `authenticated`.** `postgres` and `service_role` bypass RLS, so the
 visibility check admits anything on those paths. Say so in the migration header: it is the same
 asymmetry that makes the guard below unrecoverable by re-seeding the hazard row from a test.
+
+**"Deployment" means two different things here, and conflating them produced a contradiction in the
+first draft of this plan.** The schema and the application move on different schedules:
+
+- **`npm run db:push` runs in Phase 1, and reaches production.** There is deliberately no
+  single-target push — advancing one schema and forgetting the other is the only way the two drift, so
+  forgetting is not an available mistake. Working around the wrapper to touch `gymlog-test` alone would
+  break the guarantee that rule exists to provide, which is a worse trade than an additive trigger
+  arriving on production early. The migration adds a function and a trigger and changes no data; it
+  cannot affect a row already stored, and no application code reaches it until the Worker is deployed.
+- **`npx wrangler deploy` waits for both PRs to merge.** That is where the owner's decision binds, and
+  it is the half that a user could actually observe.
 
 ---
 
@@ -409,9 +422,10 @@ wants a solo review first.
 
 ## Post-merge (shared with `account-deletion`, owned by neither alone)
 
-`npm run db:push` for both migrations, then `npx wrangler deploy`, then confirm on the public URL.
-Runs once, after both PRs merge, because `db:push` advances production and each branch carries its own
-migration. Recorded here and in `account-deletion`'s plan identically.
+`npx wrangler deploy`, then confirm on the public URL. Runs once, after both PRs merge. The schema is
+**already** on both projects by then — each slice pushes its own migration in its own Phase 1, per
+§ Critical Implementation Details — so this step is the application only. Recorded here and in
+`account-deletion`'s plan identically.
 
 **Between merge and `db:push` the documents on `main` are ahead of production**: `AGENTS.md` says the
 hazard is closed while the database has no trigger, and during exactly that window the `left join` in
