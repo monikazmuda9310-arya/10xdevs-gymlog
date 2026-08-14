@@ -879,18 +879,18 @@ row and goes last only on a **tie**. Both facts are now pinned separately (`legs
 
 #### Automated
 
-- [x] 3.1 `npm run test:render` passes, no-island and two-figure assertions retained
-- [x] 3.2 `npm test`, `npm run lint`, `npm run typecheck` pass
-- [x] 3.3 Mutation (g): a page-level failure flag fails the degrade assertion
-- [x] 3.4 The six-step gate passes once before the commit
+- [x] 3.1 `npm run test:render` passes, no-island and two-figure assertions retained — e1e158b
+- [x] 3.2 `npm test`, `npm run lint`, `npm run typecheck` pass — e1e158b
+- [x] 3.3 Mutation (g): a page-level failure flag fails the degrade assertion — e1e158b
+- [x] 3.4 The six-step gate passes once before the commit — e1e158b
 
 #### Manual
 
-- [x] 3.5 Group figures added by hand equal the "This week" figure exactly, in kg and in lb
-- [x] 3.6 The bars read as a shape rather than as noise
-- [x] 3.7 Switching to pounds moves totals and breakdown rows together
+- [x] 3.5 Group figures added by hand equal the "This week" figure exactly, in kg and in lb — e1e158b
+- [x] 3.6 The bars read as a shape rather than as noise — e1e158b
+- [x] 3.7 Switching to pounds moves totals and breakdown rows together — e1e158b
 - [x] 3.8 A planks-only GROUP reads `0` with `Sets logged, no external load`; untrained groups read
-      `0` with `No sets`
+      `0` with `No sets` — e1e158b
 
 #### Phase 3 evidence
 
@@ -931,13 +931,34 @@ group", the exercise row means "one exercise you cannot read". The exercise row 
 
 #### Automated
 
-- [ ] 4.1 `npm run build` succeeds
-- [ ] 4.2 `npx wrangler deploy` reports a new version at 100%, id recorded
+- [x] 4.1 `npm run build` succeeds
+- [x] 4.2 `npx wrangler deploy` reports a new version at 100%, id recorded
 
 #### Manual
 
-- [ ] 4.3 The breakdown renders on the deployed `/dashboard` and reconciles on screen
-- [ ] 4.4 An empty week still shows both totals
+- [x] 4.3 The breakdown renders on the deployed `/dashboard` and reconciles on screen
+- [x] 4.4 An empty week still shows both totals
+
+#### Phase 4 evidence
+
+`npm run build` complete in 18.66 s. `npx wrangler deploy`: **Worker version
+`ea6318d6-ec4d-4666-b1a4-cf8ce26164c4`**, confirmed at **100 %** of traffic by
+`npx wrangler deployments list` (deployed 2026-08-14T16:07:51Z, author `monika.zmuda9310@gmail.com`).
+Four new client assets uploaded, 2179.07 KiB total / 442.83 KiB gzipped, Worker startup 22 ms.
+
+No schema step: the migration went to both projects in Phase 1 and was purely additive, so production
+carried the view for three phases before anything read it.
+
+**A read-only probe of the public address**, which is the check a green gate cannot make
+(`lessons.md`): `/dashboard` answers **302 → `/auth/signin`** and `/auth/signin` answers **200**. That
+proves the new version is serving and the middleware still guards in both directions; it says nothing
+about the breakdown, which is what 4.3 and 4.4 are for and why they need a signed-in human.
+
+Criteria 4.3 and 4.4 confirmed by the owner on 2026-08-14, signed in at
+`https://gymlog.10x-astro-starter.workers.dev/dashboard`: the breakdown renders under the two totals
+and its group rows add up to the "This week" figure on screen, and a week with no sets still shows
+both totals. **This is the check S-02 skipped and `lessons.md` exists for** — the gate and CI are
+both blind to it.
 
 ### Phase 5: Documents
 
