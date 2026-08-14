@@ -106,7 +106,10 @@ const groupLabel = (group: MuscleGroup | null): string =>
  */
 const barWidth = (kilograms: number): string => {
   const share = weekTotalKg > 0 ? (kilograms / weekTotalKg) * 100 : 0;
-  return `${String(Math.max(0, Math.min(100, share)))}%`;
+  // One decimal, because the alternative is `48.60000000000001%` in the markup for an ordinary week.
+  // Rounding here is safe in a way rounding a FIGURE is not: nothing is added up and no number is
+  // read, so this is the one place in the slice where a tenth of a percent cannot cost anything.
+  return `${Math.max(0, Math.min(100, share)).toFixed(1)}%`;
 };
 
 // One wording, used beside the weekly totals AND on a group row. The distinction it carries is the
@@ -213,7 +216,15 @@ const NO_EXTERNAL_LOAD = "Sets logged, no external load";
         {
           breakdownFailed || !breakdown ? (
             <p class="rounded-lg border border-amber-400/30 bg-amber-900/20 px-4 py-4 text-center text-sm text-amber-100">
-              Your breakdown could not be loaded. The totals above are unaffected.
+              {/*
+                **Deliberately silent about whether trying again would help**, because two of the
+                three ways this fires are permanent for this week: the row cap and a genuine failure
+                to reconcile both produce the same sentence on every reload. The plan's wording
+                ("could not be loaded") read as transient and invited a retry that cannot work —
+                implementation review F5. The totals clause stays: it is the one thing the reader
+                needs, and it is true in every case.
+              */}
+              This week's breakdown could not be shown. The totals above are unaffected.
             </p>
           ) : (
             <div class="space-y-5">

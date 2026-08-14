@@ -1,7 +1,7 @@
 ---
 change_id: tonnage-breakdown
 title: Tonnage breakdown per exercise and muscle group
-status: implemented
+status: impl_reviewed
 created: 2026-08-14
 updated: 2026-08-14
 archived_at: null

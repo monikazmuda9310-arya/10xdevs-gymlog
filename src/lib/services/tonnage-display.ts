@@ -70,11 +70,21 @@ export function tonnageFigure(kilograms: number, unit: WeightUnit): string {
  * total. Ties go to the earlier row, which makes the output a function of the input alone: the
  * breakdown arrives already sorted, so a render assertion on positions is not testing a coin flip.
  *
- * **The deficit is clamped, and the clamp is not the guard.** With rows that sum to the total, the
- * number of units to hand out is between zero and the row count by construction — sum-of-floors is
- * never above floor-of-sum. The clamp exists so a caller who ignored `foldBreakdown`'s
- * reconciliation gets a wrong-but-sane column rather than a negative figure or a crash; the thing
- * that actually keeps the column honest is that guard, one module away.
+ * **The deficit is clamped, and the clamp guarantees LESS than it looks like it does.** With rows
+ * that sum to the total, the number of units to hand out is between zero and the row count by
+ * construction — sum-of-floors is never above floor-of-sum. All the clamp adds is that `remaining`
+ * stays inside `[0, n]` whatever it is handed, so no row is over- or under-allocated and the loop
+ * cannot run off the end.
+ *
+ * **It does NOT sanitise the values, and this function makes no promise about them.** A negative row
+ * prints negative and a `NaN` prints `"NaN"` — the very output `foldBreakdown` and `weeklyTonnage`
+ * refuse by name. Neither is reachable: `greatest(weight_kg, 0)` in `public.daily_exercise_tonnage`
+ * makes every row non-negative, and `foldBreakdown` refuses a non-finite sum before a figure is ever
+ * formatted. **Those two are the guarantee; this function inherits it rather than restating it**, and
+ * a second validation of the same invariant here is the duplication this repository documents as a
+ * hazard. Said plainly because the earlier wording claimed the clamp did this, which it never did
+ * (implementation review F3, 2026-08-14) — and a comment asserting a guarantee is itself a checkable
+ * claim (`lessons.md`).
  */
 export function apportionedFigures(kilograms: number[], totalKilograms: number, unit: WeightUnit): string[] {
   const converted = kilograms.map((value) => kilogramsIn(value, unit));

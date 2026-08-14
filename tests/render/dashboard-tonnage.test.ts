@@ -79,9 +79,30 @@ const BREAKDOWN_WITH_UNREADABLE = [breakdownRow("legs", "Barbell squat", 12000),
 /** A group that trained and moved no external load, beside five that did not train at all. */
 const BREAKDOWN_WITH_PLANKS = [breakdownRow("legs", "Barbell squat", 12345.7), breakdownRow("core", "Plank", 0)];
 
-/** Both range reads share a chain shape: `select().eq().gte().lte()`. */
+/**
+ * The same distinction one level up: a WEEK that trained and moved no external load.
+ *
+ * Sums to `0`, which is what the week total below is — the fixture coupling stated above cuts both
+ * ways, and a zero week needs a zero breakdown or the page renders the failure sentence instead.
+ */
+const BREAKDOWN_ALL_PLANKS = [breakdownRow("core", "Plank", 0)];
+
+/** `daily_tonnage`: `select().eq().gte().lte()`. No cap — its window is a constant fourteen days. */
 function rangeChain(answer: () => Promise<unknown>) {
   return { select: () => ({ eq: () => ({ gte: () => ({ lte: answer }) }) }) };
+}
+
+/**
+ * `daily_exercise_tonnage`: the same chain **plus `.limit(MAX_BREAKDOWN_ROWS + 1)`**.
+ *
+ * The extra link is not decoration. The stub mirrors the real call, so the moment the limit was
+ * added to `weeklyBreakdown` this suite went red — `.limit` on the resolved promise threw, the page
+ * caught it as a failed read, and seven assertions started testing the failure path at once. That is
+ * the same tripwire the unstubbed-table `throw` provides one level up, and it is why the two chains
+ * are written separately rather than sharing a permissive shape.
+ */
+function breakdownChain(answer: () => Promise<unknown>) {
+  return { select: () => ({ eq: () => ({ gte: () => ({ lte: () => ({ limit: answer }) }) }) }) };
 }
 
 /**
@@ -106,7 +127,7 @@ function stub({
       ? Promise.resolve({ data: null, error: { message: "unreachable", code: "XX000" } })
       : Promise.resolve({ data: rows, error: null }),
   );
-  const dailyByExercise = rangeChain(() =>
+  const dailyByExercise = breakdownChain(() =>
     breakdown === "throw"
       ? Promise.resolve({ data: null, error: { message: "unreachable", code: "XX000" } })
       : Promise.resolve({ data: breakdown, error: null }),
@@ -149,12 +170,18 @@ async function render(config: Parameters<typeof stub>[0]): Promise<string> {
 }
 
 const FAILURE = "Your weekly tonnage could not be loaded";
-/** The breakdown's OWN failure sentence. A different sentence because it is a different outcome. */
-const BREAKDOWN_FAILURE = "Your breakdown could not be loaded";
+/**
+ * The breakdown's OWN failure sentence. A different sentence because it is a different outcome —
+ * and one that says nothing about retrying, because two of the three ways it fires are permanent
+ * for that week (implementation review F5).
+ */
+const BREAKDOWN_FAILURE = "This week's breakdown could not be shown";
 // Per WEEK, not per page: the card that is empty names its own week. Rendering "this week" under
 // the *Last week* card was the copy defect the implementation review found — and the old constant
 // pinned it, so a passing assertion was holding it in place.
 const NO_SETS = "No sets logged last week";
+/** Its twin for the other card — the sentence a planks-only week must NOT get. */
+const NO_SETS_THIS_WEEK = "No sets logged this week";
 /** The class the figure itself carries — present iff a number is on screen. */
 const FIGURE_CLASS = "text-2xl font-semibold text-purple-200";
 /**
@@ -183,10 +210,11 @@ let failed: string;
 let noProfile: string;
 let unreadable: string;
 let planks: string;
+let planksWeek: string;
 let breakdownFailed: string;
 
 beforeAll(async () => {
-  [both, inPounds, oneEmpty, failed, noProfile, unreadable, planks, breakdownFailed] = await Promise.all([
+  [both, inPounds, oneEmpty, failed, noProfile, unreadable, planks, planksWeek, breakdownFailed] = await Promise.all([
     render({ profile: PROFILE, rows: ROWS }),
     render({ profile: { ...PROFILE, weight_unit: "lb" }, rows: ROWS }),
     render({ profile: PROFILE, rows: [{ performed_on: weeks.current.start, tonnage_kg: 12345.7 }] }),
@@ -194,6 +222,15 @@ beforeAll(async () => {
     render({ profile: null, rows: [] }),
     render({ profile: PROFILE, rows: ROWS, breakdown: BREAKDOWN_WITH_UNREADABLE }),
     render({ profile: PROFILE, rows: ROWS, breakdown: BREAKDOWN_WITH_PLANKS }),
+    // A week WITH sets and no external load: the row exists, so `hasSets` is true, and the total is 0.
+    render({
+      profile: PROFILE,
+      rows: [
+        { performed_on: weeks.current.start, tonnage_kg: 0 },
+        { performed_on: weeks.previous.start, tonnage_kg: 9000 },
+      ],
+      breakdown: BREAKDOWN_ALL_PLANKS,
+    }),
     render({ profile: PROFILE, rows: ROWS, breakdown: "throw" }),
   ]);
 });
@@ -204,6 +241,20 @@ function groupRow(html: string, label: string): string {
 
   expect(rows).toHaveLength(1);
   return rows[0];
+}
+
+/**
+ * The "This week" card's markup, from its figure up to the "Last week" figure that follows it.
+ *
+ * Bounded on both sides, which is what makes a `not.toContain` over it mean anything — the same
+ * sentence legitimately appears further down on a group row, so a whole-page substring check could
+ * not tell the two apart.
+ */
+function thisWeekCard(html: string): string {
+  const cards = html.split(FIGURE_CLASS);
+
+  expect(cards).toHaveLength(3);
+  return cards[1];
 }
 
 /** Every breakdown figure on the page, in document order: six or seven groups, then the exercises. */
@@ -267,6 +318,26 @@ describe("the dashboard when a week is empty", () => {
     expect(figures).toContain("0");
     // And exactly one week says the sentence — not both, and not neither.
     expect(oneEmpty.split(NO_SETS)).toHaveLength(2);
+  });
+
+  it("tells a week of planks apart from a week of nothing", () => {
+    // **The half S-07 left unwritten**, and which `tonnage-display.test.ts:46-51` already described
+    // as though it existed: a week that trained and moved no external load rendered a bare `0` and
+    // read as a rest week. `hasSets`, not the figure, decides — both weeks print `0`.
+    //
+    // Asserted on the "This week" card in isolation rather than on the page: the same sentence
+    // legitimately appears on the `core` group row below, so a whole-page check would pass against a
+    // page that never wrote it beside the total. Added by implementation review F2.
+    const card = thisWeekCard(planksWeek);
+
+    expect(card).toContain(NO_EXTERNAL_LOAD);
+    expect(card).not.toContain(NO_SETS_THIS_WEEK);
+    expect(planksWeek).not.toContain(NO_SETS_THIS_WEEK);
+    expect(planksWeek).not.toContain(FAILURE);
+    expect(planksWeek).not.toContain(BREAKDOWN_FAILURE);
+    // And the empty week still says its own thing, from the same fixture: last week has 9000 kg, so
+    // neither sentence belongs to it.
+    expect(planksWeek).not.toContain(NO_SETS);
   });
 
   it("distinguishes an empty week from a failed read", () => {

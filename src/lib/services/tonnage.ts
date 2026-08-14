@@ -40,7 +40,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/db/database.types";
 import { trainingWeeksFor, type DateRange } from "@/lib/services/calendar";
-import { foldBreakdown, type WeekBreakdown } from "@/lib/services/tonnage-breakdown";
+import { foldBreakdown, MAX_BREAKDOWN_ROWS, type WeekBreakdown } from "@/lib/services/tonnage-breakdown";
 
 type Client = SupabaseClient<Database>;
 
@@ -159,7 +159,15 @@ export async function weeklyBreakdown(
     // `workouts_user_performed_on_idx`.
     .eq("user_id", userId)
     .gte("performed_on", week.start)
-    .lte("performed_on", week.end);
+    .lte("performed_on", week.end)
+    // **`+ 1` is what keeps this from being the silent truncation this module refuses.**
+    // `foldBreakdown` throws ABOVE `MAX_BREAKDOWN_ROWS`, so one row over the cap is precisely the
+    // signal it needs: an implausibly wide week still arrives over the line and is still refused,
+    // with the same message. What changes is that the payload crossing into the Worker is bounded.
+    // Until this line the cap bounded the FOLD and not the TRANSFER — and deserialising N rows is
+    // work proportional to N, which is the exact thing the 10 ms CPU cap makes dangerous and the
+    // exact thing this module's header claims to prevent. Implementation review F1, 2026-08-14.
+    .limit(MAX_BREAKDOWN_ROWS + 1);
 
   if (error) {
     throw error;

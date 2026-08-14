@@ -39,7 +39,7 @@ if (supabase && user) {
 // `personal_records` VIEW, and `supabase gen types` makes every view column nullable because
 // Postgres cannot prove not-null through one.
 //
-// **The fallback is the raw value, never "Unattributed".** A null here is a read anomaly — it says
+// **The fallback is nothing at all, never "Unattributed".** A null here is a read anomaly — it says
 // nothing about the account's training — while "Unattributed" is a specific claim about tonnage
 // whose exercise this account can no longer read, and it belongs to the dashboard breakdown alone.
 // Printing it here would answer a question nobody asked with a fact that is not true.
