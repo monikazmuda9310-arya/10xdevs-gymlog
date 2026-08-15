@@ -278,7 +278,7 @@ export type Database = {
       };
     };
     Functions: {
-      [_ in never]: never;
+      delete_own_account: { Args: never; Returns: undefined };
     };
     Enums: {
       estimation_formula: "epley" | "brzycki";

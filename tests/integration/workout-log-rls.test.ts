@@ -257,9 +257,16 @@ describe("the training record: another account cannot reach it", () => {
     const forgedWorkout = await ownerB.client
       .from("workouts")
       .insert({ user_id: ownerA.userId, performed_on: TODAY, note: `${MARK}forged-w-${RUN_ID}` });
+    // **`exerciseB`, and it MUST be an exercise the forger can see.** Since 2026-08-15 a `before
+    // insert` trigger on exercise_entries refuses an exercise_id invisible to the caller, and a
+    // BEFORE trigger fires ahead of the RLS WITH CHECK. Name A's private exercise here and the
+    // trigger answers 23503 first, so this line would stop exercising the INSERT POLICY altogether
+    // — green even with the policy weakened. B's own exercise passes the trigger and passes the
+    // composite key (A does own workoutA), leaving the ownership policy as the only thing that can
+    // refuse it. See supabase/migrations/20260815090000_scope_exercise_entries_to_visible_exercises.sql.
     const forgedEntry = await ownerB.client
       .from("exercise_entries")
-      .insert({ user_id: ownerA.userId, workout_id: workoutA, exercise_id: exerciseA });
+      .insert({ user_id: ownerA.userId, workout_id: workoutA, exercise_id: exerciseB });
     const forgedSet = await ownerB.client
       .from("sets")
       .insert({ user_id: ownerA.userId, exercise_entry_id: entryA, reps: 5, weight: 60, weight_unit: "kg" });

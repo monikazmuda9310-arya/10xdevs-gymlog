@@ -1,9 +1,9 @@
 ---
 change_id: account-deletion
 title: Let an account delete itself, and fail honestly when the database refuses
-status: new
+status: implementing
 created: 2026-08-14
-updated: 2026-08-14
+updated: 2026-08-15
 archived_at: null
 ---
 
@@ -61,6 +61,32 @@ confirming — on the native `<dialog>` rather than shadcn's `alert-dialog`, whi
   timestamp, and `npm run db:push` advances both hosted projects at once.
 - Both will edit `AGENTS.md` and `README.md` in their documentation phase. That is a guaranteed
   conflict on the second merge and is expected, not a surprise.
+
+**Three facts the sibling slice settled on 2026-08-15, after this file was written.**
+`cross-account-isolation` is implemented, reviewed and open as PR #1 (not merged). Each of these
+contradicts something above or would be assumed wrongly:
+
+1. **The latest migration is now `20260815120000`, not `20260815090000`.** The sibling slice shipped
+   a second migration out of its implementation review. Any migration here needs a timestamp after
+   that one.
+2. **`s09i-a@`, `s09i-b@` and `s09i-signout@gymlog-test.dev` are now PERMANENT accounts**, not
+   per-run throwaways. That reversal was itself an implementation-review finding: nothing in this
+   repository can delete an `auth.users` row, so per-run accounts leaked three per run, and an
+   interrupted run's rows became unreachable to every later run. **This suite must never delete an
+   account whose address begins `s09i-`** — a hazard that did not exist while they were disposable,
+   and one that no assertion here would notice, because it would surface as the sibling suite
+   failing on a later run.
+   - The same finding is worth reading before designing this suite's own fixtures: a suite that
+     genuinely CAN delete accounts is the first one here able to clean up after itself, which makes
+     "throwaway per run" a real option rather than the least-bad one. Say which it is and why.
+3. **The unscoped `exercise_id` is closed for `authenticated` callers.** So the blocked-cascade
+   failure this slice owns is now unreachable through the application — but **not** unreachable in
+   general: a `before` trigger validates nothing already stored and binds `authenticated` only, so
+   `postgres` and `service_role` can still create the blocking row. The honest-failure path is still
+   required; what changed is that constructing the fixture for it may now need a migration or a
+   deliberately seeded row rather than an ordinary insert. **Establish how the test will build that
+   state before planning a phase around asserting it** — `lessons.md` § "A user cannot do X yet" is
+   not "X is untested", and its inverse bites here.
 
 **Also due here, from `STATE.md`:** the one-off accounts listed in its reference block are to be
 cleaned up with this slice — including the production account that now holds real training rows,
