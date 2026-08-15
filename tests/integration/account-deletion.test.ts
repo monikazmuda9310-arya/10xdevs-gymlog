@@ -216,10 +216,14 @@ describe("account deletion: an account can remove itself", () => {
   });
 
   it("3. the seeded catalogue is untouched by a deletion", async () => {
-    // **The `is not distinct from` tripwire.** The function bypasses RLS, so the 38 shared rows are
-    // protected inside it by nothing but `where user_id = caller` — `null = <uuid>` is NULL, so they
-    // never match. A "null-safe" rewrite to `is not distinct from` would take the whole catalogue
-    // with the first deletion, and no policy anywhere would stop it.
+    // **What this catches is the exercises delete losing its `where` clause**, which would take the
+    // shared catalogue with the first deletion and which no policy anywhere would stop — the
+    // function bypasses RLS, so `where user_id = caller` is the only thing protecting the 38 rows.
+    //
+    // **What it does NOT catch is the `is not distinct from` rewrite**, and the closing note of this
+    // file explains why: measured under the Phase 1 protocol, that rewrite is inert while a real uid
+    // exists, because `<uuid> is not distinct from NULL` is FALSE. Do not cite this assertion as the
+    // tripwire for it — the migration header used to, and was wrong.
     const victim = await throwawayAccount("catalogue");
     await makePrivateExercise(victim, "catalogue");
 
@@ -338,6 +342,12 @@ describe("account deletion: the endpoint", () => {
     const fresh = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
     const again = await fresh.auth.signUp({ email: victim.email, password });
     expect(again.error).toBeNull();
+    // **Not optional, and assertion 5 has the same line for the same reason.** Without it, a `signUp`
+    // that returns `{ error: null, session: null }` — precisely what happens if Confirm email is
+    // switched on for gymlog-test — makes `undefined !== victim.userId` true, and this proof passes
+    // while proving nothing. `throwawayAccount` catches that condition for the accounts it creates;
+    // this call goes through a bare client and bypasses it.
+    expect(again.data.session).not.toBeNull();
     expect(again.data.session?.user.id).not.toBe(victim.userId);
     if (again.data.session) {
       created.push({ client: fresh, userId: again.data.session.user.id, email: victim.email });

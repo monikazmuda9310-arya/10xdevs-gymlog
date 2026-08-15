@@ -819,12 +819,22 @@ follow `db:push`, or the RPC will be missing from the committed types.
 
 - [x] 4.1 Full gate green: all six steps
       — `lint` exit 0 → `typecheck` 0 errors → 244 unit → 30 render → 121 integration → `build` 0.
-- [ ] 4.2 CI green on the pushed branch
+- [x] 4.2 CI green on the pushed branch
+      — run 31892699067, all six gate steps green on `feature/account-deletion`. First run of this
+      branch's suites from a clean clone against the migrated `gymlog-test`, so it is also the
+      evidence that the RPC and its grants survive without any local state. PR:
+      <https://github.com/monikazmuda9310-arya/10xdevs-gymlog/pull/2> — **not merged**, per
+      § Changes Required #5.
 - [x] 4.3 Every test file, assertion number and function name cited in the documents exists
-      — checked rather than assumed: the five cited paths all resolve, and `delete_own_account`
-      appears in `AGENTS.md`, `access-control.md` and `lessons.md`. **`README.md` deliberately does
-      not name it** — that file is the user-facing register and speaks of `DELETE /api/account` and
-      what deletion removes, not of database functions.
+      — checked rather than assumed, **and the check was narrower than this row first claimed**: the
+      five paths cited by THIS SLICE's own additions resolve, and `delete_own_account` appears in
+      `AGENTS.md`, `access-control.md` and `lessons.md`. **`README.md` deliberately does not name
+      it** — that file is the user-facing register and speaks of `DELETE /api/account` and what
+      deletion removes, not of database functions. **What does NOT resolve on this branch**: six
+      citations of `tests/integration/account-boundary.test.ts`, all of which arrived with the
+      sibling-branch documents taken below. They are the sibling's file and resolve the moment PR #1
+      merges — a transient artefact of the split, surfaced by the implementation review because the
+      original wording of this row asserted more than had been checked.
       **This phase also had to take the sibling branch's `AGENTS.md`, `access-control.md`,
       `lessons.md` and `README.md`**, the same way 1.3 and 1.5 took its migrations and tests: those
       files still said "four shapes" here while the sibling had already added a fifth, so a sixth

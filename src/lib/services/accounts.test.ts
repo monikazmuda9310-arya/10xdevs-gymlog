@@ -37,12 +37,22 @@ describe("accountDeletionFailureCode", () => {
     }
   });
 
-  it("the blocked message says that nothing was removed", () => {
-    // Load-bearing wording, not a style check. The deletion runs in one transaction, so a blocked
-    // attempt leaves every row intact — and "we could not delete your account" without that
-    // reassurance invites the user to assume a half-deleted account, which is the outcome they would
-    // most fear and the one thing that cannot happen.
+  it("only the message that can KNOW nothing was removed says so", () => {
+    // **Load-bearing wording, and the asymmetry is the whole point.** A `23503` came from Postgres,
+    // so the transaction rolled back and "Nothing was removed" is a fact worth stating — without it
+    // the user assumes a half-deleted account, the outcome they would most fear and the one thing
+    // that cannot happen.
     expect(ACCOUNT_MESSAGES.account_delete_blocked).toContain("Nothing was removed");
-    expect(ACCOUNT_MESSAGES.unexpected).toContain("Nothing was removed");
+
+    // `unexpected` is ALSO reached when the RPC's response was lost after it committed, so the same
+    // reassurance there would be a lie told at the worst possible moment. An implementation review
+    // found it being told: an unguarded `signOut()` throw turned a successful deletion into
+    // "Nothing was removed". These two assertions are what stop the sentence being copied back.
+    expect(ACCOUNT_MESSAGES.unexpected).not.toContain("Nothing was removed");
+    expect(ACCOUNT_MESSAGES.request_failed).not.toContain("Nothing was removed");
+
+    // What they say instead: how the user can find out for themselves.
+    expect(ACCOUNT_MESSAGES.unexpected).toContain("signing in again");
+    expect(ACCOUNT_MESSAGES.request_failed).toContain("signing in again");
   });
 });

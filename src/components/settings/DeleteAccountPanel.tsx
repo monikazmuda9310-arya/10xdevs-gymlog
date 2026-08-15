@@ -41,6 +41,14 @@ export function DeleteAccountPanel({ footprint }: Props) {
   const bodyId = useId();
 
   async function remove() {
+    // **A latch, not a `disabled` attribute.** `pending` is React state, so the button's `disabled`
+    // only takes effect on the NEXT render — two fast clicks fire two DELETEs, and the second gets
+    // `no_data_found` for an account the first one already removed. That flashes a failure sentence
+    // in the dialog while the first request's navigation is in flight, which is alarming at exactly
+    // the wrong moment.
+    if (pending) {
+      return;
+    }
     setPending(true);
     setError(null);
     try {
@@ -57,7 +65,10 @@ export function DeleteAccountPanel({ footprint }: Props) {
       // `WorkoutHeader` after deleting a workout.
       window.location.href = "/auth/signin?notice=account_deleted";
     } catch {
-      setError(accountMessageForCode("unexpected"));
+      // **Its own code, not the server's `unexpected`.** The request never completed, so this layer
+      // knows strictly less than the endpoint would — it cannot say whether the deletion happened.
+      // Borrowing a server-authored sentence here would attribute knowledge to a layer with none.
+      setError(accountMessageForCode("request_failed"));
       setPending(false);
     }
   }

@@ -18,6 +18,12 @@
 -- by the function taking NO PARAMETERS. After both slices merge this repository holds one function of
 -- each kind, each documenting the other as its failure mode. Neither is a licence for a third.
 --
+-- THE OWNER IS THE ONE VARIABLE THAT DECIDES EVERYTHING HERE, SO IT IS WRITTEN DOWN. A `security
+-- definer` function runs with its OWNER's rights, and this one is owned by `postgres` because that is
+-- the role `npm run db:push` connects as (SUPABASE_DB_URL). That is precisely the role holding DELETE
+-- on auth.users. If this migration is ever applied by a different role, the function silently gains
+-- that role's rights instead — and nothing in the SQL below would look any different.
+--
 -- NO PARAMETERS, ON PURPOSE. The uid comes from auth.uid() inside the body, so there is no argument a
 -- caller could aim at somebody else's account. A parameterised delete_own_account(p_user_id uuid)
 -- guarded by `if p_user_id <> auth.uid() then raise` is strictly worse: the guard is one line somebody
@@ -54,12 +60,31 @@
 -- catalogue rows are protected here by nothing but this predicate. They carry `user_id is null`, and
 -- `null = <uuid>` is NULL, so they are never matched. A "null-safe" tidy-up to
 -- `where user_id is not distinct from caller` would match every seeded row the first time a null uid
--- reached it and wipe the catalogue for every account. Assertion 3 of the suite is what notices.
+-- reached it and wipe the catalogue for every account.
+--
+-- **DO NOT READ THAT AS "A TEST WOULD CATCH IT". IT WOULD NOT, AND THAT WAS MEASURED.** An earlier
+-- version of this header claimed assertion 3 of tests/integration/account-deletion.test.ts was the
+-- tripwire. The Phase 1 mutation protocol disproved it: `<uuid> is not distinct from NULL` is FALSE,
+-- so the rewrite is inert while a real uid exists and only bites in the company of a null caller —
+-- which the guard above already prevents. What assertion 3 DOES catch is this predicate losing its
+-- `where` clause altogether, which is a different mutation. The closing note of that suite explains
+-- why the `is not distinct from` rewrite is unguarded and cannot be guarded from there.
 --
 -- The `revoke` names `public`, and that is the whole reason this line differs from the table template.
 -- Supabase's implicit grant on TABLES goes to anon/authenticated; the default EXECUTE grant on a
 -- FUNCTION goes to PUBLIC. Revoking from anon and authenticated alone would leave this callable by
 -- anybody. Assertion 7 is what notices.
+--
+-- **THE REVOKE LIST IS NOT EXHAUSTIVE, AND SAYING SO IS BETTER THAN LOOKING COMPLETE.** A Supabase
+-- project's bootstrap runs `alter default privileges in schema public grant all on functions to
+-- postgres, anon, authenticated, service_role`, so `service_role` holds an EXPLICIT execute grant
+-- that the line below does not remove. It is not a hole: a service_role JWT carries `role` but no
+-- `sub`, so `auth.uid()` is null and the guard above raises before any delete — and AGENTS.md
+-- § Environment forbids that key reaching the application or the tests at all. It is also NOT
+-- assertable from here, because vitest.integration.config.ts strips that credential by design, so
+-- the suite is incapable of holding it. Recorded rather than closed: adding `service_role` to the
+-- revoke would be correct and would cost a migration and a production push for something four other
+-- things already make unreachable.
 
 create function public.delete_own_account() returns void
 language plpgsql

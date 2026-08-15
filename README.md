@@ -179,23 +179,6 @@ and `http://localhost:4321/**` for local work.
 | `/api/profile`          | PATCH, JSON. Replaces all three preferences at once. Writes only the row named by `locals.user.id`; no route parameter   |
 | `/api/account`          | DELETE. Removes the signed-in account and everything stored with it, then **signs the caller out in the same request**. No route parameter and no body — the account is named by `auth.uid()` inside the database |
 
-### Deleting your account
-
-`/settings` carries the control, and the confirmation names how much training goes — workouts, sets
-and custom exercises — because "your whole history" is an abstraction nobody can weigh. If those
-counts cannot be read the dialog says so rather than showing zeros: a zero would read as "you have
-nothing to lose" at the exact moment that is the question.
-
-- **What goes**: your account, your workouts, exercise entries and sets, your custom exercises, and
-  your preferences. The 38 seeded exercises are shared and are never touched.
-- **What survives, and it is worth stating plainly**: the authentication provider keeps its own audit
-  log, which records your email address and carries no link back to the deleted account row. That
-  table is Supabase's, not this application's, and nothing here can remove it.
-- **Nothing is deleted by halves.** The whole removal is one transaction, so a deletion that fails
-  leaves every row exactly as it was — which is what the failure message says.
-- Afterwards you land on the sign-in screen with a neutral notice. Signing in with that address fails;
-  signing **up** with it creates a genuinely new account with nothing in it.
-
 Correcting what was logged, added by S-05. Each resource carries its mutations and a preflight that
 answers what the change would cost:
 
@@ -275,6 +258,25 @@ Each `…/impact` answers `{ impact: [...] }`. **When the ranking read fails it 
 `impact_unavailable`, never an empty list** — "nothing is at stake" is a positive claim, and the
 screen would render it as reassurance. The action stays available; the dialog says the consequence is
 unknown.
+
+### Deleting your account
+
+`/settings` carries the control, and the confirmation names how much training goes — workouts, sets
+and custom exercises — because "your whole history" is an abstraction nobody can weigh. If those
+counts cannot be read the dialog says so rather than showing zeros: a zero would read as "you have
+nothing to lose" at the exact moment that is the question.
+
+- **What goes**: your account, your workouts, exercise entries and sets, your custom exercises, and
+  your preferences. The 38 seeded exercises are shared and are never touched.
+- **What survives, and it is worth stating plainly**: the authentication provider keeps its own audit
+  log, which records your email address and carries no link back to the deleted account row. That
+  table is Supabase's, not this application's, and nothing here can remove it.
+- **Nothing is deleted by halves.** The whole removal is one transaction, so a deletion that is
+  refused leaves every row exactly as it was — and the refusal message says so. A failure that is
+  **not** a refusal says something weaker on purpose ("try signing in again to check"), because a
+  lost response cannot tell the difference between a deletion that happened and one that did not.
+- Afterwards you land on the sign-in screen with a neutral notice. Signing in with that address fails;
+  signing **up** with it creates a genuinely new account with nothing in it.
 
 Route protection is handled in `src/middleware.ts`, in **both** directions: `PROTECTED_ROUTES` keeps
 signed-out visitors out of the application, and `AUTH_ROUTES` sends a signed-in visitor away from

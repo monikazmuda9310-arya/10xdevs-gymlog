@@ -13,7 +13,9 @@ import {
   MAX_PASSWORD_LENGTH,
   isValidEmail,
   AUTH_MESSAGES,
+  AUTH_NOTICES,
   messageForCode,
+  noticeForCode,
 } from "@/lib/validation/auth";
 import { parseSignInForm, parseSignUpForm } from "@/lib/validation/auth-schemas";
 import { neutralAuthCode } from "@/lib/validation/auth-errors";
@@ -216,6 +218,41 @@ describe("messageForCode", () => {
     expect(messageForCode(crafted)).toBe(AUTH_MESSAGES.unexpected);
     expect(messageForCode("__proto__")).toBe(AUTH_MESSAGES.unexpected);
     expect(messageForCode("constructor")).toBe(AUTH_MESSAGES.unexpected);
+  });
+});
+
+describe("noticeForCode", () => {
+  // **This function's fall-back is the OPPOSITE of `messageForCode`'s, deliberately — and that is
+  // the line somebody will one day "harmonise", with a diff that reads as a simplification.**
+  // A generic failure sentence is a safe answer to a mangled URL; a generic REASSURANCE is not.
+  // "Something completed successfully" is a positive claim, and inventing one for a code we do not
+  // recognise would tell the user an action succeeded when nothing is known about it. Three comments
+  // say so; these assertions are what make the rule survive a reader who does not reach them.
+
+  it("resolves a known code to this project's text", () => {
+    expect(noticeForCode("account_deleted")).toBe(AUTH_NOTICES.account_deleted);
+  });
+
+  it("renders nothing when there is no code", () => {
+    expect(noticeForCode(null)).toBeNull();
+    expect(noticeForCode(undefined)).toBeNull();
+    expect(noticeForCode("")).toBeNull();
+  });
+
+  it("renders NOTHING for an unrecognised code — never a generic reassurance", () => {
+    expect(noticeForCode("not_a_notice")).toBeNull();
+    expect(noticeForCode("sign_in_failed")).toBeNull();
+    expect(noticeForCode("__proto__")).toBeNull();
+    expect(noticeForCode("constructor")).toBeNull();
+  });
+
+  it("shares no key with AUTH_MESSAGES, so no code can grow a red-box twin", () => {
+    // `/auth/signin` renders `?error=` in a red box and `?notice=` in a neutral one. A key in both
+    // catalogues would let one code be rendered either way depending on which parameter a link
+    // happened to use — the failure the two-catalogue split exists to make unreachable rather than
+    // merely unwritten.
+    const shared = Object.keys(AUTH_NOTICES).filter((key) => Object.hasOwn(AUTH_MESSAGES, key));
+    expect(shared).toEqual([]);
   });
 });
 

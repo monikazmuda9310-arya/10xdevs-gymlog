@@ -55,12 +55,22 @@ export const DELETE: APIRoute = async (context) => {
     return fail(code === "account_delete_blocked" ? 409 : 500, code);
   }
 
-  const signOut = await supabase.auth.signOut();
-  if (signOut.error) {
-    // Not a failure of the deletion — the account is genuinely gone, so the caller is still told
-    // success. Logged because nothing else would notice a browser left holding a dead cookie.
+  // **The try/catch is load-bearing, not defensive habit.** `signOut()` resolves `{ error }` for an
+  // ordinary auth failure but RE-THROWS anything that is not an `AuthError`. Left unguarded, such a
+  // throw escapes this handler after the deletion has already committed: Astro answers a generic
+  // HTML 500, the panel's `response.json()` fails, and the user is told the deletion did not happen —
+  // about an account that no longer exists. That is the one lie this endpoint must never tell.
+  try {
+    const signOut = await supabase.auth.signOut();
+    if (signOut.error) {
+      // Not a failure of the deletion — the account is genuinely gone, so the caller is still told
+      // success. Logged because nothing else would notice a browser left holding a dead cookie.
+      // eslint-disable-next-line no-console -- deliberate server-side diagnostic
+      console.error("[account] deleted, but the session could not be ended", { error: signOut.error });
+    }
+  } catch (error) {
     // eslint-disable-next-line no-console -- deliberate server-side diagnostic
-    console.error("[account] deleted, but the session could not be ended", { error: signOut.error });
+    console.error("[account] deleted, but signOut threw", { error });
   }
 
   return new Response(JSON.stringify({ deleted: true }), {
