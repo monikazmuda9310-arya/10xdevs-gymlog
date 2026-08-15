@@ -1,11 +1,18 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import SignInForm from "@/components/auth/SignInForm";
-import { messageForCode } from "@/lib/validation/auth";
+import { messageForCode, noticeForCode } from "@/lib/validation/auth";
 
 // The query string carries a code; the text comes from this project's catalogue. Rendering
 // `?error=` verbatim would let a crafted link display any sentence as a system message.
 const error = messageForCode(Astro.url.searchParams.get("error"));
+
+// A NEUTRAL outcome, on a SEPARATE parameter resolved by a SEPARATE catalogue. Reusing `?error=`
+// would render a deliberate, successful action — deleting your own account — inside a red failure
+// box, on the very screen you are sent to immediately afterwards. `noticeForCode` renders nothing
+// for an unrecognised code rather than a generic sentence: a generic reassurance is a positive
+// claim, and a mangled URL must not produce one.
+const notice = noticeForCode(Astro.url.searchParams.get("notice"));
 ---
 
 <Layout title="Sign in">
@@ -16,6 +23,16 @@ const error = messageForCode(Astro.url.searchParams.get("error"));
       >
         Sign in
       </h1>
+      {
+        notice && (
+          <p
+            role="status"
+            class="mb-4 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-center text-sm text-blue-100"
+          >
+            {notice}
+          </p>
+        )
+      }
       <SignInForm serverError={error} client:load />
       <p class="mt-4 text-center text-sm text-blue-100/60">
         Don't have an account? <a href="/auth/signup" class="text-purple-300 hover:underline">Sign up</a>

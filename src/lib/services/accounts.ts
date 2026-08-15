@@ -25,6 +25,56 @@ export function accountDeletionFailureCode(error: { code?: string } | null | und
   return error?.code === FOREIGN_KEY_VIOLATION ? "account_delete_blocked" : "unexpected";
 }
 
+/** What the confirmation dialog names, so the user can weigh what they are about to lose. */
+export interface AccountFootprint {
+  workouts: number;
+  sets: number;
+  customExercises: number;
+}
+
+/**
+ * How much training the account holds.
+ *
+ * **Returns `null` when any of the three reads fails, and never a zero.** A zero here is a positive
+ * claim — "you have nothing to lose" — offered at the exact moment the user is deciding whether to
+ * lose it, and it is the same mistake `AGENTS.md` records for an emitted tonnage of zero and for an
+ * empty `impact` list. The dialog drops the numbers and says so instead.
+ *
+ * Counted with `head: true`, so no rows cross the wire — three counts, not three result sets.
+ * Explicit `.eq("user_id", …)` on every one: the policy is the guarantee, the filter is the index
+ * path (`AGENTS.md` § Access control).
+ */
+export async function accountFootprint(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<AccountFootprint | null> {
+  const [workouts, sets, customExercises] = await Promise.all([
+    supabase.from("workouts").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    supabase.from("sets").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    supabase.from("exercises").select("id", { count: "exact", head: true }).eq("user_id", userId),
+  ]);
+
+  if (workouts.error || sets.error || customExercises.error) {
+    return null;
+  }
+  // **`typeof !== "number"`, not `=== null`.** PostgREST types `count` as `number | null`, but a
+  // read that never produced one at all leaves it `undefined`, and `undefined === null` is false —
+  // so a null-check alone lets a non-count through and the dialog renders "undefined workouts".
+  // Caught by `tests/render/settings-delete-panel.test.ts`; the distinction is the whole reason
+  // this function returns `null` rather than a partially-filled object.
+  //
+  // Written out one binding at a time rather than over an array, because `typeof` on a local const
+  // is what NARROWS the type — an `.every()` over an array proves nothing to the compiler, and the
+  // cast or `!` needed to paper over that is forbidden here by two separate lint rules.
+  const workoutCount = workouts.count;
+  const setCount = sets.count;
+  const exerciseCount = customExercises.count;
+  if (typeof workoutCount !== "number" || typeof setCount !== "number" || typeof exerciseCount !== "number") {
+    return null;
+  }
+  return { workouts: workoutCount, sets: setCount, customExercises: exerciseCount };
+}
+
 /**
  * Delete the calling account through `public.delete_own_account()`.
  *

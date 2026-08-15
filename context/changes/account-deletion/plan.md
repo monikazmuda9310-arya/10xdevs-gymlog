@@ -764,11 +764,11 @@ follow `db:push`, or the RPC will be missing from the committed types.
       drift between them resolves silently to the generic sentence); and that both failure messages
       say **"Nothing was removed"** — load-bearing rather than style, because the deletion is one
       transaction and a user who fears a half-deleted account has no other way to find out. 244 unit
-      tests, up from 240.
+      tests, up from 240. — 2ade13d
 - [x] 2.2 Mutation (e): the `23503` branch removed → the hermetic test fails on the code
       — confirmed and read: `AssertionError: expected 'unexpected' to be 'account_delete_blocked'` —
       failing on the **code**, not on a status or a thrown error, which is what the criterion asks.
-      Restored and re-verified green.
+      Restored and re-verified green. — 2ade13d
 - [x] 2.3 `npm run test:integration` green, every suite
       — 14 files / **121 tests** (118 + assertions 8, 9, 10). Assertion 8 calls the exported handler
       with a real session and proves the account is gone from OUTSIDE, by signing the same address up
@@ -777,18 +777,36 @@ follow `db:push`, or the RPC will be missing from the committed types.
       reachable — the same-account one does not exist (1.2) and the cross-account one is refused by
       the sibling slice's trigger. Seeding a hazard row through a migration was considered and
       refused: `db:push` reaches production, so it would write a permanent, real block onto a real
-      account's deletion to make a test possible.
+      account's deletion to make a test possible. — 2ade13d
 - [x] 2.4 The full six-step gate passes
       — `lint` exit 0 → `typecheck` 119 files, 0 errors → 244 unit → 25 render → 121 integration →
-      `build` exit 0.
+      `build` exit 0. — 2ade13d
 
 ### Phase 3: The screen
 
 #### Automated
 
-- [ ] 3.1 `npm run test:render` covers the panel in both the loaded and `loadFailed` states
-- [ ] 3.2 Mutation (f): the panel moved inside the `loadFailed` ternary → the render check fails
-- [ ] 3.3 The full six-step gate passes
+- [x] 3.1 `npm run test:render` covers the panel in both the loaded and `loadFailed` states
+      — `tests/render/settings-delete-panel.test.ts`, five cases: both placement states, the real
+      counts in the dialog, the counts-unavailable sentence, and Cancel first in the DOM carrying
+      `data-initial-focus`. **30 render tests, up from 25 — and writing them found a real defect.**
+      `accountFootprint` guarded on `count === null`, but a read that never produced a count leaves
+      it `undefined`, so the dialog rendered "This removes **undefined** workouts". Fixed by
+      narrowing on `typeof`, one binding at a time (an `.every()` over an array proves nothing to
+      the compiler, and both ways of papering over that are forbidden by lint). The suite now
+      asserts `not.toContain("undefined")` on that path.
+      **It also required correcting an existing assertion in `settings-island.test.ts`**, which read
+      "exactly one island" and "no island at all". Those were proxies for "the 418 zone names never
+      cross into a prop", and a second legitimate island broke the proxy while the guarantee held.
+      `islandProps` now takes the island's `component-export` and the assertions name
+      `PreferencesForm`, so a third island can neither break them nor make them vacuous.
+- [x] 3.2 Mutation (f): the panel moved inside the `loadFailed` ternary → the render check fails
+      — confirmed exactly as specified: **only** "renders when the profile could NOT be loaded"
+      goes red (`expected … to contain 'component-export="DeleteAccountPanel"'`), the other 29 stay
+      green. Restored, and the reason is now written beside the slot in `settings.astro`.
+- [x] 3.3 The full six-step gate passes
+      — `lint` exit 0 → `typecheck` 125 files, 0 errors → 244 unit → 30 render → 121 integration →
+      `build` exit 0.
 
 #### Manual
 
