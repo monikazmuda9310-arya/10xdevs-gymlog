@@ -376,6 +376,40 @@
   the construct you are about to forbid before writing the migration; the suite that builds it on
   purpose will not announce itself.
 
+## A single-column foreign key into an RLS-protected table is an ownership hole no policy will show you — and it has as many ends as the table has cascades
+
+- **Context**: `exercise_entries.exercise_id references public.exercises (id) on delete restrict`,
+  written in `20260811005248_create_workout_log_with_row_ownership.sql` and closed by
+  `cross-account-isolation` on 2026-08-15.
+- **Problem**: every policy in the repository was correct and the hole was still open. The insert
+  policy on `exercise_entries` checks `(select auth.uid()) = user_id` **on the row in front of it**;
+  the select policy on `exercises` checks `user_id is null or (select auth.uid()) = user_id` **when
+  something reads it**; and a foreign key evaluates **neither**, because FK checks bypass RLS
+  entirely. So account A could store an entry naming account B's private exercise, and nothing in
+  either policy text is wrong. **Reading the policies is how you miss this** — the defect lives in
+  the join between two tables that are each individually correct.
+  - **It surfaced first as an arithmetic bug.** S-08 met it from the tonnage side, where an inner
+    join in a `security_invoker` view silently dropped the set's kilograms from its own owner's
+    breakdown, and answered with `left join`. That closed the consequence, not the cause.
+  - **And it had a second end nobody was looking for.** `exercises.user_id` cascades from
+    `auth.users`, so deleting account B cascades into B's private exercises — and the `on delete
+    restrict` above then **blocks that cascade**. One account could permanently prevent a stranger
+    from deleting their own account, which is a baseline data-protection duty. Same row, same
+    defect, a consequence in a completely different feature, and nothing surfaces but a database
+    error.
+- **Rule**: **when a foreign key points at a table that carries a select policy, ask who may
+  reference each row — the key does not, and no policy on either table will answer it.** Then follow
+  every cascade out of the referenced table before deciding the blast radius: an ownership hole has
+  one end where the row is written and another wherever a cascade meets it, and the second end is
+  the one that gets planned as somebody else's slice. Where a composite key cannot express the check
+  — into a shared catalogue it cannot, because `MATCH SIMPLE` equality never matches a null owner —
+  the answer is a `security invoker` trigger whose check IS the select policy, written up in
+  `context/foundation/access-control.md` so it is not invisible in the table definition.
+- **Applies to**: every single-column foreign key into a table with RLS, most of all a shared
+  catalogue where the nullable owner makes the declarative shape unavailable. And to any defect
+  already "handled" downstream: `left join` fixed a wrong number and left the row constructible, so
+  the closed-looking case is exactly where to check whether the cause is still open.
+
 ## Measurement record — the evidence behind the rules in `AGENTS.md`
 
 > **These entries are not rules and must not be read as ones.** They are the measurements and

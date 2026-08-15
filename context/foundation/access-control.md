@@ -1,13 +1,17 @@
 # Access control — the templates
 
 **This file is the expansion of `AGENTS.md` § Access control.** That section states the guarantee
-and names the four shapes; this one holds the SQL to copy and the reason each line is there.
+and names the five shapes; this one holds the SQL to copy and the reason each line is there.
 
 **Read it before writing any migration that creates a table or a view.** `AGENTS.md` is loaded every
 session and this file is not, which is the whole point of the split — but it also means an agent who
-improvises a policy set has skipped the only document that would have stopped them. The four shapes
+improvises a policy set has skipped the only document that would have stopped them. The five shapes
 below are not interchangeable: the plain template alone is a defect at depth 2, and a view left
 unmarked hands every account's training to every account.
+
+**Four of them are declarative and the fifth is not.** The last one is a trigger, which means the
+enforcement is invisible in the table definition a reader inspects first — that is its whole cost,
+and it is why it is written down here rather than left to be found.
 
 Citations elsewhere in the repository of the form "`AGENTS.md` § Access control → the derived-view
 variant" mean the correspondingly named section **here**; the headings are unchanged so those
@@ -122,6 +126,77 @@ same against `exercise_entries (id, user_id)`. The duplicate index on the parent
   the repository that would notice a migration "simplifying" the composite key away. **Do not
   delete it as redundant**, for the same reason as `exercises-rls` assertion 4.
 - **Copy this for every future nested table.** The plain template alone is a defect at depth 2.
+- **It does not transfer to a reference INTO the shared catalogue** — `exercise_entries.exercise_id`
+  is exactly that, and it is closed by the trigger variant below rather than by a key.
+
+### The access-control-trigger variant — the exception to "nested ownership is closed by a key"
+
+Use it when a row references a table under a **select policy** and the composite key above cannot
+express the check. There is exactly one such reference here:
+`exercise_entries.exercise_id references public.exercises (id)`, closed by
+`supabase/migrations/20260815090000_scope_exercise_entries_to_visible_exercises.sql`.
+
+**Why a composite key cannot do it, and this is the part everyone gets wrong.** The obvious move is
+`foreign key (exercise_id, user_id) references public.exercises (id, user_id)`, and the reason it
+fails has **nothing to do with policies**: a foreign key does not evaluate them, and FK checks bypass
+RLS. The obstacle is `MATCH SIMPLE` matching. FK matching is **equality**, and `NULL = NULL` is not
+`TRUE` — so a referencing tuple whose `user_id` is `not null` can never match a referenced row whose
+`user_id` is `null`, and the 38 seeded catalogue rows are exactly those null-owner rows. Every
+account would lose the shared catalogue. **Do not repeat the policy explanation here**; "a policy
+admits a row only on `TRUE`" is the § shared-catalogue variant's rule and does not apply to keys.
+
+```sql
+create function public.<t>_require_visible_<parent>() returns trigger
+language plpgsql
+security invoker              -- the whole design; see below
+set search_path = ''          -- so the body schema-qualifies everything
+as $$
+begin
+  -- Bare existence query: RLS supplies the predicate, so the check IS the select policy.
+  if not exists (select 1 from public.<parent> where id = new.<parent>_id) then
+    raise exception using
+      errcode = 'foreign_key_violation',
+      message = format('<parent> %s is not available to this account', new.<parent>_id);
+  end if;
+  return new;
+end;
+$$;
+
+create trigger <t>_<parent>_must_be_visible
+  before insert or update of <parent>_id on public.<t>
+  for each row execute function public.<t>_require_visible_<parent>();
+```
+
+- **`security definer` silently disables it, and it is the reflex for trigger functions.** The
+  function would then run as `postgres`, which owns every table here and is not subject to their
+  policies, so the existence query finds **every** row and the trigger admits everything while
+  looking exactly as it does now. This repository already has a `security definer` trigger
+  (`public.handle_new_user`), which is why `invoker` is written out rather than left to the SQL
+  default. Assertions 1 and 2 of `tests/integration/account-boundary.test.ts` are what fail when it
+  changes — and the failure is **byte-identical** to removing the trigger altogether.
+- **`update of <col>` as well as `insert`.** Where the table carries an UPDATE policy, re-pointing a
+  row the caller owns is the same hazard through a second door. Dropping that clause leaves the
+  insert assertion green and only the update one red.
+- **Raise `foreign_key_violation` (`23503`), and keep the constraint name OUT of the message.**
+  `src/pages/api/exercise-entries/index.ts` maps a 23503 onto `404`, choosing between
+  `workout_not_found` and `exercise_not_found` by whether the message contains
+  `exercise_entries_workout_owner_fkey`. Raising 23503 therefore lands on the answer an absent row
+  already gets — no existence oracle, and **no application change at all**. A `BEFORE` trigger fires
+  ahead of constraint checks, so from the moment it exists it is the trigger, not the plain key, that
+  raises for a genuinely missing row too: `workout-endpoints`' "tells a missing exercise apart from a
+  workout that is not the caller's" and `account-boundary` assertion 7 both depend on that message
+  rule. Assertion 7 is what fails (as `500 unexpected`) if the code changes.
+- **It binds `authenticated` and nothing else, and say so wherever you rely on it.** `postgres` and
+  `service_role` bypass RLS, so the visibility check admits anything on those paths — migrations and
+  service-role tooling can still create the hazard row. A `before` trigger also validates **nothing
+  already stored**, so count the violating rows before writing the migration rather than assuming
+  zero. Both projects were counted on 2026-08-15 and answered zero.
+- **Prefer a declarative shape when one exists.** The alternative that would work here — a generated
+  sentinel owner key on both tables plus a check constraint — was weighed and rejected on cost (two
+  new columns, a backfill, a value every caller must supply, and a sentinel uuid meaning "shared"
+  that somebody will read as a real account). `context/changes/cross-account-isolation/plan.md`
+  § Mechanism records it, so "lost on cost after being weighed" is not confused with "never
+  considered".
 
 ### The derived-view variant — when the read is a view rather than a table
 

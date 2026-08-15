@@ -544,12 +544,12 @@ near the 10 ms Worker CPU cap.
       created before deleting, unconditionally, so a leak cannot depend on which assertions ran or
       on assertion 6 reaching its last line. The refused read answers `42501` (`anon` holds no grant
       on `workouts`), asserted alongside an empty `data`: "the read failed" and "the read returned
-      the row anyway" are different outcomes and only one is a leak.
+      the row anyway" are different outcomes and only one is a leak. — c9ba922
 - [x] 2.2 The endpoint answers `404 exercise_not_found`; the outcome is recorded, not assumed
       — **no source change was needed.** `src/pages/api/exercise-entries/index.ts` mapped it
       correctly with no branch of its own, exactly as § Key Discoveries predicted, and assertion 7
       now holds that prediction as a claim rather than as an expectation. It also checks the two
-      wrong answers by name: not `500 unexpected`, not `workout_not_found`.
+      wrong answers by name: not `500 unexpected`, not `workout_not_found`. — c9ba922
 - [x] 2.3 `workout-endpoints`' "tells a missing exercise apart from a workout that is not the
       caller's" still green after the trigger
       — confirmed by name in a `--reporter=verbose` run, not merely by the file's colour. The
@@ -557,7 +557,7 @@ near the 10 ms Worker CPU cap.
       that assertion, and assertion 7 here. A `BEFORE` trigger fires ahead of constraint checks, so
       it is the trigger — not the plain foreign key — that raises for a genuinely missing exercise
       too, and both keep working only because its message does not contain
-      `exercise_entries_workout_owner_fkey`.
+      `exercise_entries_workout_owner_fkey`. — c9ba922
 - [x] 2.4 Mutation (d): a raised code other than `23503` makes the endpoint answer `500 unexpected`
       — applied to `gymlog-test` alone (`errcode = 'raise_exception'`, P0001) and confirmed:
       assertion 7 red on `expected 500 to be 404`, with the endpoint's own diagnostic
@@ -569,19 +569,32 @@ near the 10 ms Worker CPU cap.
       verbatim and verified byte-identical against a `pg_get_functiondef` dump taken before the
       mutation (`prosecdef: false` throughout); violation counts re-taken afterwards and still
       **0/0**, so the mutation run left no hazard row behind. The write to `gymlog-test` was refused
-      by the permission classifier and was run by the owner, 2026-08-15.
+      by the permission classifier and was run by the owner, 2026-08-15. — c9ba922
 - [x] 2.5 The full six-step gate passes
       — `lint` clean (exit 0) → `typecheck` 119 files, 0 errors → `npm test` 240 → `test:render` 25
       → `test:integration` 118 → `build` complete. The integration step was run again after the
-      mutation was restored, and is the 118 recorded here.
+      mutation was restored, and is the 118 recorded here. — c9ba922
 
 ### Phase 3: Documents, and the pull request
 
 #### Automated
 
-- [ ] 3.1 Full gate green: all six steps
+- [x] 3.1 Full gate green: all six steps
+      — `lint` exit 0 → `typecheck` 0 errors → 240 unit → 25 render → 118 integration → `build`
+      exit 0, run after every document edit rather than before them.
 - [ ] 3.2 CI green on the pushed branch
-- [ ] 3.3 Every test file and assertion number named in the amended documents exists
+- [x] 3.3 Every test file and assertion number named in the amended documents exists
+      — checked one by one rather than assumed: `account-boundary.test.ts` assertions 1, 2 and 7;
+      `workout-endpoints`' "tells a missing exercise apart from a workout that is not the caller's"
+      (cited by **title text**, since that suite does not number its `it` titles and a positional
+      citation rots on the next insertion); `exercise_entries_workout_owner_fkey` in the migration,
+      in `WORKOUT_OWNER_CONSTRAINT` and in the generated types; `public.handle_new_user` as the
+      repository's existing `security definer` trigger; and
+      `20260815090000_scope_exercise_entries_to_visible_exercises.sql`.
+      **One thing the plan did not list and that had to change**: `access-control.md` gained a fifth
+      shape, so `AGENTS.md`'s "The four shapes live in…" heading, its intro sentence and the file's
+      own header all said **four** and were now false. Amended in the same commit — a document that
+      undercounts its own contents is how the fifth shape stops being read.
 
 #### Manual
 

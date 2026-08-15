@@ -3,7 +3,7 @@ project: "GymLog"
 version: 1
 status: draft
 created: 2026-08-09
-updated: 2026-08-14
+updated: 2026-08-15
 prd_version: 1
 main_goal: speed
 top_blocker: time
@@ -64,7 +64,7 @@ the primary success criterion, and it is placed as early as its prerequisites al
 | S-06 | unit-formula-timezone-preferences | choose kilograms or pounds, the estimation formula, and the timezone their week runs in | S-03, F-03                                                                                                                      | FR-016, FR-022, US-03, NFR §unit round-trip                                         | done     |
 | S-07 | weekly-tonnage                    | see this training week's total tonnage next to last week's                              | S-05, S-06, F-01                                                                                                                | US-03, FR-017                                                                       | done     |
 | S-08 | tonnage-breakdown                 | see where the week's work went, per exercise and per muscle group                       | S-07, F-01                                                                                                                      | US-03, FR-018, FR-019                                                               | done     |
-| S-09 | account-boundary                  | be certain no other account can reach their training, and delete their own account      | S-02, S-03, S-06, F-01, F-03                                                                                                    | US-04, NFR §no cross-account reach, NFR §own-data deletion                          | planning |
+| S-09 | account-boundary                  | be certain no other account can reach their training, and delete their own account      | S-02, S-03, S-06, F-01, F-03                                                                                                    | US-04, NFR §no cross-account reach, NFR §own-data deletion                          | in-progress |
 
 ## Streams
 
@@ -266,8 +266,8 @@ Foundations below assume these are present and do NOT re-scaffold them.
 - **Parallel with:** S-07, S-08
 - **Blockers:** —
 - **Unknowns:** —
-- **Risk:** the enforcement itself is not deferred to this slice — the ownership policy is written in the same migration as every table from F-03 onwards, and a table that lands without one is a defect rather than a follow-up. What is sequenced here is the adversarial proof, which can only run once all three levels of the record exist, and which has to assert against stored rows rather than the status code the caller sees: a check that only reads the response passes happily against a broken boundary. Account deletion joins it because it is the same boundary read from the other side.
-- **Status:** planning
+- **Risk:** the enforcement itself is not deferred to this slice — the ownership policy is written in the same migration as every table from F-03 onwards, and a table that lands without one is a defect rather than a follow-up. What is sequenced here is the adversarial proof, which can only run once all three levels of the record exist, and which has to assert against stored rows rather than the status code the caller sees: a check that only reads the response passes happily against a broken boundary. Account deletion joins it because it is the same boundary read from the other side. **The proof turned out to be nearly complete already** — twelve suites covered every criterion but one, so `cross-account-isolation` spent its effort on a real schema defect (the unscoped `exercise_id`) and added the single missing assertion, signing out.
+- **Status:** in-progress
 
 ## Backlog Handoff
 
