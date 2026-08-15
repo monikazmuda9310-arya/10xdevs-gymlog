@@ -321,6 +321,12 @@
   assertion's **own** fixture window, so an access defect and an arithmetic defect stay
   distinguishable. Measured under mutation: `expected 500 to be close to 680`, short by exactly the
   hazard set's tonnage.
+  - **The "construct it" half is no longer performable HERE, and the rule still stands elsewhere.**
+    `cross-account-isolation` closed the source defect on 2026-08-15, so an `authenticated` caller
+    can no longer build that particular row and assertion 9 was retired — see "Closing a defect can
+    retire the only test of an unrelated guarantee" below for what that cost. Read the rule as
+    written for any view whose referenced table is still reachable this way; where the row has been
+    made unconstructible, the honest answer is a named gap, not a weaker assertion.
 - **Applies to**: every view joining a table that carries a select policy — not only aggregates — and
   every figure claimed to reconcile with another figure derived by a different query. Two numbers
   that must agree need a test that computes both from one fixture; "they are derived from the same

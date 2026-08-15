@@ -1,7 +1,7 @@
 ---
 change_id: cross-account-isolation
 title: Prove US-04 against stored state at every level, and decide the unscoped exercise_id
-status: implemented
+status: impl_reviewed
 created: 2026-08-14
 updated: 2026-08-15
 archived_at: null

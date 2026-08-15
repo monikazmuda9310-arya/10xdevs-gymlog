@@ -54,14 +54,25 @@
 // publishable key; never a `service_role` key; throw in `beforeAll` when a variable is missing,
 // because a check must never skip its way to green.
 //
-// MARK is `s09i-` — not a prefix of, and not prefixed by, any existing mark (`s01-signup-`, `s03-`,
-// `s03-endpoints-`, `s03-page-`, `s07-`, `s08-`). Deliberately not `s09-`, which is a strict prefix
-// of this one and of anything the sibling slice picks.
+// MARK is `s09i-` — not a prefix of, and not prefixed by, any of the ten marks this repository
+// uses (`s01-signup-`, `s03-`, `s03-endpoints-`, `s03-page-`, `s04-`, `s05-`, `s05m-`, `s06-`,
+// `s07-`, `s08-`). Deliberately not `s09-`, which is a strict prefix of this one and of anything the
+// sibling slice picks.
 //
-// **This suite owns its accounts and never touches `rls-owner-a/b`.** Three throwaway accounts per
-// run: every other suite shares that fixture pair, and the sibling slice `account-deletion` is
-// developing in a parallel worktree against the same `gymlog-test`. The third exists because
-// assertion 6 deliberately ends its account's session, which no other assertion may inherit.
+// **This suite owns its three accounts and never touches `rls-owner-a/b`.** Every other suite
+// shares that fixture pair, and the sibling slice `account-deletion` is developing in a parallel
+// worktree against the same `gymlog-test`. The third account exists because assertion 6 deliberately
+// ends its account's session, which no other assertion may inherit.
+//
+// **They are a FIXED POOL, not throwaway accounts per run, and the reason is durability rather than
+// tidiness.** Run-unique addresses looked safer — nothing another run could collide with — but
+// nothing in this repository can delete an `auth.users` row (that needs `auth.admin.deleteUser` and
+// a `service_role` key, which `vitest.integration.config.ts` strips), so every run leaked three
+// accounts permanently; and an interrupted run's ROWS were worse still, because no later run knew
+// those account ids and RLS hides them from every other account. Fixed addresses plus the
+// `beforeAll` reset below make the garbage self-healing, which is the reason every sibling RLS suite
+// resets at the START of a run (`workout-log-rls.test.ts`, `exercises-rls.test.ts`). Run-uniqueness
+// is kept where it is actually load-bearing — in the row MARKS, via `RUN_ID`.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -77,12 +88,21 @@ const RUN_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,
 const FOREIGN_KEY_VIOLATION = "23503";
 /** What Postgres answers a role holding no grant on the table — assertion 6's signed-out client. */
 const INSUFFICIENT_PRIVILEGE = "42501";
+/** What the `not null` constraint on `exercise_id` answers — assertion 8. */
+const NOT_NULL_VIOLATION = "23502";
 
 interface Account {
   client: SupabaseClient<Database>;
   userId: string;
   email: string;
 }
+
+/** This suite's three fixed accounts, created on the first run that needs them and reused after. */
+const ADDRESSES = {
+  a: `${MARK}a@gymlog-test.dev`,
+  b: `${MARK}b@gymlog-test.dev`,
+  signout: `${MARK}signout@gymlog-test.dev`,
+} as const;
 
 let accountA: Account;
 let accountB: Account;
@@ -100,13 +120,14 @@ let accountC: Account;
 let accountPassword: string;
 
 /**
- * Every account this run actually created, in creation order.
+ * Every account this run actually reached, in order.
  *
- * `afterAll` iterates THIS rather than `[accountA, accountB]`: when `beforeAll` dies partway — the
- * second signup rate-limited, say — the second binding is still unassigned, and teardown reaching
- * through it would replace a legible setup failure with a TypeError from a hook.
+ * `beforeAll` and `afterAll` iterate THIS rather than `[accountA, accountB, accountC]`: when
+ * `beforeAll` dies partway — the second sign-in rate-limited, say — the later bindings are still
+ * unassigned, and a hook reaching through one would replace a legible setup failure with a
+ * TypeError.
  */
-const created: Account[] = [];
+const accounts: Account[] = [];
 
 /** A's private exercise: the row B must never be able to point an entry at. */
 let aPrivateExerciseId: string;
@@ -122,26 +143,39 @@ function required(name: string): string {
 }
 
 /**
- * A brand-new account, created for this run alone.
+ * One of this suite's three accounts: signed in if it exists, created if it does not.
  *
- * `signUp` returns a session because email confirmation is OFF on `gymlog-test`, which
- * `auth-flows.test.ts` assertion 1 is the tripwire for.
+ * Sign-in first, in the shape `workout-log-rls.test.ts` established, so the first run creates the
+ * account and every later run reuses it. `signUp` returns a session because email confirmation is
+ * OFF on `gymlog-test`, which `auth-flows.test.ts` assertion 1 is the tripwire for — and a created
+ * account with no session means somebody switched it on, which breaks every suite that bootstraps
+ * without an inbox.
  */
-async function throwawayAccount(url: string, key: string, password: string, role: string): Promise<Account> {
-  const email = `${MARK}${role}-${RUN_ID}@gymlog-test.dev`;
+async function authenticate(url: string, key: string, password: string, email: string): Promise<Account> {
   const client = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data, error } = await client.auth.signUp({ email, password });
-  if (error) {
-    throw new Error(`could not create ${email}: ${error.message}`);
+
+  const signIn = await client.auth.signInWithPassword({ email, password });
+  if (signIn.data.session) {
+    const account = { client, userId: signIn.data.session.user.id, email };
+    accounts.push(account);
+    return account;
   }
-  if (!data.session) {
+
+  const signUp = await client.auth.signUp({ email, password });
+  if (signUp.error) {
+    throw new Error(
+      `could not sign in or sign up ${email}. Sign-in said "${signIn.error?.message ?? "no session"}"; ` +
+        `sign-up said "${signUp.error.message}".`,
+    );
+  }
+  if (!signUp.data.session) {
     throw new Error(
       `${email} was created without a session. Email confirmation has been switched on for ` +
         `gymlog-test, which breaks every suite that bootstraps an account without an inbox.`,
     );
   }
-  const account = { client, userId: data.session.user.id, email };
-  created.push(account);
+  const account = { client, userId: signUp.data.session.user.id, email };
+  accounts.push(account);
   return account;
 }
 
@@ -202,23 +236,76 @@ function apiContext(body: unknown, account: Account): APIContext {
   } as unknown as APIContext;
 }
 
+/**
+ * Say so when a cleanup call fails, rather than leaking in silence.
+ *
+ * Every statement in `sweep` is fire-and-forget by nature — there is nothing to assert about a
+ * delete that matched nothing. But a FAILED delete is different: the rows survive, and with them
+ * the `on delete restrict` that makes the next statement fail too. Unread, that is a suite which
+ * starts failing later for a reason that happened here.
+ */
+function report(what: string, error: { code?: string; message: string } | null): void {
+  if (error) {
+    // eslint-disable-next-line no-console -- a silent cleanup failure is the thing being prevented
+    console.warn(`[account-boundary] ${what} failed: ${error.code ?? "?"} ${error.message}`);
+  }
+}
+
+/**
+ * Remove every row this suite has ever written, across all three accounts.
+ *
+ * Run at the START of a run as well as at the end. **Teardown protects the happy path; only setup
+ * protects the next run** (`lessons.md` § "A `finally` that restores shared state does not survive
+ * a killed process") — and with fixed accounts an interrupted run's rows are reachable again,
+ * which is the whole reason those accounts stopped being throwaway.
+ *
+ * Two passes, and the order is not tidiness: `exercise_id` carries `on delete restrict`, so an
+ * exercise cannot go while an entry still points at it, and deleting a workout is what cascades the
+ * entries away. Across accounts as well as within one, because the pass is cheap and the ordering
+ * argument does not depend on which account owns what.
+ */
+async function sweep(): Promise<void> {
+  for (const account of accounts) {
+    const { error } = await account.client
+      .from("workouts")
+      .delete()
+      .like("note", `${MARK}%`)
+      .eq("user_id", account.userId);
+    report(`clearing ${account.email}'s workouts`, error);
+  }
+  for (const account of accounts) {
+    const { error } = await account.client
+      .from("exercises")
+      .delete()
+      .like("name", `${MARK}%`)
+      .eq("user_id", account.userId);
+    report(`clearing ${account.email}'s exercises`, error);
+  }
+}
+
 beforeAll(async () => {
   const url = required("SUPABASE_TEST_URL");
   const key = required("SUPABASE_TEST_KEY");
   accountPassword = required("GYMLOG_TEST_PASSWORD");
 
-  accountA = await throwawayAccount(url, key, accountPassword, "a");
-  accountB = await throwawayAccount(url, key, accountPassword, "b");
-  accountC = await throwawayAccount(url, key, accountPassword, "signout");
+  accountA = await authenticate(url, key, accountPassword, ADDRESSES.a);
+  accountB = await authenticate(url, key, accountPassword, ADDRESSES.b);
+  accountC = await authenticate(url, key, accountPassword, ADDRESSES.signout);
 
-  // No fixture reset: both accounts were created seconds ago and own nothing else. That is the
-  // point of throwaway accounts — `lessons.md` § "A `finally` that restores shared state does not
-  // survive a killed process" applies to SHARED fixtures, and this suite has none.
+  await sweep();
+
   aPrivateExerciseId = await makePrivateExercise(accountA, "a-private");
 
-  const seeded = await accountB.client.from("exercises").select("id").is("user_id", null).limit(1).single();
+  // Pinned by name rather than "any seeded row": with `.limit(1)` and no `order by`, which of the
+  // 38 comes back is unspecified, so a failure would name a different exercise on different runs.
+  const seeded = await accountB.client
+    .from("exercises")
+    .select("id")
+    .is("user_id", null)
+    .eq("name", "Deadlift")
+    .single();
   if (seeded.error) {
-    throw new Error(`could not read a seeded exercise: ${seeded.error.code} ${seeded.error.message}`);
+    throw new Error(`could not read the seeded 'Deadlift': ${seeded.error.code} ${seeded.error.message}`);
   }
   seededExerciseId = seeded.data.id;
 });
@@ -228,18 +315,15 @@ afterAll(async () => {
   // so re-authenticate every account first. Unconditional rather than conditional: signing in a
   // client that already has a session simply replaces it, and the alternative is teardown that
   // depends on which assertions ran.
-  for (const account of created) {
-    await account.client.auth.signInWithPassword({ email: account.email, password: accountPassword });
+  for (const account of accounts) {
+    const { error } = await account.client.auth.signInWithPassword({
+      email: account.email,
+      password: accountPassword,
+    });
+    report(`re-authenticating ${account.email}`, error);
   }
 
-  // Workouts before exercises, for every account: `exercise_id` carries `on delete restrict`, and
-  // deleting a workout cascades to its entries and sets, which is what releases it.
-  for (const account of created) {
-    await account.client.from("workouts").delete().like("note", `${MARK}%`).eq("user_id", account.userId);
-  }
-  for (const account of created) {
-    await account.client.from("exercises").delete().like("name", `${MARK}%`).eq("user_id", account.userId);
-  }
+  await sweep();
 });
 
 describe("account boundary: an entry cannot name an exercise the account cannot see", () => {
@@ -412,6 +496,32 @@ describe("account boundary: what the endpoint tells a caller the trigger refused
     expect(((await response.json()) as { code: string }).code).toBe("exercise_not_found");
 
     // Persisted state, not the response: the refusal has to have written nothing.
+    expect(await readEntries(accountB, workoutId)).toEqual([]);
+  });
+});
+
+describe("account boundary: the trigger answers only the question it was asked", () => {
+  it("8. a null exercise_id is refused by the not-null constraint, not by the visibility trigger", async () => {
+    // **The guard added by `20260815120000`, and the assertion that would notice it being removed.**
+    // `not null` is enforced in ExecConstraints, which runs AFTER `before row` triggers — so without
+    // the short-circuit the trigger sees `new.exercise_id is null`, finds no such exercise, and
+    // raises `23503` with an empty id in the message. `/api/exercise-entries` would then answer
+    // `404 exercise_not_found` for a write that is malformed rather than pointed at a hidden row:
+    // a different fact about the system, told to whoever reads the log.
+    //
+    // Unreachable through the endpoint — `parseAddExerciseEntry` requires a uuid — which is exactly
+    // why it needs an assertion at this level, where PostgREST is spoken to directly.
+    const workoutId = await makeWorkout(accountB, "null-exercise");
+
+    const attempt = await accountB.client
+      .from("exercise_entries")
+      // The generated types type `exercise_id` as a required string, correctly: no application code
+      // may write null here. The cast is the point of the test — it reaches the database the way a
+      // hand-written PostgREST call would.
+      .insert({ user_id: accountB.userId, workout_id: workoutId, exercise_id: null as unknown as string })
+      .select("id");
+
+    expect(attempt.error?.code).toBe(NOT_NULL_VIOLATION);
     expect(await readEntries(accountB, workoutId)).toEqual([]);
   });
 });

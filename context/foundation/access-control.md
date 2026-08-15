@@ -186,6 +186,18 @@ create trigger <t>_<parent>_must_be_visible
   raises for a genuinely missing row too: `workout-endpoints`' "tells a missing exercise apart from a
   workout that is not the caller's" and `account-boundary` assertion 7 both depend on that message
   rule. Assertion 7 is what fails (as `500 unexpected`) if the code changes.
+- **The check is evaluated for the CALLER, not for the row's owner — so it means "the row's owner
+  can see it" only while the table's INSERT/UPDATE policy pins `user_id` to `auth.uid()`.** A
+  `before row` trigger fires ahead of the RLS `with check`, so `new.user_id = auth.uid()` is not yet
+  established when the function runs. On `exercise_entries` the two always coincide, because the
+  insert policy pins `user_id` immediately afterwards and refuses `42501` otherwise — but that means
+  this shape's guarantee rests on a policy in a different file. **Write that dependency down
+  wherever you use this shape**, and do NOT close it by adding an owner term to the query: that
+  restates the select policy in a second place, which is the one thing the bare existence query
+  exists to prevent.
+- **Hand a NULL reference back to the `NOT NULL` constraint** — `if new.<parent>_id is null then
+  return new; end if;` — because `NOT NULL` is enforced after `before row` triggers, so without it
+  the function answers a question it was not asked, with an empty id in the message.
 - **It binds `authenticated` and nothing else, and say so wherever you rely on it.** `postgres` and
   `service_role` bypass RLS, so the visibility check admits anything on those paths — migrations and
   service-role tooling can still create the hazard row. A `before` trigger also validates **nothing

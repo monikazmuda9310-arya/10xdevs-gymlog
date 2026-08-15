@@ -448,10 +448,23 @@ Beyond the MARK, the throwaway accounts and the expected `AGENTS.md` conflict al
 
 ### Integration Tests
 
-`tests/integration/account-boundary.test.ts`, MARK `s09i-`, own throwaway accounts, fixtures reset in
-`beforeAll` and restored in a `finally` — and each precondition established by this suite itself rather
-than trusted from another, per `lessons.md` § "A `finally` that restores shared state does not survive
-a killed process".
+`tests/integration/account-boundary.test.ts`, MARK `s09i-`, its own three accounts — never
+`rls-owner-a/b` — with fixtures swept in `beforeAll` and again in `afterAll`, and each precondition
+established by this suite itself rather than trusted from another, per `lessons.md` § "A `finally`
+that restores shared state does not survive a killed process".
+
+**Amended after the implementation review, 2026-08-15 (finding F1).** This section originally said
+"own **throwaway** accounts" — created per run, with no `beforeAll` reset, on the reasoning that an
+account seconds old owns nothing to collide with. That is right about collisions and wrong about
+durability, and it was built that way before the review caught it. Nothing in this repository can
+delete an `auth.users` row (`auth.admin.deleteUser` needs a `service_role` key that
+`vitest.integration.config.ts` strips), so each run leaked three accounts permanently; worse, an
+interrupted run's ROWS became unreachable, because no later run knew those account ids and RLS hides
+them from every other account. The three addresses are now **fixed** (`s09i-a@`, `s09i-b@`,
+`s09i-signout@gymlog-test.dev`), obtained through the sign-in-or-sign-up helper
+`workout-log-rls.test.ts` established, and the `beforeAll` sweep makes the garbage self-healing —
+which is why every sibling RLS suite resets at the start of a run. Run-uniqueness is kept where it
+is actually load-bearing: in the row marks, via `RUN_ID`.
 
 ### Manual Testing Steps
 

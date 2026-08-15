@@ -166,9 +166,10 @@ interface LoggedEntry {
  * tables.
  *
  * Not through `/api/sets`, deliberately: that endpoint stamps the unit from the profile, and
- * assertion 3 needs a single workout carrying BOTH units. Not through `/api/exercise-entries`
- * either, because assertion 9 needs an entry the service would happily create but the UI never
- * would. Both endpoint paths have their own suites.
+ * assertion 3 needs a single workout carrying BOTH units. It also bypassed
+ * `/api/exercise-entries`, which retired assertion 9 needed in order to build an entry the service
+ * would happily create but the UI never would — no longer possible for any caller, see the note at
+ * the foot of this file. Both endpoint paths have their own suites.
  */
 async function logWorkout(owner: Owner, performedOn: string, entries: LoggedEntry[]): Promise<string> {
   const workout = await owner.client
@@ -320,10 +321,10 @@ beforeAll(async () => {
   // tidiness.** `exercise_id` carries `on delete restrict`, so deleting an exercise while any entry
   // still points at it fails outright; deleting workouts cascades to entries and sets, which is what
   // releases the restrict. Retired assertion 9 built such an entry ACROSS the two accounts, which is
-  // why the passes are also ordered across owners — and this run may still meet one of its rows,
-  // because that fixture survived from one run to the beginning of the next. Kept after the
-  // retirement: the single-owner case still needs the ordering, and the cross-owner pass costs one
-  // extra statement.
+  // why the passes are also ordered across owners. No run can meet one of its rows any more — the
+  // trigger refuses that row at insert, and both hosted projects were counted at zero after the
+  // retirement landed. Kept anyway: the single-owner case still needs the ordering, and the
+  // cross-owner pass costs one extra statement.
   for (const owner of [ownerA, ownerB]) {
     await owner.client.from("workouts").delete().like("note", `${MARK}%`).eq("user_id", owner.userId);
   }
