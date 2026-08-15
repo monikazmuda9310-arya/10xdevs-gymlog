@@ -482,6 +482,42 @@ a user (FR-012) are private to that account.
    shipping `PATCH /api/exercises/[id]` is a separate slice, and it inherits this answer rather than
    re-opening it.
 
+3. **How does a user who has forgotten their password get back to their training?** — **OPEN, and
+   raised on 2026-08-15 by the account-cleanup phase of S-09 rather than by planning.**
+
+   **This is a gap, not a decision, and the distinction is the reason it is written here.** Password
+   recovery appears in no requirement — `FR-001` covers creating an account, `FR-002` signing in and
+   out, `FR-003` the redirect — and it appears in **no Non-Goal either**. Everything this product
+   genuinely declined is listed there with its reason; this was never weighed. S-01 excluded it at
+   slice level ("none is in `FR-001..003`, and each is its own slice"), which defers a question
+   rather than answering it.
+
+   **What made it visible is that the opposite capability shipped first.** Since S-09 the product can
+   permanently delete an account, and it still cannot recover one. A user who forgets their password
+   loses every workout they have logged: the rows survive untouched and become unreachable forever,
+   because `US-04` is doing exactly its job. The only escape is the Supabase dashboard, which is an
+   operator, not a user.
+
+   **It was not hypothetical when it was found.** Five of the eight production accounts had to be
+   deleted from the dashboard rather than through `/settings`, precisely because no password was
+   recorded and no recovery path exists — so the account-deletion feature's own first cleanup could
+   not use it. `@gymlog-test.dev` and `@example.com` receive no mail, but that only compounds a
+   product gap; it is not the cause.
+
+   **The cost is not a checkbox, and pricing it is half the answer.** Supabase will send the
+   recovery link on request, but it lands on `site_url`, and this application has **no
+   `/auth/callback` route** to exchange the PKCE code for a session and **no screen for choosing a
+   new password**. So the database side would work while the user saw a page that cannot help them —
+   the same shape as the `site_url` defect S-01 found by clicking a real link, and invisible to every
+   test for the same reason. A slice here is: the callback route, the new-password screen and its
+   endpoint, entries in `AUTH_MESSAGES`, and `uri_allow_list` configuration that lives outside this
+   repository.
+
+   **Deliberately not decided now.** The one badge requirement still outstanding is the
+   user-perspective browser test; recovery does not advance it and would open a slice with Supabase
+   project configuration in the middle of it. What must not happen is this being mistaken later for a
+   considered omission — hence an Open Question rather than a Non-Goal.
+
 Resolved during shaping, recorded here so the reasoning is not lost:
 
 - **Records are tracked per exercise, not per repetition-range.** A five-repetition best and a

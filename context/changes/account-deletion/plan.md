@@ -892,9 +892,77 @@ follow `db:push`, or the RPC will be missing from the committed types.
 
 #### Manual
 
-- [ ] 6.1 The account holding real training rows is identified against the data, not by inference
-- [ ] 6.2 The four F-03 smoke accounts deleted and confirmed gone
-- [ ] 6.3 `s01-manual-…@example.com` and `proroknh@gmail.com` deleted and confirmed gone
-- [ ] 6.4 The two confirmed-email accounts resolved — deleted with the owner's go-ahead, or recorded as
+- [x] 6.1 The account holding real training rows is identified against the data, not by inference
+      — **`monika.zmuda9310+gymlog1@gmail.com`**, read from `gymlog` itself over `SUPABASE_DB_URL`
+      (read-only `select`, no writes, no DDL, throwaway client in the scratchpad). It holds the
+      **only** workout in production: `2026-08-14`, two entries, two sets — `Back Squat 5 × 100 kg`
+      and `Barbell Curl 5 × 60 kg`, both against **seeded** exercises. Every other account has
+      `workouts = 0`.
+      **The elimination in § Changes Required was half right and would have deleted the wrong thing
+      by one step.** `monika.zmuda9310@gmail.com` — the other candidate — holds **no** workout but
+      **one custom exercise**, `Zercher Squat` (`legs`, not bodyweight). So "the account with real
+      training rows" and "the account with something of its own to lose" are **two different
+      accounts**, and only the data says so.
+      **The `restrict` edge is not armed anywhere in production**: that custom exercise has zero
+      `exercise_entries` pointing at it, from its own account or any other, so no deletion here can
+      answer `account_delete_blocked`. Seeded catalogue verified at **38** rows before anything was
+      touched.
+      Exactly eight accounts remain, matching `STATE.md`'s list — the Phase 5 throwaway is already
+      gone, which is independent confirmation of 5.2/5.3.
+- [x] 6.2 The four F-03 smoke accounts deleted and confirmed gone
+      — deleted by the owner, 2026-08-15, from the Supabase dashboard (Authentication → Users →
+      Delete user) against project ref `cdzybmwxtefhbanfytna`. Confirmed by re-reading the data,
+      not by the dashboard's own answer: `auth.users` is down from 8 rows to 4, all four addresses
+      gone, and **zero orphans** at every level — `profiles`, `workouts`, `exercise_entries`,
+      `sets`, owner-scoped `exercises` — so the cascade took everything rather than only the
+      `auth.users` row. Seeded catalogue still **38**; the one real workout still 1/2/2.
+      **This was NOT the feature's first real use, and the plan assumed it would be.** `/settings`
+      needs a session, and no password for these four is recorded anywhere — not in `context/`,
+      not in `scripts/`, not in git history. Password recovery cannot substitute: this application
+      has no reset flow at all (S-01 § What We're NOT Doing), and `@gymlog-test.dev` receives no
+      mail regardless. The dashboard was therefore the only available path, and it is an
+      administrative one — no schema touched, so `AGENTS.md`'s `supabase_migrations` warning about
+      the SQL editor does not apply here. Recorded in `STATE.md` as an open product gap.
+- [x] 6.3 `s01-manual-…@example.com` and `proroknh@gmail.com` deleted and confirmed gone
+      — owner, 2026-08-15, by **two different routes on purpose**. `proroknh@gmail.com` went
+      through `/settings → Delete account` on the deployed URL — **the feature's first real
+      cleanup use**, which 6.2 could not be. `s01-manual-…@example.com` went from the dashboard,
+      because `@example.com` receives no mail and no password was recorded (§ 6.2's gap).
+      Confirmed by re-reading the data: `auth.users` down to 2 rows, zero orphans at every level,
+      catalogue **38**, the one real workout still 1/2/2.
+      **A guard worth keeping for anyone repeating this**: `/settings` does **not** show which
+      account is signed in — `Layout.astro` renders no `Topbar` — so the identity check has to be
+      made on `/dashboard` ("Welcome, …") **before** navigating to the delete control. Checked in
+      the code rather than assumed, and it is the only thing standing between this phase and
+      deleting the wrong account.
+- [x] 6.4 The two confirmed-email accounts resolved — deleted with the owner's go-ahead, or recorded as
       deliberately kept with the reason
-- [ ] 6.5 `STATE.md`'s cleanup block updated to reflect what actually happened
+      — **split, on the owner's ruling of 2026-08-15 (CONTRACT §6.6).**
+      `monika.zmuda9310@gmail.com` **deleted** through `/settings` on the deployed URL, the second
+      real use of the feature. Its custom exercise `Zercher Squat` went with it: the
+      `public.exercises` rows with a non-null `user_id` now number **zero**, read back afterwards.
+      `monika.zmuda9310+gymlog1@gmail.com` is **deliberately KEPT**, and the reason is the
+      asymmetry rather than sentiment: keeping it is reversible — the account can now delete
+      itself in one click, which is the whole point of this slice — while deleting it is not
+      reversible at all, backup retention on the free plan being zero days. It also holds the only
+      training in production and is the only way to verify a future `wrangler deploy` by signing in,
+      which otherwise costs a fresh signup and a confirmation-email round trip every time. Phase 3's
+      browser tests do **not** need it: `STATE.md` binds E2E to `gymlog-test`, because production
+      requires clicking a real confirmation link.
+      **The `+gymlog1` suffix is the hazard here and it is worth naming.** The two remaining
+      addresses differed only by it, one of them holding the only real training, and `/settings`
+      shows neither. The identity check on `/dashboard` (§ 6.3) is what made this safe.
+      Final production state, read back rather than inferred: **1** account, **1** profile, 1
+      workout / 2 entries / 2 sets (`Back Squat 5 × 100 kg`, `Barbell Curl 5 × 60 kg`, 2026-08-14),
+      **0** custom exercises, seeded catalogue **38**, and **zero orphans** at every level.
+- [x] 6.5 `STATE.md`'s cleanup block updated to reflect what actually happened
+      — the cleanup section now carries the outcome per account, the route each went by and why,
+      the kept account with its reason, and the product gap the phase exposed. **Seven of eight
+      deleted, one kept deliberately.**
+      **Two findings outlived the phase and are recorded outside this plan.** The absence of any
+      password-recovery path — which is why five accounts could not go through `/settings` and why
+      this phase was not the feature's first real use as § Overview assumed — is written up as
+      `context/foundation/prd.md` § Open Questions #3, **as an open question rather than a
+      Non-Goal**, because it was overlooked rather than declined. And `/settings` not showing the
+      signed-in account is noted in 6.3 as the thing that makes deleting the wrong account
+      possible.
