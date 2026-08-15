@@ -321,6 +321,12 @@
   assertion's **own** fixture window, so an access defect and an arithmetic defect stay
   distinguishable. Measured under mutation: `expected 500 to be close to 680`, short by exactly the
   hazard set's tonnage.
+  - **The "construct it" half is no longer performable HERE, and the rule still stands elsewhere.**
+    `cross-account-isolation` closed the source defect on 2026-08-15, so an `authenticated` caller
+    can no longer build that particular row and assertion 9 was retired — see "Closing a defect can
+    retire the only test of an unrelated guarantee" below for what that cost. Read the rule as
+    written for any view whose referenced table is still reachable this way; where the row has been
+    made unconstructible, the honest answer is a named gap, not a weaker assertion.
 - **Applies to**: every view joining a table that carries a select policy — not only aggregates — and
   every figure claimed to reconcile with another figure derived by a different query. Two numbers
   that must agree need a test that computes both from one fixture; "they are derived from the same
@@ -346,6 +352,99 @@
   environment-independent.
 - **Applies to**: timezones, locales, filesystem case-sensitivity, line endings, and any other
   ambient setting that differs between a developer's machine and CI.
+
+## Closing a defect can retire the only test of an unrelated guarantee — say so where the guarantee lives
+
+- **Context**: assertion 9 of `tests/integration/tonnage-breakdown.test.ts`, retired by
+  `cross-account-isolation` Phase 1 on 2026-08-15.
+- **Problem**: the assertion constructed the cross-account entry row — account A's entry naming
+  account B's private exercise — and used it to prove that the **`left join`** in
+  `public.daily_exercise_tonnage` keeps that set's kilograms in A's own weekly figure. It was the only
+  thing in the repository that would notice the `left` being "simplified" to `join`. Closing the
+  source defect with a `before insert or update` trigger made the row unconstructible, so the
+  assertion did not fail an expectation — **it died in setup**, because `logWorkout` throws when an
+  insert is refused. Two things follow that are easy to miss while celebrating the fix. First, the
+  gate goes red the moment the migration lands, so the retirement has to be sequenced **before** it.
+  Second, and worse: the guarantee did **not** retire with the test. A `before` trigger validates
+  nothing already stored, and a `security invoker` one binds `authenticated` only — `postgres` and
+  `service_role` bypass RLS and are unconstrained — so the hazard row is still reachable from three
+  directions while the thing that would notice its consequence is gone.
+- **Rule**: **when a change makes an existing assertion unconstructible, ask what that assertion was
+  holding before deleting it, and write the answer where the guarantee lives — not only in the test
+  file.** Then say plainly, in the same words you would use to refuse a new assertion: name the
+  guarantee, state that no mutation available today breaks it, and name the exact future edit that
+  would. A weaker replacement assertion is the wrong answer — it reads as coverage and is not.
+  Sequence the retirement **ahead** of the change that causes it, so the gate is never red in between,
+  and never let "the defect is closed" stand in for "the consequence is still guarded": they are
+  different claims about different code.
+- **Applies to**: every change that closes a hole another suite deliberately exploits — access-control
+  hardening most of all, because hazard fixtures are exactly the rows such a change forbids. Grep for
+  the construct you are about to forbid before writing the migration; the suite that builds it on
+  purpose will not announce itself.
+
+## A single-column foreign key into an RLS-protected table is an ownership hole no policy will show you — and it has as many ends as the table has cascades
+
+- **Context**: `exercise_entries.exercise_id references public.exercises (id) on delete restrict`,
+  written in `20260811005248_create_workout_log_with_row_ownership.sql` and closed by
+  `cross-account-isolation` on 2026-08-15.
+- **Problem**: every policy in the repository was correct and the hole was still open. The insert
+  policy on `exercise_entries` checks `(select auth.uid()) = user_id` **on the row in front of it**;
+  the select policy on `exercises` checks `user_id is null or (select auth.uid()) = user_id` **when
+  something reads it**; and a foreign key evaluates **neither**, because FK checks bypass RLS
+  entirely. So account A could store an entry naming account B's private exercise, and nothing in
+  either policy text is wrong. **Reading the policies is how you miss this** — the defect lives in
+  the join between two tables that are each individually correct.
+  - **It surfaced first as an arithmetic bug.** S-08 met it from the tonnage side, where an inner
+    join in a `security_invoker` view silently dropped the set's kilograms from its own owner's
+    breakdown, and answered with `left join`. That closed the consequence, not the cause.
+  - **And it had a second end nobody was looking for.** `exercises.user_id` cascades from
+    `auth.users`, so deleting account B cascades into B's private exercises — and the `on delete
+    restrict` above then **blocks that cascade**. One account could permanently prevent a stranger
+    from deleting their own account, which is a baseline data-protection duty. Same row, same
+    defect, a consequence in a completely different feature, and nothing surfaces but a database
+    error.
+- **Rule**: **when a foreign key points at a table that carries a select policy, ask who may
+  reference each row — the key does not, and no policy on either table will answer it.** Then follow
+  every cascade out of the referenced table before deciding the blast radius: an ownership hole has
+  one end where the row is written and another wherever a cascade meets it, and the second end is
+  the one that gets planned as somebody else's slice. Where a composite key cannot express the check
+  — into a shared catalogue it cannot, because `MATCH SIMPLE` equality never matches a null owner —
+  the answer is a `security invoker` trigger whose check IS the select policy, written up in
+  `context/foundation/access-control.md` so it is not invisible in the table definition.
+- **Applies to**: every single-column foreign key into a table with RLS, most of all a shared
+  catalogue where the nullable owner makes the declarative shape unavailable. And to any defect
+  already "handled" downstream: `left join` fixed a wrong number and left the row constructible, so
+  the closed-looking case is exactly where to check whether the cause is still open.
+
+## The ORDER database-internal actions fire in is a fact about the catalogue — and reading the catalogue is still not measuring
+
+- **Context**: `public.delete_own_account()` and step 1.2 of
+  `context/changes/account-deletion/plan.md`, 2026-08-15.
+- **Problem**: planning needed to know whether `delete from auth.users` would abort for an account
+  owning a custom exercise referenced by its own entry — `exercise_entries.exercise_id` carries the
+  schema's only `on delete restrict`. The migration files cannot answer that: they declare the
+  constraints, not the order the referential-integrity triggers run in. So the catalogue was read
+  instead — `pg_trigger` on `auth.users`, in OID order — and it showed the cascade into
+  `public.exercises` (17556) firing **before** the one into `public.exercise_entries` (17601). The
+  conclusion drawn was that the exercises delete would meet live referencing rows and abort, and it
+  was written into the plan's Current State Analysis as the justification for the whole design.
+  **It was wrong, and the measurement said so in twenty seconds**: both cases deleted cleanly. The
+  `RESTRICT` check is **itself an AFTER trigger**, queued behind the cascade that removes the
+  referencing rows, so it runs when there is nothing left to refuse. "Not deferrable" — the property
+  that distinguishes `RESTRICT` from `NO ACTION` — means "cannot be postponed to COMMIT", **not**
+  "checked synchronously inside the cascade", and the two readings are indistinguishable until you
+  try it.
+- **Rule**: **when a plan's shape rests on the order database-internal actions fire in, measure it
+  before any design is justified by it, and put the measurement where the design lives.** Reading
+  `pg_trigger` is the right instinct and is still an inference; a throwaway account and one statement
+  is the fact. Keep the design if it survives on other grounds — this one did, on independence from an
+  ordering nobody has promised us — but **rewrite the reason**, because a migration header that
+  threatens a failure a five-minute experiment disproves teaches the next reader to distrust the whole
+  file.
+- **Applies to**: cascade/restrict interactions, trigger firing order, deferrable-constraint timing,
+  and any plan step phrased as "X will fail because Y runs first". More generally: the cheapest step
+  in a plan is often the one deciding whether the expensive ones are aimed correctly, and it is the
+  first one dropped once a design already feels settled.
 
 ## Measurement record — the evidence behind the rules in `AGENTS.md`
 

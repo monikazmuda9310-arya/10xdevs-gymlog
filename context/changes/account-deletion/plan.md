@@ -799,14 +799,14 @@ follow `db:push`, or the RPC will be missing from the committed types.
       "exactly one island" and "no island at all". Those were proxies for "the 418 zone names never
       cross into a prop", and a second legitimate island broke the proxy while the guarantee held.
       `islandProps` now takes the island's `component-export` and the assertions name
-      `PreferencesForm`, so a third island can neither break them nor make them vacuous.
+      `PreferencesForm`, so a third island can neither break them nor make them vacuous. — f11dd0e
 - [x] 3.2 Mutation (f): the panel moved inside the `loadFailed` ternary → the render check fails
       — confirmed exactly as specified: **only** "renders when the profile could NOT be loaded"
       goes red (`expected … to contain 'component-export="DeleteAccountPanel"'`), the other 29 stay
-      green. Restored, and the reason is now written beside the slot in `settings.astro`.
+      green. Restored, and the reason is now written beside the slot in `settings.astro`. — f11dd0e
 - [x] 3.3 The full six-step gate passes
       — `lint` exit 0 → `typecheck` 125 files, 0 errors → 244 unit → 30 render → 121 integration →
-      `build` exit 0.
+      `build` exit 0. — f11dd0e
 
 #### Manual
 
@@ -817,9 +817,19 @@ follow `db:push`, or the RPC will be missing from the committed types.
 
 #### Automated
 
-- [ ] 4.1 Full gate green: all six steps
+- [x] 4.1 Full gate green: all six steps
+      — `lint` exit 0 → `typecheck` 0 errors → 244 unit → 30 render → 121 integration → `build` 0.
 - [ ] 4.2 CI green on the pushed branch
-- [ ] 4.3 Every test file, assertion number and function name cited in the documents exists
+- [x] 4.3 Every test file, assertion number and function name cited in the documents exists
+      — checked rather than assumed: the five cited paths all resolve, and `delete_own_account`
+      appears in `AGENTS.md`, `access-control.md` and `lessons.md`. **`README.md` deliberately does
+      not name it** — that file is the user-facing register and speaks of `DELETE /api/account` and
+      what deletion removes, not of database functions.
+      **This phase also had to take the sibling branch's `AGENTS.md`, `access-control.md`,
+      `lessons.md` and `README.md`**, the same way 1.3 and 1.5 took its migrations and tests: those
+      files still said "four shapes" here while the sibling had already added a fifth, so a sixth
+      could not be counted honestly. This branch's copies are now supersets, which is what makes the
+      second merge resolve without conflict rather than on the same lines.
 
 #### Manual
 
