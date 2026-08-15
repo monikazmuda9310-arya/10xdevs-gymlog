@@ -810,8 +810,15 @@ follow `db:push`, or the RPC will be missing from the committed types.
 
 #### Manual
 
-- [ ] 3.4 On the deployed URL: counts are real, cancel does nothing, deletion lands on a neutral notice
-- [ ] 3.5 Keyboard only: focus lands on Cancel, Escape closes without deleting
+- [x] 3.4 On the deployed URL: counts are real, cancel does nothing, deletion lands on a neutral notice
+      — confirmed by the owner, 2026-08-15, on `https://gymlog.10x-astro-starter.workers.dev` against
+      a throwaway account holding a **custom** exercise with logged sets: the dialog named real
+      figures, Cancel left the workout in place, and the sign-in screen showed the notice in a
+      neutral box rather than the red error one.
+- [x] 3.5 Keyboard only: focus lands on Cancel, Escape closes without deleting
+      — confirmed by the owner, 2026-08-15. Both halves of the `data-initial-focus` decision hold in
+      a real browser: `showModal()` lands on Cancel rather than on the destructive control, and
+      Escape closes without deleting.
 
 ### Phase 4: Documents, and the pull request
 
@@ -843,19 +850,43 @@ follow `db:push`, or the RPC will be missing from the committed types.
 
 #### Manual
 
-- [ ] 4.4 The PR body is readable by somebody who has not seen this plan
-- [ ] 4.5 `access-control.md` and `AGENTS.md` agree on how many shapes there are
+- [x] 4.4 The PR body is readable by somebody who has not seen this plan
+      — confirmed by the owner, 2026-08-15, against both PR bodies rather than only this slice's.
+- [x] 4.5 `access-control.md` and `AGENTS.md` agree on how many shapes there are
+      — confirmed by the owner, 2026-08-15, against four independent counts that all read six:
+      `access-control.md`'s section headings, its own prose ("six shapes", twice), `AGENTS.md`'s
+      heading, and the row count of `AGENTS.md`'s shapes table. The sixth is the `security definer`
+      RPC — the only shape here that deliberately escapes RLS.
 
 ### Phase 5: Deployment
 
 #### Automated
 
-- [ ] 5.1 CI green on `main` after both merges
+- [x] 5.1 CI green on `main` after both merges
+      — PR #1 merged as `c386fc9` (run 31901861710, 4m23s), PR #2 as `7c706ba` (run 31902876819,
+      4m30s), both green. **Merge commits, not squashes**, so every phase SHA cited in both plans
+      still resolves on `main` — verified with `git merge-base --is-ancestor` for all five of this
+      slice's. `main` then ran the full gate locally before deploying: 248 unit, 30 render, **129**
+      integration (both new suites present together for the first time).
+      **PR #2 conflicted and the plan said it would not.** The claim that a superset merges cleanly
+      was wrong: files taken with `git checkout` from the sibling share no history with what landed
+      on `main`, so git saw two independent edits of the same lines. Three documents conflicted
+      (`AGENTS.md`, `access-control.md`, `lessons.md`); resolved by merging `main` INTO the branch and
+      keeping the branch's supersets, after checking line by line that nothing from `main` was lost —
+      the only removals were the "five shapes" sentences this slice deliberately rewrote.
+      Deployed: version `7b0f6f07`. Smoke-tested live — `?notice=account_deleted` renders the neutral
+      sentence and an unrecognised code renders **nothing**, which is the inverted fall-back working
+      in production rather than only in a unit test.
 
 #### Manual
 
-- [ ] 5.2 A throwaway account created on the deployed URL can delete itself
-- [ ] 5.3 Signing in with that address fails; signing up with it succeeds
+- [x] 5.2 A throwaway account created on the deployed URL can delete itself
+      — confirmed by the owner, 2026-08-15, on a real production account created through the real
+      confirmation-email flow.
+- [x] 5.3 Signing in with that address fails; signing up with it succeeds
+      — confirmed by the owner, 2026-08-15. This is the strongest evidence in the slice: it is the
+      only check that shows the `auth.users` row is genuinely gone rather than merely unreadable, and
+      it was performed against **production**.
 
 ### Phase 6: Production account cleanup
 
