@@ -660,7 +660,7 @@ follow `db:push`, or the RPC will be missing from the committed types.
       Both projects now reachable from here, and the drift check shows the **remote two migrations
       ahead of this branch** (`20260815090000`, `20260815120000` — the sibling slice's, with an empty
       local column). That is the decoupling `AGENTS.md` describes, not drift, and it is why the new
-      migration's timestamp constraint is hard rather than cosmetic.
+      migration's timestamp constraint is hard rather than cosmetic. — 250394d
 - [x] 1.2 Self-block measured on `gymlog-test`; both outcomes recorded, including a contradicting result
       — **THE MEASUREMENT CONTRADICTS THE INFERENCE, and this is the step existing for its own
       reason.** Both cases SUCCEEDED: an account owning a custom exercise with a workout, an entry
@@ -673,7 +673,7 @@ follow `db:push`, or the RPC will be missing from the committed types.
       **The self-block does not exist**, so the sole justification for dependency-order deletion is
       gone; the cross-account blocker is unaffected either way. Measured with
       `selfblock-measure.mjs` (untracked, removed after). Both throwaway accounts were deleted by the
-      measurement itself, so nothing leaked.
+      measurement itself, so nothing leaked. — 250394d
 - [x] 1.3 Migration applies to both projects: `npm run db:push`, timestamp later than `20260815120000`
       — `20260815140000_delete_own_account.sql`. **The first attempt failed, and the plan had the
       constraint half right**: a later timestamp is necessary but not sufficient — the CLI also
@@ -683,12 +683,12 @@ follow `db:push`, or the RPC will be missing from the committed types.
       to the sibling's, so the second merge resolves without conflict. **The CLI's own suggestion,
       `migration repair --status reverted`, was NOT taken** — it would rewrite the shared remote
       history to claim those migrations were reverted, after which the sibling branch would re-apply
-      them. On the retry the CLI saw both already remote and pushed only the new one.
+      them. On the retry the CLI saw both already remote and pushed only the new one. — 250394d
 - [x] 1.4 Types regenerated and committed: `npm run db:types`
       — `Database["public"]["Functions"]` was `[_ in never]: never` and now carries
       `delete_own_account: { Args: never; Returns: undefined }`. **`Args: never` is worth noticing**:
       it makes an argument-carrying call a compile error as well as a `PGRST202` at runtime, so
-      assertion 6 guards the runtime half of a rule the type system now states too.
+      assertion 6 guards the runtime half of a rule the type system now states too. — 250394d
 - [x] 1.5 Every suite passes, not only the new one: `npm run test:integration`
       — 14 files / **118 tests** (13 existing + the new suite's 7; `tonnage-breakdown` is one lighter
       because the sibling retired its assertion 9). **Two suites were red before this, and neither
@@ -698,16 +698,16 @@ follow `db:push`, or the RPC will be missing from the committed types.
       that trigger for hours while this branch still had the pre-fix test files. A migration adding
       only a function cannot affect an `exercise_entries` insert. Resolved the same way as 1.3, by
       taking both files from `feature/cross-account-isolation`; they are identical, so the second
-      merge resolves without conflict.
-- [x] 1.6 The suite is repeatable: two consecutive runs green — 118/118 twice, back to back
+      merge resolves without conflict. — 250394d
+- [x] 1.6 The suite is repeatable: two consecutive runs green — 118/118 twice, back to back — 250394d
 - [x] 1.7 `npm run typecheck` and `npm run lint` pass
       — typecheck 119 files, 0 errors. Lint caught one real thing in assertion 6: casting
       `survivor.client.rpc` detached the method from its object (`@typescript-eslint/unbound-method`).
-      Fixed by casting the CLIENT instead, so the call stays bound — the rule was right, not noise.
+      Fixed by casting the CLIENT instead, so the call stays bound — the rule was right, not noise. — 250394d
 - [x] 1.8 Mutation (a): exercises deleted before workouts → assertion 1 fails, assertion 2 passes
       — **confirmed exactly as written**: assertion 1 red on `expected { code: '23503', … } to be
       null`, assertion 2 green. So the ORDER inside the function is load-bearing even though a bare
-      `delete from auth.users` succeeds (1.2) — reversing it walks straight into the `restrict` edge.
+      `delete from auth.users` succeeds (1.2) — reversing it walks straight into the `restrict` edge. — 250394d
 - [x] 1.9 Mutation (b): `execute` granted to `public` → assertion 7 fails
       — **not confirmed on the first pass, then made true by strengthening the assertion.** Widening
       the grant left the suite 7/7 green, because the function then RAN and its own null-uid guard
@@ -715,7 +715,7 @@ follow `db:push`, or the RPC will be missing from the committed types.
       checked only the code, so it could not tell "you may not call this" from "you called it as
       nobody". It now also matches the message, and the mutation goes red on exactly that:
       `expected 'delete_own_account() requires an auth…' to contain 'permission denied for function'`
-      — the second layer's words appearing where the first layer's belong.
+      — the second layer's words appearing where the first layer's belong. — 250394d
 - [x] 1.10 Mutation (c): null-uid raise removed → assertion 7 fails on a success answer
       — **NOT CONFIRMED, and the criterion describes a test that cannot be written.** Removing the
       raise breaks nothing: reaching it needs `auth.uid()` to be null INSIDE the function, which
@@ -723,7 +723,7 @@ follow `db:push`, or the RPC will be missing from the committed types.
       always has a uid. This is `lessons.md` § "When a mutation does not break anything, fix the claim
       — never the test": the guard stays (defence in depth is cheap and the edit that makes it matter
       is one somebody will plausibly make), and the untested guarantee is now named in the closing
-      note of `tests/integration/account-deletion.test.ts` rather than left implied.
+      note of `tests/integration/account-deletion.test.ts` rather than left implied. — 250394d
 - [x] 1.11 Mutation (d): `is not distinct from` on the exercises delete → assertion 3 fails
       — **NOT CONFIRMED, and the reason is not the obvious one.** `<uuid> is not distinct from NULL`
       is **FALSE**, so the rewrite matches no seeded row at all while a real uid exists; it is
@@ -734,7 +734,7 @@ follow `db:push`, or the RPC will be missing from the committed types.
       rolled back by `no_data_found` on `delete from auth.users where id = null`. Destroying the 38
       seeded rows for real needs **all four** removed at once. The three-way combination was
       therefore **deliberately not run**: the only experiment that could prove layer 3 destroys the
-      fixture twelve suites depend on, to confirm something four layers already make unreachable.
+      fixture twelve suites depend on, to confirm something four layers already make unreachable. — 250394d
 - [x] 1.12 Every mutation's failure message read; `gymlog-test` restored and the restore verified
       — every failure read rather than counted, which is what turned 1.9 from a false pass into a
       real guard and 1.10/1.11 from "confirmed" into findings. **The first restore check reported
@@ -743,7 +743,7 @@ follow `db:push`, or the RPC will be missing from the committed types.
       `pg_get_functiondef` and reading it, then by a structural predicate keyed on the mutated CODE
       line (`is not distinct from caller;`). Final state: `prosecdef` true, `search_path=""`,
       owner-scoped delete present, null guard present, zero-row guard present, `anon` cannot execute,
-      `authenticated` can, and the seeded catalogue still counts **38**.
+      `authenticated` can, and the seeded catalogue still counts **38**. — 250394d
 
 #### Manual
 
@@ -751,16 +751,36 @@ follow `db:push`, or the RPC will be missing from the committed types.
       — confirmed by the owner, 2026-08-15, against the `WHY THE DELETES ARE EXPLICIT AND ORDERED —
       AND WHAT THAT IS *NOT*` paragraph, which states that a bare delete works, that this was
       measured, and that the order buys independence from AFTER-trigger queue ordering rather than
-      preventing a failure that does not occur.
+      preventing a failure that does not occur. — 250394d
 
 ### Phase 2: The endpoint, the honest failure, and a new message catalogue
 
 #### Automated
 
-- [ ] 2.1 `npm test` covers the mapping, both the `23503` branch and the fall-through
-- [ ] 2.2 Mutation (e): the `23503` branch removed → the hermetic test fails on the code
-- [ ] 2.3 `npm run test:integration` green, every suite
-- [ ] 2.4 The full six-step gate passes
+- [x] 2.1 `npm test` covers the mapping, both the `23503` branch and the fall-through
+      — `src/lib/services/accounts.test.ts`, four cases: the `23503` branch; a fall-through over six
+      codes the function and PostgREST can really raise plus `null`/`undefined`/`{}`; a check that
+      every code the mapping can return **has a message** (catalogue and mapping are two files, and a
+      drift between them resolves silently to the generic sentence); and that both failure messages
+      say **"Nothing was removed"** — load-bearing rather than style, because the deletion is one
+      transaction and a user who fears a half-deleted account has no other way to find out. 244 unit
+      tests, up from 240.
+- [x] 2.2 Mutation (e): the `23503` branch removed → the hermetic test fails on the code
+      — confirmed and read: `AssertionError: expected 'unexpected' to be 'account_delete_blocked'` —
+      failing on the **code**, not on a status or a thrown error, which is what the criterion asks.
+      Restored and re-verified green.
+- [x] 2.3 `npm run test:integration` green, every suite
+      — 14 files / **121 tests** (118 + assertions 8, 9, 10). Assertion 8 calls the exported handler
+      with a real session and proves the account is gone from OUTSIDE, by signing the same address up
+      again and getting a different user id. **The named gap for the blocked path landed here too**,
+      as prose in the suite header rather than an assertion: neither route into that state is
+      reachable — the same-account one does not exist (1.2) and the cross-account one is refused by
+      the sibling slice's trigger. Seeding a hazard row through a migration was considered and
+      refused: `db:push` reaches production, so it would write a permanent, real block onto a real
+      account's deletion to make a test possible.
+- [x] 2.4 The full six-step gate passes
+      — `lint` exit 0 → `typecheck` 119 files, 0 errors → 244 unit → 25 render → 121 integration →
+      `build` exit 0.
 
 ### Phase 3: The screen
 

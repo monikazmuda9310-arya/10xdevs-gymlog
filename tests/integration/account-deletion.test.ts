@@ -34,8 +34,10 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { APIContext } from "astro";
 
 import type { Database } from "@/db/database.types";
+import { DELETE as deleteAccountRoute } from "@/pages/api/account/index";
 
 const MARK = "s09d-";
 const RUN_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -140,6 +142,21 @@ async function makePrivateExercise(account: Account, label: string): Promise<str
     .single();
   if (error) throw new Error(`could not create the '${label}' exercise: ${error.code} ${error.message}`);
   return data.id;
+}
+
+/**
+ * The slice of `APIContext` the delete route actually reads.
+ *
+ * There is no request body and no route parameter — the account is named by `auth.uid()` inside the
+ * database function — so this is `locals` and nothing else.
+ */
+function apiContext(account: Account): APIContext {
+  return { locals: { supabase: account.client, user: { id: account.userId } } } as unknown as APIContext;
+}
+
+/** The same, for a caller the middleware would have bounced: a live client with no user. */
+function anonymousContext(client: SupabaseClient<Database>): APIContext {
+  return { locals: { supabase: client, user: null } } as unknown as APIContext;
 }
 
 beforeAll(async () => {
@@ -306,6 +323,83 @@ describe("account deletion: the function cannot be aimed or borrowed", () => {
   });
 });
 
+describe("account deletion: the endpoint", () => {
+  it("8. DELETE /api/account removes the caller's account and answers 200", async () => {
+    // Called as the exported handler with a real session, in the pattern of
+    // `workout-endpoints.test.ts` — never through `astro dev`, whose `.dev.vars` point at PRODUCTION.
+    const victim = await throwawayAccount("endpoint");
+    await logSomething(victim, seededExerciseId, "endpoint");
+
+    const response = await deleteAccountRoute(apiContext(victim));
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { deleted: boolean }).deleted).toBe(true);
+
+    // The account is gone, proven from outside: signing the address up again succeeds with a new id.
+    const fresh = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const again = await fresh.auth.signUp({ email: victim.email, password });
+    expect(again.error).toBeNull();
+    expect(again.data.session?.user.id).not.toBe(victim.userId);
+    if (again.data.session) {
+      created.push({ client: fresh, userId: again.data.session.user.id, email: victim.email });
+    }
+
+    // And nobody else's training moved.
+    const reread = await survivor.client.from("workouts").select("id").eq("user_id", survivor.userId);
+    expect(reread.data).toHaveLength(1);
+  });
+
+  it("9. an unauthenticated caller gets 401 and nothing is deleted", async () => {
+    // `locals.user` null is a caller the middleware would have bounced — but an endpoint is reachable
+    // directly and must not lean on a page guard.
+    const response = await deleteAccountRoute(anonymousContext(survivor.client));
+    expect(response.status).toBe(401);
+    expect(((await response.json()) as { code: string }).code).toBe("unauthenticated");
+
+    const reread = await survivor.client.from("workouts").select("id").eq("user_id", survivor.userId);
+    expect(reread.data).toHaveLength(1);
+  });
+
+  it("10. a missing Supabase client is refused rather than thrown", async () => {
+    // The silent-failure class `AGENTS.md` § Cloudflare traps warns about: absent secrets make
+    // `locals.supabase` null, and an endpoint that assumed otherwise would 500 on every request.
+    const response = await deleteAccountRoute({
+      locals: { supabase: null, user: { id: survivor.userId } },
+    } as unknown as APIContext);
+    expect(response.status).toBe(500);
+    expect(((await response.json()) as { code: string }).code).toBe("not_configured");
+  });
+});
+
+// **THE BLOCKED PATH — THE ONE THING THIS SLICE OWNS — HAS NO END-TO-END TEST, AND THIS PARAGRAPH IS
+// WRITTEN IN THE SAME WORDS THIS REPOSITORY USES TO REFUSE A DECORATIVE ONE.**
+//
+// The guarantee: when `exercise_entries.exercise_id`'s `on delete restrict` refuses the cascade into
+// `public.exercises`, the caller is told so — `409 account_delete_blocked`, never a 500 and never a
+// silent success — and every row survives, because the whole deletion is one transaction.
+//
+// **It cannot be reached from here, and the reason changed twice while this was being built.**
+//   * The SAME-ACCOUNT route was the plan's expectation and does not exist: measured on 2026-08-15,
+//     an account owning a custom exercise with a logged entry deletes cleanly (Progress 1.2), because
+//     the RESTRICT check is itself an AFTER trigger queued behind the cascade that removes the
+//     referencing rows. Assertion 1 above is what remains of that expectation, and it now guards the
+//     deletion ORDER rather than a failure.
+//   * The CROSS-ACCOUNT route — another account's entry pointing at this account's private exercise —
+//     is refused at insert by `20260815090000`'s trigger for every `authenticated` caller, which is
+//     the sibling slice's whole purpose. Building it needs `postgres` or `service_role`, and
+//     `vitest.integration.config.ts` strips every credential but three.
+//
+// **No mutation available today breaks the guarantee**, because no caller reachable from this suite
+// can put the database into the state it describes. What guards the half that can be checked is
+// `src/lib/services/accounts.test.ts`: `23503` maps to `account_delete_blocked` and not to
+// `unexpected`, hermetically, with the mapping mutated to confirm it fails. What that cannot prove is
+// that Postgres raises `23503` on this path at all.
+//
+// The future edits that would make this testable, in the order they are likely: `RESTRICT` becoming
+// `NO ACTION` on `exercise_entries.exercise_id`; the sibling trigger being dropped or narrowed; or a
+// deliberately seeded hazard row. **Seeding one through a migration was considered and refused** —
+// `npm run db:push` reaches production, so it would write a permanent, real block onto a real
+// account's deletion in order to make a test possible.
+//
 // **TWO GUARDS IN `delete_own_account` HAVE NO TEST, AND THIS PARAGRAPH IS WRITTEN IN THE SAME WORDS
 // THIS REPOSITORY USES TO REFUSE A DECORATIVE ONE** (`lessons.md` § "When a mutation does not break
 // anything, fix the claim — never the test", and § "An assertion you keep because it cannot fail YET").
