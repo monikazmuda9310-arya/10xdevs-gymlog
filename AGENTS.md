@@ -140,9 +140,14 @@ without changing the test and saying so.**
     account B's private exercise. An **inner** join inside `public.daily_exercise_tonnage` would drop
     that set's kilograms from **A's own** breakdown while `daily_tonnage` still counted them, with no
     error and both figures plausible. The view uses **`left join`**, and an unreadable exercise keeps
-    its kilograms as an `Unattributed` row. **Assertion 9 of
-    `tests/integration/tonnage-breakdown.test.ts` constructs that hazard row on purpose** — it is the
-    only thing here that would notice the `left` being "simplified" away.
+    its kilograms as an `Unattributed` row.
+    - **Nothing in this repository would notice the `left` being "simplified" away, and that is a
+      known gap rather than an oversight.** Assertion 9 of `tests/integration/tonnage-breakdown.test.ts`
+      used to construct the hazard row on purpose; `cross-account-isolation` refused that row at the
+      source on 2026-08-15, so the assertion died in setup and was **retired**. Its reasoning is
+      preserved at the foot of that file. The guarantee did **not** retire with it: the trigger is a
+      `before` trigger and validates nothing already stored, and it binds `authenticated` only, so
+      `postgres` and `service_role` are unconstrained. **Keep the `left join`.**
   - **A muscle-group correction is retroactive by construction, and it cannot move the weekly total.**
     Nothing stores the group — not `sets`, not `exercise_entries` — so changing
     `exercises.muscle_group` moves historical tonnage **between** buckets on the next read, with no

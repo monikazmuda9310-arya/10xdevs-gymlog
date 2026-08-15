@@ -480,24 +480,58 @@ near the 10 ms Worker CPU cap.
 
 #### Automated
 
-- [ ] 1.1 Assertion 9 settled, the `left join`'s unguarded status recorded in `AGENTS.md` and
+- [x] 1.1 Assertion 9 settled, the `left join`'s unguarded status recorded in `AGENTS.md` and
       `lessons.md`, and `npm run test:integration` green with no migration applied
-- [ ] 1.2 Violation counts recorded for both projects, `s08-` fixtures excluded on `gymlog-test`; any
+      — retired outright (its reasoning preserved at the foot of `tonnage-breakdown.test.ts`; a
+      weaker replacement was refused per `lessons.md` § "A guard you have not mutated may not
+      guard"). 13 files / 111 tests green, no migration applied.
+- [x] 1.2 Violation counts recorded for both projects, `s08-` fixtures excluded on `gymlog-test`; any
       non-zero count on `gymlog` escalated to the owner
-- [ ] 1.3 Migration applies to both projects: `npm run db:push`
-- [ ] 1.4 Every suite passes, not only the new one: `npm run test:integration`
-- [ ] 1.5 The suite is repeatable: second consecutive run green
-- [ ] 1.6 Type checking passes: `npm run typecheck`
-- [ ] 1.7 Linting passes: `npm run lint`
-- [ ] 1.8 Mutation (a): dropping `or update of exercise_id` fails assertion 2
-- [ ] 1.9 Mutation (b): removing the trigger fails assertions 1 and 2
-- [ ] 1.10 Mutation (c): flipping the function to `security definer` makes assertions 1 and 2 pass
+      — **`gymlog` 0, `gymlog-test` 0** (0 excluding `s08-` in both). Nothing to escalate and no data
+      step in the migration. `gymlog-test` reads zero rather than the non-zero the plan expected
+      because step 1.1's run retired assertion 9 and its `beforeAll` swept the previous run's
+      leftover on the way past. Taken with the Management API query endpoint, `read_only: true`, not
+      `psql`: this machine has neither `psql` nor a `pg` package. Same databases, same privileges —
+      it runs as the database owner, so RLS hides nothing from the count.
+- [x] 1.3 Migration applies to both projects: `npm run db:push`
+      — `20260815090000_scope_exercise_entries_to_visible_exercises.sql`; `npm run db:status` shows
+      both histories at that version.
+- [x] 1.4 Every suite passes, not only the new one: `npm run test:integration`
+      — 14 files / 116 tests. **Required one adaptation the plan did not foresee** (owner approved,
+      2026-08-15): `workout-log-rls` assertion 3 forged an entry naming account A's PRIVATE exercise,
+      so the new BEFORE trigger fired ahead of the RLS `WITH CHECK` and answered `23503` where the
+      assertion wanted `42501`. The row was still refused, but the assertion had silently stopped
+      exercising the insert POLICY — it would have stayed green with that policy weakened. Fixed by
+      forging `exerciseB` instead, which the trigger admits, restoring `42501` and the original
+      claim; the reason is written into the test beside it.
+- [x] 1.5 The suite is repeatable: second consecutive run green — two consecutive full runs, 116/116
+- [x] 1.6 Type checking passes: `npm run typecheck` — 119 files, 0 errors, 0 warnings
+- [x] 1.7 Linting passes: `npm run lint` — clean
+- [x] 1.8 Mutation (a): dropping `or update of exercise_id` fails assertion 2
+      — assertion 2 alone red, assertion 1 green
+- [x] 1.9 Mutation (b): removing the trigger fails assertions 1 and 2 — both red
+- [x] 1.10 Mutation (c): flipping the function to `security definer` makes assertions 1 and 2 pass
       when they should fail
-- [ ] 1.11 Every mutation's failure message read and confirmed to be the intended one
+      — confirmed, with the wording sharpened: what the criterion describes is the GUARD passing a
+      row it should refuse, and the assertions are what notice, so both go red. **The failure is
+      byte-identical to mutation (b)'s** — `security definer` is indistinguishable from having no
+      trigger at all, which is precisely why it is the keystone. Verified against `pg_proc.prosecdef`
+      before and after, not merely applied.
+- [x] 1.11 Every mutation's failure message read and confirmed to be the intended one
+      — all three read `AssertionError: expected undefined to be '23503'`: **no error was raised at
+      all**, i.e. the write was admitted. That is the criterion's own reason (`lessons.md` § "A
+      mutation that fails for the WRONG REASON has not confirmed the guard") — a wrong-reason red
+      here would have been a different code, or a red in an assertion the mutation does not name.
+      Each mutation applied to `gymlog-test` only, restored afterwards, and the restore verified by
+      re-reading `pg_get_triggerdef` and `prosecdef`; the violation count was re-taken at the end and
+      is still 0/0, so the mutation runs left no hazard row behind.
 
 #### Manual
 
-- [ ] 1.12 The migration header gives the `MATCH SIMPLE` reason, not the RLS policy one
+- [x] 1.12 The migration header gives the `MATCH SIMPLE` reason, not the RLS policy one
+      — confirmed by the owner, 2026-08-15, against both halves: the `WHY NOT A COMPOSITE FOREIGN
+      KEY` paragraph gives equality / `NULL = NULL` / the 38 null-owner rows and explicitly disowns
+      the policy explanation, and the `Purpose:` block alone conveys what the trigger closes.
 
 ### Phase 2: The sign-out gap, and proving the endpoint already answers correctly
 

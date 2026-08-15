@@ -347,6 +347,35 @@
 - **Applies to**: timezones, locales, filesystem case-sensitivity, line endings, and any other
   ambient setting that differs between a developer's machine and CI.
 
+## Closing a defect can retire the only test of an unrelated guarantee — say so where the guarantee lives
+
+- **Context**: assertion 9 of `tests/integration/tonnage-breakdown.test.ts`, retired by
+  `cross-account-isolation` Phase 1 on 2026-08-15.
+- **Problem**: the assertion constructed the cross-account entry row — account A's entry naming
+  account B's private exercise — and used it to prove that the **`left join`** in
+  `public.daily_exercise_tonnage` keeps that set's kilograms in A's own weekly figure. It was the only
+  thing in the repository that would notice the `left` being "simplified" to `join`. Closing the
+  source defect with a `before insert or update` trigger made the row unconstructible, so the
+  assertion did not fail an expectation — **it died in setup**, because `logWorkout` throws when an
+  insert is refused. Two things follow that are easy to miss while celebrating the fix. First, the
+  gate goes red the moment the migration lands, so the retirement has to be sequenced **before** it.
+  Second, and worse: the guarantee did **not** retire with the test. A `before` trigger validates
+  nothing already stored, and a `security invoker` one binds `authenticated` only — `postgres` and
+  `service_role` bypass RLS and are unconstrained — so the hazard row is still reachable from three
+  directions while the thing that would notice its consequence is gone.
+- **Rule**: **when a change makes an existing assertion unconstructible, ask what that assertion was
+  holding before deleting it, and write the answer where the guarantee lives — not only in the test
+  file.** Then say plainly, in the same words you would use to refuse a new assertion: name the
+  guarantee, state that no mutation available today breaks it, and name the exact future edit that
+  would. A weaker replacement assertion is the wrong answer — it reads as coverage and is not.
+  Sequence the retirement **ahead** of the change that causes it, so the gate is never red in between,
+  and never let "the defect is closed" stand in for "the consequence is still guarded": they are
+  different claims about different code.
+- **Applies to**: every change that closes a hole another suite deliberately exploits — access-control
+  hardening most of all, because hazard fixtures are exactly the rows such a change forbids. Grep for
+  the construct you are about to forbid before writing the migration; the suite that builds it on
+  purpose will not announce itself.
+
 ## Measurement record — the evidence behind the rules in `AGENTS.md`
 
 > **These entries are not rules and must not be read as ones.** They are the measurements and
