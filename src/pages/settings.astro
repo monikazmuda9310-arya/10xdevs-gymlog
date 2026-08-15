@@ -1,7 +1,9 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import { PreferencesForm } from "@/components/settings/PreferencesForm";
+import { DeleteAccountPanel } from "@/components/settings/DeleteAccountPanel";
 import { getProfile } from "@/lib/services/profiles";
+import { accountFootprint, type AccountFootprint } from "@/lib/services/accounts";
 import { supportedTimeZones } from "@/lib/services/timezones";
 import type { EstimationFormula, WeightUnit } from "@/types";
 
@@ -50,6 +52,24 @@ if (supabase && user) {
     loadFailed = true;
     // eslint-disable-next-line no-console -- deliberate server-side diagnostic
     console.error("settings: profile read failed", error);
+  }
+}
+
+// What the deletion dialog names. Read HERE rather than by the island, because the island has no
+// Supabase client and giving it one would ship the whole library to the browser for three integers.
+// **Three integers are a legitimate island prop; the 418-entry timezone list above is not** — the
+// rule is about the size of what crosses the wire, not about props being forbidden.
+//
+// **A failed read stays `null` and is never coerced to zeros.** `accountFootprint` returns null when
+// any of the three counts fails, and the dialog says so — a zero would read as "you have nothing to
+// lose" at the exact moment that is the question being asked.
+let footprint: AccountFootprint | null = null;
+if (supabase && user) {
+  try {
+    footprint = await accountFootprint(supabase, user.id);
+  } catch (error) {
+    // eslint-disable-next-line no-console -- deliberate server-side diagnostic
+    console.error("settings: account footprint read failed", error);
   }
 }
 
@@ -129,6 +149,15 @@ const zoneIsKnown = timeZones.includes(timezone);
           </PreferencesForm>
         )
       }
+
+      {
+        /* **Outside the ternary above, deliberately.** `loadFailed` replaces the preferences form
+          when the profile read fails — and somebody whose account record needs attention is more
+          likely to want this control, not less. Moving it inside is the one mistake
+          tests/render/settings-delete-panel.test.ts exists to catch, and it does: mutation (f) of
+          this slice's Phase 3 protocol reddens exactly the failed-profile case. */
+      }
+      <DeleteAccountPanel client:load footprint={footprint} />
     </div>
   </div>
 </Layout>

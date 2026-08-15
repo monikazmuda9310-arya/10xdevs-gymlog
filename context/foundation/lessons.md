@@ -416,6 +416,36 @@
   already "handled" downstream: `left join` fixed a wrong number and left the row constructible, so
   the closed-looking case is exactly where to check whether the cause is still open.
 
+## The ORDER database-internal actions fire in is a fact about the catalogue — and reading the catalogue is still not measuring
+
+- **Context**: `public.delete_own_account()` and step 1.2 of
+  `context/changes/account-deletion/plan.md`, 2026-08-15.
+- **Problem**: planning needed to know whether `delete from auth.users` would abort for an account
+  owning a custom exercise referenced by its own entry — `exercise_entries.exercise_id` carries the
+  schema's only `on delete restrict`. The migration files cannot answer that: they declare the
+  constraints, not the order the referential-integrity triggers run in. So the catalogue was read
+  instead — `pg_trigger` on `auth.users`, in OID order — and it showed the cascade into
+  `public.exercises` (17556) firing **before** the one into `public.exercise_entries` (17601). The
+  conclusion drawn was that the exercises delete would meet live referencing rows and abort, and it
+  was written into the plan's Current State Analysis as the justification for the whole design.
+  **It was wrong, and the measurement said so in twenty seconds**: both cases deleted cleanly. The
+  `RESTRICT` check is **itself an AFTER trigger**, queued behind the cascade that removes the
+  referencing rows, so it runs when there is nothing left to refuse. "Not deferrable" — the property
+  that distinguishes `RESTRICT` from `NO ACTION` — means "cannot be postponed to COMMIT", **not**
+  "checked synchronously inside the cascade", and the two readings are indistinguishable until you
+  try it.
+- **Rule**: **when a plan's shape rests on the order database-internal actions fire in, measure it
+  before any design is justified by it, and put the measurement where the design lives.** Reading
+  `pg_trigger` is the right instinct and is still an inference; a throwaway account and one statement
+  is the fact. Keep the design if it survives on other grounds — this one did, on independence from an
+  ordering nobody has promised us — but **rewrite the reason**, because a migration header that
+  threatens a failure a five-minute experiment disproves teaches the next reader to distrust the whole
+  file.
+- **Applies to**: cascade/restrict interactions, trigger firing order, deferrable-constraint timing,
+  and any plan step phrased as "X will fail because Y runs first". More generally: the cheapest step
+  in a plan is often the one deciding whether the expensive ones are aimed correctly, and it is the
+  first one dropped once a design already feels settled.
+
 ## Measurement record — the evidence behind the rules in `AGENTS.md`
 
 > **These entries are not rules and must not be read as ones.** They are the measurements and

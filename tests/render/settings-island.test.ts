@@ -66,14 +66,28 @@ beforeAll(async () => {
   html = await render(PROFILE);
 });
 
-/** Every `props="…"` payload Astro serialised into the page, decoded from its HTML entities. */
-function islandProps(markup: string): string[] {
+/**
+ * Every `props="…"` payload Astro serialised for ONE NAMED island, decoded from its HTML entities.
+ *
+ * **Named rather than counted, and that is a correction.** This helper used to return every island's
+ * props, and the assertions below spoke of "exactly one island" and "no island at all". Those were
+ * proxies for the real guarantee — that the 418 zone names never cross into a prop — and both broke
+ * the moment `/settings` gained a second, legitimate island (`DeleteAccountPanel`, added by
+ * `account-deletion`). Counting islands was never the claim. Naming the one this file is about keeps
+ * the guarantee exactly as strong while a third island can neither break it nor make it vacuous.
+ */
+function islandProps(markup: string, componentExport = "PreferencesForm"): string[] {
   const payloads: string[] = [];
-  const pattern = /<astro-island\b[^>]*\bprops="([^"]*)"/g;
-  for (const match of markup.matchAll(pattern)) {
-    payloads.push(
-      match[1].replaceAll("&quot;", '"').replaceAll("&#34;", '"').replaceAll("&amp;", "&").replaceAll("&#38;", "&"),
-    );
+  for (const [tag] of markup.matchAll(/<astro-island\b[^>]*>/g)) {
+    if (!tag.includes(`component-export="${componentExport}"`)) {
+      continue;
+    }
+    const props = /\bprops="([^"]*)"/.exec(tag);
+    if (props) {
+      payloads.push(
+        props[1].replaceAll("&quot;", '"').replaceAll("&#34;", '"').replaceAll("&amp;", "&").replaceAll("&#38;", "&"),
+      );
+    }
   }
   return payloads;
 }
@@ -90,7 +104,7 @@ describe("the settings page's rendered HTML", () => {
     // Without this, every check that follows would pass against a page that rendered nothing —
     // "no zone name in the props" is trivially true when there are no props.
     const props = islandProps(html);
-    expect(props.length, "the page should render exactly one hydrated island").toBe(1);
+    expect(props.length, "the page should render exactly one PreferencesForm island").toBe(1);
     // The island DOES receive the three current values; that is all it is entitled to.
     expect(props[0]).toContain("Europe/Warsaw");
     expect(props[0]).toContain("brzycki");
@@ -204,8 +218,12 @@ describe("the settings page when there is no profile row at all", () => {
     );
 
     expect(empty).toContain("Your preferences could not be loaded");
-    // No form, no island, and above all no `<select>` offering a zone we never read.
-    expect(empty).not.toContain("<astro-island");
+    // No form, no PreferencesForm island, and above all no `<select>` offering a zone we never read.
+    // **Named rather than "no island at all"**: the page legitimately renders a second island here —
+    // the delete-account panel, which `account-deletion` deliberately placed OUTSIDE this branch,
+    // because somebody whose profile cannot be read is more likely to want that control, not less.
+    // `settings-delete-panel.test.ts` asserts its presence in this very state.
+    expect(empty).not.toContain('component-export="PreferencesForm"');
     expect(optionValues(empty)).toEqual([]);
   });
 });

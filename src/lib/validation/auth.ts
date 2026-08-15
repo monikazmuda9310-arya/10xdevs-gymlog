@@ -72,6 +72,36 @@ export const AUTH_MESSAGES = {
 export type AuthMessageCode = keyof typeof AUTH_MESSAGES;
 
 /**
+ * Neutral outcomes, kept in a SEPARATE catalogue from the failures above — and the separation is the
+ * point rather than tidiness.
+ *
+ * `/auth/signin` renders `?error=` inside a red box. If "your account has been deleted" lived in
+ * `AUTH_MESSAGES`, then `?error=account_deleted` would render a deliberate, successful action as a
+ * system failure — on the one screen the user reaches immediately after taking it. Two catalogues
+ * and two query parameters make that combination unreachable rather than merely unlikely.
+ */
+export const AUTH_NOTICES = {
+  account_deleted: "Your account and all of its training data have been deleted.",
+} as const;
+
+export type AuthNoticeCode = keyof typeof AUTH_NOTICES;
+
+/**
+ * Resolve a neutral notice from the query string.
+ *
+ * **An unrecognised code renders NOTHING, which is the opposite of `messageForCode`'s fall-back and
+ * is deliberate.** A generic failure sentence is a safe answer to a mangled URL; a generic
+ * reassurance is not — "something completed successfully" is a positive claim, and inventing one for
+ * a code we do not recognise would tell the user an action succeeded when nothing is known about it.
+ */
+export function noticeForCode(code: string | null | undefined): string | null {
+  if (!code) {
+    return null;
+  }
+  return Object.hasOwn(AUTH_NOTICES, code) ? AUTH_NOTICES[code as AuthNoticeCode] : null;
+}
+
+/**
  * Resolve a code from the query string. Absent → no message at all; unrecognised → the generic
  * one, so a hand-edited URL yields our text rather than the visitor's.
  */

@@ -196,12 +196,14 @@ an identifier directly. This is enforced in the database, not only in the UI.
   per-operation, per-role policies. A table without RLS is a defect, not a follow-up.
 - Tests for this must assert against **persisted state**, not just the response status code.
 
-### The five shapes live in `context/foundation/access-control.md` — read it before writing a migration
+### The six shapes live in `context/foundation/access-control.md` — read it before writing a migration
 
-**Creating a table, or a view over one, without opening that file is how this guardrail breaks.** It
-carries the SQL to copy and the reason each line is there. They are not interchangeable, and each has
-one thing that bites in silence. **Four are declarative and the fifth is a trigger**, whose whole
-cost is that it is invisible in the table definition a reader inspects first:
+**Creating a table, a view over one, or a function without opening that file is how this guardrail
+breaks.** It carries the SQL to copy and the reason each line is there. They are not interchangeable,
+and each has one thing that bites in silence. **Four are declarative; the last two are not, and they
+fail in opposite directions** — the trigger enforces procedurally, so its rule is invisible in the
+table definition a reader inspects first; the RPC deliberately escapes RLS, and is the only shape here
+where being wrong hands out **more** than it should rather than less:
 
 | Shape                            | Use it when                                                                                         | What bites, silently                                                                                                                                                          |
 | -------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -210,6 +212,7 @@ cost is that it is invisible in the table definition a reader inspects first:
 | **The nested-ownership variant** | the row hangs off another owned row (`exercise_entries`, `sets`)                                    | **the plain template alone is a defect at depth 2** — a policy never looks at the parent. Closed by a composite foreign key, which must be the **only** key between each pair |
 | **The derived-view variant**     | the read is a view (`set_estimates`, `personal_records`, `daily_tonnage`, `daily_exercise_tonnage`) | **without `security_invoker = true` a view executes as its OWNER** and hands every account's training to every account, with no error                                         |
 | **The access-control trigger**   | the reference is INTO the shared catalogue, where a composite key cannot reach (`exercise_entries.exercise_id`) | **`security definer` disables it while the SQL still reads correctly** — the function then runs as `postgres`, sees every row, and admits everything. It binds `authenticated` only |
+| **The `security definer` RPC**   | the operation is IMPOSSIBLE under RLS by construction (`public.delete_own_account()` — `authenticated` has no `DELETE` on `auth.users` and must never get one) | the default `EXECUTE` grant on a **function** goes to **`PUBLIC`**, so a revoke naming only `anon`/`authenticated` leaves it callable by anybody. Takes **no parameters**, and a null `auth.uid()` must RAISE rather than match zero rows |
 
 - **`(select auth.uid())`, never bare `auth.uid()`.** The subselect is evaluated once as an InitPlan
   instead of once per row. Required, not stylistic — see § Cloudflare traps.
@@ -566,6 +569,26 @@ reader could not infer from there.
   - **The update payload carries no `weight_unit` and no `weight_kg`.** The unit belongs to the row,
     not to the account editing it: re-stamping it from the profile would turn 100 lb into 100 kg the
     first time somebody fixed a typo after the unit became switchable.
+- **One RPC, and it is the only thing here that escapes RLS on purpose.**
+  `public.delete_own_account()` (`20260815140000_delete_own_account.sql`) deletes the caller's account
+  — `security definer`, no parameters, reached by `DELETE /api/account`, which signs the caller out in
+  the same request so the cookie-clearing headers ride that response. § the `security definer` RPC in
+  `context/foundation/access-control.md`.
+  - **It deletes explicitly, in dependency order** — `workouts`, then the caller's own `exercises`,
+    then `auth.users` — and the header says plainly that **a bare `delete from auth.users` also
+    works**. That was measured on 2026-08-15, against the planning assumption that it would not: the
+    `RESTRICT` on `exercise_entries.exercise_id` is itself an AFTER trigger, queued **behind** the
+    cascade that removes the referencing rows, so it never fires. The order stays for independence
+    from that queue ordering, which is observed rather than contracted. **Do not restate the
+    self-block as a fact; it does not exist.**
+  - **What deletion does NOT remove**: `auth.audit_log_entries`, which carries no foreign key to
+    `auth.users` and keeps the address in its payload. Provider-managed and outside this repository's
+    control, and named in `README.md` rather than in the confirmation dialog.
+  - **The blocked path has no end-to-end test and that is written down, not implied** — closing note
+    of `tests/integration/account-deletion.test.ts`. Neither route into it is reachable: the
+    same-account one does not exist (above), and the cross-account one is refused at insert by the
+    trigger shape. `src/lib/services/accounts.test.ts` guards the half that can be checked —
+    `23503` → `account_delete_blocked`, never `unexpected`.
 - **Four views, all `security_invoker = true`, all read-only, none storing anything** (§ derived-view
   variant in `context/foundation/access-control.md`).
   - `public.set_estimates` — one row per set with its estimated 1RM under the row owner's own

@@ -1,17 +1,19 @@
 # Access control — the templates
 
 **This file is the expansion of `AGENTS.md` § Access control.** That section states the guarantee
-and names the five shapes; this one holds the SQL to copy and the reason each line is there.
+and names the six shapes; this one holds the SQL to copy and the reason each line is there.
 
-**Read it before writing any migration that creates a table or a view.** `AGENTS.md` is loaded every
-session and this file is not, which is the whole point of the split — but it also means an agent who
-improvises a policy set has skipped the only document that would have stopped them. The five shapes
-below are not interchangeable: the plain template alone is a defect at depth 2, and a view left
-unmarked hands every account's training to every account.
+**Read it before writing any migration that creates a table, a view, or a function.** `AGENTS.md` is
+loaded every session and this file is not, which is the whole point of the split — but it also means
+an agent who improvises a policy set has skipped the only document that would have stopped them. The
+six shapes below are not interchangeable: the plain template alone is a defect at depth 2, and a view
+left unmarked hands every account's training to every account.
 
-**Four of them are declarative and the fifth is not.** The last one is a trigger, which means the
-enforcement is invisible in the table definition a reader inspects first — that is its whole cost,
-and it is why it is written down here rather than left to be found.
+**Four of them are declarative; the last two are not, and they fail in opposite directions.** The
+access-control trigger enforces procedurally, so the rule is invisible in the table definition a
+reader inspects first. The `security definer` RPC deliberately **escapes** RLS altogether — it is the
+only shape here that does, and the only one where being wrong hands out more than it should rather
+than less. Both are written down for that reason rather than left to be found.
 
 Citations elsewhere in the repository of the form "`AGENTS.md` § Access control → the derived-view
 variant" mean the correspondingly named section **here**; the headings are unchanged so those
@@ -255,3 +257,57 @@ grant select on public.<v> to authenticated;
   requires ("what will this record fall to") is the runner-up of the same ranking `/api/sets` already
   asks for, not a new number to keep. Adding an `estimated_1rm` or a `personal_records` table would
   undo this and turn the formula switch into a lie.
+
+### The `security definer` RPC — the only shape that deliberately escapes RLS
+
+Use it when the operation is **impossible** under row-level security by construction, not merely
+awkward. There is exactly one here: `public.delete_own_account()`
+(`20260815140000_delete_own_account.sql`), which deletes the caller's `auth.users` row.
+`has_table_privilege('authenticated', 'auth.users', 'DELETE')` is **false** and must stay false — the
+alternative is Supabase's `auth.admin.deleteUser`, which needs a `service_role` key that
+`AGENTS.md` § Environment forbids in both the application and the tests.
+
+```sql
+create function public.<verb>_own_<thing>() returns void   -- NO PARAMETERS
+language plpgsql
+security definer
+set search_path = ''            -- and schema-qualify everything in the body
+as $$
+declare
+  caller uuid := auth.uid();
+begin
+  if caller is null then
+    raise exception using errcode = 'insufficient_privilege', message = '…requires an authenticated caller';
+  end if;
+  -- …work, always `where <owner column> = caller`…
+end;
+$$;
+
+-- `public` is the load-bearing word here — see below.
+revoke all on function public.<verb>_own_<thing>() from public, anon, authenticated;
+grant execute on function public.<verb>_own_<thing>() to authenticated;
+```
+
+- **The default `EXECUTE` grant on a FUNCTION goes to `PUBLIC`, not to `anon`/`authenticated`.** The
+  table template's revoke exists for Supabase's implicit grant and names those two roles; copying that
+  line to a function leaves it callable by anybody, because `PUBLIC` was never revoked. Different
+  source, same class of trap, and it is invisible in exactly the same way.
+- **No parameters.** The subject comes from `auth.uid()` in the body, so there is no argument a caller
+  could aim at somebody else's row. A parameter guarded by `if p_id <> auth.uid() then raise` is
+  strictly worse: the guard is one line somebody can delete, and PostgREST publishes the signature.
+  It also yields a free assertion — a call carrying any argument must answer `PGRST202`.
+- **`auth.uid()` is null off the PostgREST path, and null must RAISE.** `where owner = auth.uid()`
+  would otherwise match zero rows and report success — the lie § "A zero-row UPDATE or DELETE is a
+  SUCCESS" exists to prevent, arriving here through a function rather than a handler.
+- **Never `is not distinct from` on an owner column inside one of these.** The shared-catalogue rows
+  in `public.exercises` carry `user_id is null` and are protected from a definer function by nothing
+  but `= caller` being FALSE against null. A "null-safe" rewrite matches every shared row the first
+  time a null caller reaches it, and no policy would stop it.
+- **Expect the layers to hide each other under mutation.** Measured for `delete_own_account`: the
+  missing grant and the null-uid raise both answer `42501`, so a test matching only the SQLSTATE
+  stayed green when the grant was widened. Match the **message** to tell them apart, and write down
+  which layers end up untestable rather than claiming coverage they do not have.
+- **This shape and the trigger above document each other as failure modes.** `security definer` on
+  the access-control trigger silently disables it; `security invoker` here would make the function
+  useless, since `authenticated` cannot reach `auth.users` at all. Say which side a new function is
+  on, and why, in its migration header.
