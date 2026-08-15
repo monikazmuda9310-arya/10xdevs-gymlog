@@ -10,6 +10,20 @@
 // and 2 are what would notice the trigger being dropped, restricted to `insert` alone, or flipped to
 // `security definer` — the last of which disables it while looking unchanged.
 //
+// **AND US-04'S THIRD CRITERION, WHICH NOTHING IN THIS REPOSITORY ASSERTED BEFORE.** "Signing out
+// and returning requires authenticating again" is assertion 6. `workout-endpoints.test.ts`'s
+// "refuses an unauthenticated caller at every level" is a different claim and does not cover it: it
+// hands a handler `user: null`, which is a caller that never had a session. Assertion 6 signs a real
+// one out and retries the identical read with the same client. Read its comment for what that does
+// and does not prove — a JWT is stateless and the distinction matters.
+//
+// **Assertion 7 checks what the caller is TOLD when the trigger refuses**, which is a property of
+// `src/pages/api/exercise-entries/index.ts` rather than of the database: the same `404
+// exercise_not_found` an exercise that does not exist already gets, so the refusal is no existence
+// oracle. It answers that today with no branch of its own, because the trigger raises `23503` and
+// its message does not name `exercise_entries_workout_owner_fkey`. Both halves of that sentence are
+// load-bearing and neither is obvious from reading the endpoint.
+//
 // **WHAT THIS SUITE DOES NOT RESTATE.** Cross-account reads, updates and deletes at all three levels
 // of the training record are already proven and are not duplicated here. Cited by title text rather
 // than by position, because a positional citation rots the moment somebody inserts a test:
@@ -44,20 +58,25 @@
 // `s03-endpoints-`, `s03-page-`, `s07-`, `s08-`). Deliberately not `s09-`, which is a strict prefix
 // of this one and of anything the sibling slice picks.
 //
-// **This suite owns its accounts and never touches `rls-owner-a/b`.** Two throwaway accounts per
+// **This suite owns its accounts and never touches `rls-owner-a/b`.** Three throwaway accounts per
 // run: every other suite shares that fixture pair, and the sibling slice `account-deletion` is
-// developing in a parallel worktree against the same `gymlog-test`.
+// developing in a parallel worktree against the same `gymlog-test`. The third exists because
+// assertion 6 deliberately ends its account's session, which no other assertion may inherit.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { APIContext } from "astro";
 
 import type { Database } from "@/db/database.types";
+import { POST as addEntryRoute } from "@/pages/api/exercise-entries/index";
 
 const MARK = "s09i-";
 const RUN_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 /** Raised by the trigger, and by the plain foreign keys it now fires ahead of. */
 const FOREIGN_KEY_VIOLATION = "23503";
+/** What Postgres answers a role holding no grant on the table — assertion 6's signed-out client. */
+const INSUFFICIENT_PRIVILEGE = "42501";
 
 interface Account {
   client: SupabaseClient<Database>;
@@ -67,6 +86,18 @@ interface Account {
 
 let accountA: Account;
 let accountB: Account;
+/** Assertion 6's account, and only its. It is the one whose session gets ended. */
+let accountC: Account;
+
+/**
+ * Kept so `afterAll` can re-authenticate before deleting.
+ *
+ * Assertion 6 signs `accountC` out, and a signed-out client cannot delete its own rows — so
+ * teardown would leak whatever that account created, silently, and only for the runs where it got
+ * that far. Re-authenticating in teardown rather than at the end of the assertion keeps that true
+ * when the assertion FAILS partway, which is exactly when a leak is least welcome.
+ */
+let accountPassword: string;
 
 /**
  * Every account this run actually created, in creation order.
@@ -153,13 +184,32 @@ async function readEntries(account: Account, workoutId: string) {
   return data;
 }
 
+/**
+ * The slice of `APIContext` the entry endpoint actually reads, in the shape
+ * `tests/integration/workout-endpoints.test.ts` established.
+ *
+ * Never over HTTP: `astro dev` reads its Supabase credentials from `.dev.vars`, which point at
+ * PRODUCTION, and no process-env override displaces them.
+ */
+function apiContext(body: unknown, account: Account): APIContext {
+  return {
+    locals: { supabase: account.client, user: { id: account.userId } },
+    request: new Request("http://localhost/api/exercise-entries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  } as unknown as APIContext;
+}
+
 beforeAll(async () => {
   const url = required("SUPABASE_TEST_URL");
   const key = required("SUPABASE_TEST_KEY");
-  const password = required("GYMLOG_TEST_PASSWORD");
+  accountPassword = required("GYMLOG_TEST_PASSWORD");
 
-  accountA = await throwawayAccount(url, key, password, "a");
-  accountB = await throwawayAccount(url, key, password, "b");
+  accountA = await throwawayAccount(url, key, accountPassword, "a");
+  accountB = await throwawayAccount(url, key, accountPassword, "b");
+  accountC = await throwawayAccount(url, key, accountPassword, "signout");
 
   // No fixture reset: both accounts were created seconds ago and own nothing else. That is the
   // point of throwaway accounts — `lessons.md` § "A `finally` that restores shared state does not
@@ -174,7 +224,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Workouts before exercises, for both accounts: `exercise_id` carries `on delete restrict`, and
+  // Assertion 6 ends one of these sessions on purpose, and a signed-out client deletes nothing —
+  // so re-authenticate every account first. Unconditional rather than conditional: signing in a
+  // client that already has a session simply replaces it, and the alternative is teardown that
+  // depends on which assertions ran.
+  for (const account of created) {
+    await account.client.auth.signInWithPassword({ email: account.email, password: accountPassword });
+  }
+
+  // Workouts before exercises, for every account: `exercise_id` carries `on delete restrict`, and
   // deleting a workout cascades to its entries and sets, which is what releases it.
   for (const account of created) {
     await account.client.from("workouts").delete().like("note", `${MARK}%`).eq("user_id", account.userId);
@@ -290,5 +348,70 @@ describe("account boundary: the trigger admits everything it should", () => {
 
     const reread = await accountA.client.from("exercises").select("id").eq("id", exerciseId);
     expect(reread.data).toEqual([]);
+  });
+});
+
+describe("account boundary: signing out ends access to the training record", () => {
+  it("6. after signOut the same client can no longer read the workout it had just read", async () => {
+    // **US-04's third criterion, and the only one nothing in this repository asserted.**
+    //
+    // What this proves and what it does not, stated precisely because the difference is invisible
+    // from the assertion: an access token is a stateless JWT and stays cryptographically valid
+    // until it expires — `signOut` cannot recall one. What it ends is the SESSION the client holds
+    // and the refresh token behind it, after which this client authenticates as nobody and the
+    // grants decide. That is the same mechanism a browser sign-out uses, because `@supabase/ssr`
+    // keeps the session in cookies and `/api/auth/signout` clears it. So the claim here is at the
+    // session level; the title says "client", not "screen".
+    //
+    // Distinct from `workout-endpoints.test.ts`'s "refuses an unauthenticated caller at every
+    // level", which hands a handler `user: null` — a caller that never had a session at all.
+    const workoutId = await makeWorkout(accountC, "signout");
+
+    const before = await accountC.client
+      .from("workouts")
+      .select("id, note")
+      .eq("user_id", accountC.userId)
+      .eq("id", workoutId);
+    expect(before.error).toBeNull();
+    expect(before.data).toHaveLength(1);
+
+    const { error: signOutError } = await accountC.client.auth.signOut();
+    expect(signOutError).toBeNull();
+    expect((await accountC.client.auth.getUser()).data.user).toBeNull();
+
+    // The identical read, on the same client. `anon` holds no grant on `workouts` and no policy
+    // names it — `revoke all ... from anon, authenticated` before the grant, in the migration that
+    // created the table — so this is refused before RLS is even reached.
+    const after = await accountC.client
+      .from("workouts")
+      .select("id, note")
+      .eq("user_id", accountC.userId)
+      .eq("id", workoutId);
+    expect(after.error?.code).toBe(INSUFFICIENT_PRIVILEGE);
+    // Refused AND empty-handed: "the read failed" and "the read returned the row anyway" are two
+    // different outcomes, and only one of them is a leak.
+    expect(after.data ?? []).toEqual([]);
+  });
+});
+
+describe("account boundary: what the endpoint tells a caller the trigger refused", () => {
+  it("7. POST /api/exercise-entries answers 404 exercise_not_found, not 500 and not workout_not_found", async () => {
+    // **The endpoint needs no branch for this, and that is the assertion — not an assumption.**
+    // `src/pages/api/exercise-entries/index.ts` already maps a 23503 onto a 404, choosing between
+    // `workout_not_found` and `exercise_not_found` by whether the message names
+    // `exercise_entries_workout_owner_fkey`. The trigger raises `foreign_key_violation` and names
+    // the exercise instead, so it lands on `exercise_not_found` — the same answer an exercise that
+    // genuinely does not exist gets, which is what keeps the refusal from being an existence
+    // oracle. Change the raised code and this fails as `500 unexpected`; make the message mention
+    // that constraint and it fails as `workout_not_found`.
+    const workoutId = await makeWorkout(accountB, "endpoint");
+
+    const response = await addEntryRoute(apiContext({ workoutId, exerciseId: aPrivateExerciseId }, accountB));
+
+    expect(response.status).toBe(404);
+    expect(((await response.json()) as { code: string }).code).toBe("exercise_not_found");
+
+    // Persisted state, not the response: the refusal has to have written nothing.
+    expect(await readEntries(accountB, workoutId)).toEqual([]);
   });
 });

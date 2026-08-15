@@ -484,7 +484,7 @@ near the 10 ms Worker CPU cap.
       `lessons.md`, and `npm run test:integration` green with no migration applied
       — retired outright (its reasoning preserved at the foot of `tonnage-breakdown.test.ts`; a
       weaker replacement was refused per `lessons.md` § "A guard you have not mutated may not
-      guard"). 13 files / 111 tests green, no migration applied.
+      guard"). 13 files / 111 tests green, no migration applied. — d417b63
 - [x] 1.2 Violation counts recorded for both projects, `s08-` fixtures excluded on `gymlog-test`; any
       non-zero count on `gymlog` escalated to the owner
       — **`gymlog` 0, `gymlog-test` 0** (0 excluding `s08-` in both). Nothing to escalate and no data
@@ -492,10 +492,10 @@ near the 10 ms Worker CPU cap.
       because step 1.1's run retired assertion 9 and its `beforeAll` swept the previous run's
       leftover on the way past. Taken with the Management API query endpoint, `read_only: true`, not
       `psql`: this machine has neither `psql` nor a `pg` package. Same databases, same privileges —
-      it runs as the database owner, so RLS hides nothing from the count.
+      it runs as the database owner, so RLS hides nothing from the count. — d417b63
 - [x] 1.3 Migration applies to both projects: `npm run db:push`
       — `20260815090000_scope_exercise_entries_to_visible_exercises.sql`; `npm run db:status` shows
-      both histories at that version.
+      both histories at that version. — d417b63
 - [x] 1.4 Every suite passes, not only the new one: `npm run test:integration`
       — 14 files / 116 tests. **Required one adaptation the plan did not foresee** (owner approved,
       2026-08-15): `workout-log-rls` assertion 3 forged an entry naming account A's PRIVATE exercise,
@@ -503,20 +503,20 @@ near the 10 ms Worker CPU cap.
       assertion wanted `42501`. The row was still refused, but the assertion had silently stopped
       exercising the insert POLICY — it would have stayed green with that policy weakened. Fixed by
       forging `exerciseB` instead, which the trigger admits, restoring `42501` and the original
-      claim; the reason is written into the test beside it.
-- [x] 1.5 The suite is repeatable: second consecutive run green — two consecutive full runs, 116/116
-- [x] 1.6 Type checking passes: `npm run typecheck` — 119 files, 0 errors, 0 warnings
-- [x] 1.7 Linting passes: `npm run lint` — clean
+      claim; the reason is written into the test beside it. — d417b63
+- [x] 1.5 The suite is repeatable: second consecutive run green — two consecutive full runs, 116/116 — d417b63
+- [x] 1.6 Type checking passes: `npm run typecheck` — 119 files, 0 errors, 0 warnings — d417b63
+- [x] 1.7 Linting passes: `npm run lint` — clean — d417b63
 - [x] 1.8 Mutation (a): dropping `or update of exercise_id` fails assertion 2
-      — assertion 2 alone red, assertion 1 green
-- [x] 1.9 Mutation (b): removing the trigger fails assertions 1 and 2 — both red
+      — assertion 2 alone red, assertion 1 green — d417b63
+- [x] 1.9 Mutation (b): removing the trigger fails assertions 1 and 2 — both red — d417b63
 - [x] 1.10 Mutation (c): flipping the function to `security definer` makes assertions 1 and 2 pass
       when they should fail
       — confirmed, with the wording sharpened: what the criterion describes is the GUARD passing a
       row it should refuse, and the assertions are what notice, so both go red. **The failure is
       byte-identical to mutation (b)'s** — `security definer` is indistinguishable from having no
       trigger at all, which is precisely why it is the keystone. Verified against `pg_proc.prosecdef`
-      before and after, not merely applied.
+      before and after, not merely applied. — d417b63
 - [x] 1.11 Every mutation's failure message read and confirmed to be the intended one
       — all three read `AssertionError: expected undefined to be '23503'`: **no error was raised at
       all**, i.e. the write was admitted. That is the criterion's own reason (`lessons.md` § "A
@@ -524,25 +524,56 @@ near the 10 ms Worker CPU cap.
       here would have been a different code, or a red in an assertion the mutation does not name.
       Each mutation applied to `gymlog-test` only, restored afterwards, and the restore verified by
       re-reading `pg_get_triggerdef` and `prosecdef`; the violation count was re-taken at the end and
-      is still 0/0, so the mutation runs left no hazard row behind.
+      is still 0/0, so the mutation runs left no hazard row behind. — d417b63
 
 #### Manual
 
 - [x] 1.12 The migration header gives the `MATCH SIMPLE` reason, not the RLS policy one
       — confirmed by the owner, 2026-08-15, against both halves: the `WHY NOT A COMPOSITE FOREIGN
       KEY` paragraph gives equality / `NULL = NULL` / the 38 null-owner rows and explicitly disowns
-      the policy explanation, and the `Purpose:` block alone conveys what the trigger closes.
+      the policy explanation, and the `Purpose:` block alone conveys what the trigger closes. — d417b63
 
 ### Phase 2: The sign-out gap, and proving the endpoint already answers correctly
 
 #### Automated
 
-- [ ] 2.1 Both assertions pass: `npm run test:integration`
-- [ ] 2.2 The endpoint answers `404 exercise_not_found`; the outcome is recorded, not assumed
-- [ ] 2.3 `workout-endpoints`' "tells a missing exercise apart from a workout that is not the
+- [x] 2.1 Both assertions pass: `npm run test:integration`
+      — 14 files / **118 tests** (116 + the two). Assertion 6 needed a **third throwaway account**,
+      which the plan did not anticipate: it ends its account's session, and every other assertion —
+      plus `afterAll`'s deletes — needs a live one. Teardown now re-authenticates every account it
+      created before deleting, unconditionally, so a leak cannot depend on which assertions ran or
+      on assertion 6 reaching its last line. The refused read answers `42501` (`anon` holds no grant
+      on `workouts`), asserted alongside an empty `data`: "the read failed" and "the read returned
+      the row anyway" are different outcomes and only one is a leak.
+- [x] 2.2 The endpoint answers `404 exercise_not_found`; the outcome is recorded, not assumed
+      — **no source change was needed.** `src/pages/api/exercise-entries/index.ts` mapped it
+      correctly with no branch of its own, exactly as § Key Discoveries predicted, and assertion 7
+      now holds that prediction as a claim rather than as an expectation. It also checks the two
+      wrong answers by name: not `500 unexpected`, not `workout_not_found`.
+- [x] 2.3 `workout-endpoints`' "tells a missing exercise apart from a workout that is not the
       caller's" still green after the trigger
-- [ ] 2.4 Mutation (d): a raised code other than `23503` makes the endpoint answer `500 unexpected`
-- [ ] 2.5 The full six-step gate passes
+      — confirmed by name in a `--reporter=verbose` run, not merely by the file's colour. The
+      constraint name in § Critical Implementation Details is now **load-bearing in two suites**:
+      that assertion, and assertion 7 here. A `BEFORE` trigger fires ahead of constraint checks, so
+      it is the trigger — not the plain foreign key — that raises for a genuinely missing exercise
+      too, and both keep working only because its message does not contain
+      `exercise_entries_workout_owner_fkey`.
+- [x] 2.4 Mutation (d): a raised code other than `23503` makes the endpoint answer `500 unexpected`
+      — applied to `gymlog-test` alone (`errcode = 'raise_exception'`, P0001) and confirmed:
+      assertion 7 red on `expected 500 to be 404`, with the endpoint's own diagnostic
+      `[exercise-entries] unexpected insert failure { code: 'P0001' }` in stderr. **The guard still
+      held and only the MAPPING broke** — same refusal, same message, same hint — which is the whole
+      point of the criterion: the mapping is load-bearing rather than incidental. Assertions 1 and 2
+      went red for the same single reason (`expected 'P0001' to be '23503'`), and assertion 6 stayed
+      green, correctly: sign-out has nothing to do with the trigger. Restored from the migration file
+      verbatim and verified byte-identical against a `pg_get_functiondef` dump taken before the
+      mutation (`prosecdef: false` throughout); violation counts re-taken afterwards and still
+      **0/0**, so the mutation run left no hazard row behind. The write to `gymlog-test` was refused
+      by the permission classifier and was run by the owner, 2026-08-15.
+- [x] 2.5 The full six-step gate passes
+      — `lint` clean (exit 0) → `typecheck` 119 files, 0 errors → `npm test` 240 → `test:render` 25
+      → `test:integration` 118 → `build` complete. The integration step was run again after the
+      mutation was restored, and is the 118 recorded here.
 
 ### Phase 3: Documents, and the pull request
 
