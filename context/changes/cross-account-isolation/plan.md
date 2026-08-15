@@ -581,8 +581,13 @@ near the 10 ms Worker CPU cap.
 
 - [x] 3.1 Full gate green: all six steps
       — `lint` exit 0 → `typecheck` 0 errors → 240 unit → 25 render → 118 integration → `build`
-      exit 0, run after every document edit rather than before them.
-- [ ] 3.2 CI green on the pushed branch
+      exit 0, run after every document edit rather than before them. — 8662333
+- [x] 3.2 CI green on the pushed branch
+      — run 31874937534, all six gate steps green in 4m09s on `feature/cross-account-isolation`.
+      This is the first run of the integration check **from CI against the migrated
+      `gymlog-test`**, so it is also the evidence that the trigger survives a clean clone with no
+      local state. PR: <https://github.com/monikazmuda9310-arya/10xdevs-gymlog/pull/1> — **not
+      merged**, per § Changes Required #5. — 8662333
 - [x] 3.3 Every test file and assertion number named in the amended documents exists
       — checked one by one rather than assumed: `account-boundary.test.ts` assertions 1, 2 and 7;
       `workout-endpoints`' "tells a missing exercise apart from a workout that is not the caller's"
@@ -594,10 +599,15 @@ near the 10 ms Worker CPU cap.
       **One thing the plan did not list and that had to change**: `access-control.md` gained a fifth
       shape, so `AGENTS.md`'s "The four shapes live in…" heading, its intro sentence and the file's
       own header all said **four** and were now false. Amended in the same commit — a document that
-      undercounts its own contents is how the fifth shape stops being read.
+      undercounts its own contents is how the fifth shape stops being read. — 8662333
 
 #### Manual
 
-- [ ] 3.4 The PR body is readable by somebody who has not seen this plan
-- [ ] 3.5 `AGENTS.md` describes what the trigger closes **and** what it does not — stored rows,
+- [x] 3.4 The PR body is readable by somebody who has not seen this plan
+      — confirmed by the owner, 2026-08-15. — 8662333
+- [x] 3.5 `AGENTS.md` describes what the trigger closes **and** what it does not — stored rows,
       `postgres`, `service_role` — without contradicting Phase 1's amendment about the `left join`
+      — confirmed by the owner, 2026-08-15, against both places: the new paragraph under "a JOIN is
+      a FILTER" sits **directly above** Phase 1's paragraph about the unguarded `left join`, so the
+      two claims are read together and a contradiction would be visible rather than a page apart;
+      and the new § Known state bullet at `exercise_id`. — 8662333
