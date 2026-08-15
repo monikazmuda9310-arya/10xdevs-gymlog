@@ -12,6 +12,10 @@
 // mode this guards against is not a red suite: it is two assertions quietly reading each other's
 // fixtures and BOTH passing for the wrong reason.
 //
+// **Assertion 9 was RETIRED on 2026-08-15 and its reasoning is preserved at the foot of this file.**
+// Read that block before concluding the `left join` in `public.daily_exercise_tonnage` is decorative:
+// it is load-bearing and, since the trigger `cross-account-isolation` added, no longer test-guarded.
+//
 // MARK is `s08-`, free and neither a prefix of nor prefixed by any existing mark (`s01-signup-`,
 // `s03-`, `s03-endpoints-`, `s03-page-`, `s07-`).
 
@@ -50,11 +54,9 @@ const RUN_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,
  * | `2025-03-05` | 4 — zero-load and assisted sets
  * | `2025-04-02` | 5 — two workouts, one date, one exercise
  * | `2025-04-30` | 6 — the moved workout. **Its own window, non-negotiable**: it mutates `performed_on`
- * | `2025-05-28` | 9 — the unreadable-exercise hazard. **Its own window**, so that mutation (a)
- * |              |   (`left join` → `join`) reddens this assertion and nothing else. Forcing the
- * |              |   hazard fixture into assertion 1's window would make an ACCESS defect and an
- * |              |   ARITHMETIC defect indistinguishable — `weekly-tonnage.test.ts:344-347` says
- * |              |   never to do that.
+ * | `2025-05-28` | *(retired with assertion 9 — left out of this map rather than reused, so a future
+ * |              |   assertion that wants a window does not silently inherit one that older rows in
+ * |              |   `gymlog-test` may still occupy)*
  */
 const ANCHORS = {
   access: "2024-12-11",
@@ -63,7 +65,6 @@ const ANCHORS = {
   bodyweight: "2025-03-05",
   sameDay: "2025-04-02",
   moved: "2025-04-30",
-  hazard: "2025-05-28",
 } as const;
 
 /** The factor the generated `sets.weight_kg` column applies. Compared against, never used to write. */
@@ -165,9 +166,10 @@ interface LoggedEntry {
  * tables.
  *
  * Not through `/api/sets`, deliberately: that endpoint stamps the unit from the profile, and
- * assertion 3 needs a single workout carrying BOTH units. Not through `/api/exercise-entries`
- * either, because assertion 9 needs an entry the service would happily create but the UI never
- * would. Both endpoint paths have their own suites.
+ * assertion 3 needs a single workout carrying BOTH units. It also bypassed
+ * `/api/exercise-entries`, which retired assertion 9 needed in order to build an entry the service
+ * would happily create but the UI never would — no longer possible for any caller, see the note at
+ * the foot of this file. Both endpoint paths have their own suites.
  */
 async function logWorkout(owner: Owner, performedOn: string, entries: LoggedEntry[]): Promise<string> {
   const workout = await owner.client
@@ -316,10 +318,13 @@ beforeAll(async () => {
   }
 
   // **BOTH accounts' workouts before EITHER account's exercises, and the two passes are not
-  // tidiness.** `exercise_id` carries `on delete restrict`, and assertion 9 deliberately builds an
-  // entry of account A's pointing at an exercise of account B's — so deleting B's exercises while
-  // A's workouts still exist fails outright. Deleting workouts cascades to entries and sets, which is
-  // what releases the restrict.
+  // tidiness.** `exercise_id` carries `on delete restrict`, so deleting an exercise while any entry
+  // still points at it fails outright; deleting workouts cascades to entries and sets, which is what
+  // releases the restrict. Retired assertion 9 built such an entry ACROSS the two accounts, which is
+  // why the passes are also ordered across owners. No run can meet one of its rows any more — the
+  // trigger refuses that row at insert, and both hosted projects were counted at zero after the
+  // retirement landed. Kept anyway: the single-owner case still needs the ordering, and the
+  // cross-owner pass costs one extra statement.
   for (const owner of [ownerA, ownerB]) {
     await owner.client.from("workouts").delete().like("note", `${MARK}%`).eq("user_id", owner.userId);
   }
@@ -517,48 +522,41 @@ describe("tonnage breakdown: the access boundary", () => {
   });
 });
 
-describe("tonnage breakdown: the reconciliation hazard", () => {
-  it("9. tonnage whose exercise this account cannot read survives, unattributed", async () => {
-    // **THE ONLY ASSERTION IN THIS REPOSITORY THAT WOULD NOTICE THE `left join` BEING SIMPLIFIED TO A
-    // `join`, and it constructs the hazard rather than describing it.**
-    //
-    // `exercise_entries.exercise_id references exercises (id)` is single-column and NOT
-    // ownership-scoped, and foreign-key checks run with RLS bypassed — so the database permits an
-    // entry of A's naming a PRIVATE exercise of B's. No screen creates one; that is not the point.
-    // Under `security_invoker` an inner join to `exercises` is filtered by that table's select policy,
-    // so it would delete this set's tonnage from A's OWN breakdown while `daily_tonnage` still counted
-    // it — two plausible numbers that no longer add up, with no error anywhere.
-    const weeks = weeksAround(ANCHORS.hazard);
-    const mine = await makeExercise(ownerA, "hazard-chest", "chest");
-    const theirs = await makeExercise(ownerB, "hazard-private", "legs");
-
-    await logWorkout(ownerA, ANCHORS.hazard, [
-      { exerciseId: mine, sets: [{ reps: 5, weight: 100 }] },
-      // The grafted entry: A's own user_id, A's own workout, B's private exercise.
-      { exerciseId: theirs, sets: [{ reps: 3, weight: 60 }] },
-    ]);
-
-    const rows = await readBreakdown(ownerA, weeks.current);
-    const weekTotal = await readWeekTotal(ownerA, weeks.current);
-
-    // **This comparison first, so the failure text carries the arithmetic.** Under an inner join it
-    // reads 500 against 680 — short by exactly the 180 kg of the unreadable exercise, not merely red.
-    expect(weekTotal).toBeCloseTo(680, PRECISION);
-    expect(sumRows(rows)).toBeCloseTo(weekTotal, PRECISION);
-
-    // And the tonnage is present but UNNAMED: null means "unreadable by this account", never "worth
-    // nothing". The dashboard renders this row as `Unattributed`.
-    const unattributed = rows.filter((row) => row.muscle_group === null);
-    expect(unattributed).toHaveLength(1);
-    expect(unattributed[0].exercise_name).toBeNull();
-    expect(unattributed[0].exercise_id).toBe(theirs);
-    expect(Number(unattributed[0].tonnage_kg)).toBeCloseTo(180, PRECISION);
-
-    // Non-vacuity: A's own exercise is still fully attributed in the same window, so this is not
-    // passing because the join broke for everything.
-    const attributed = rows.filter((row) => row.exercise_id === mine);
-    expect(attributed).toHaveLength(1);
-    expect(attributed[0].muscle_group).toBe("chest");
-    expect(attributed[0].exercise_name).toBe(`${MARK}hazard-chest-${RUN_ID}`);
-  });
-});
+// ------------------------------------------------------------------------------------------------
+// RETIRED — assertion 9, "tonnage whose exercise this account cannot read survives, unattributed".
+// Removed by `cross-account-isolation` on 2026-08-15. Not deleted silently, and not replaced by a
+// weaker assertion that would read as coverage: `lessons.md` § "A guard you have not mutated may not
+// guard" calls a test that cannot fail worse than an obvious gap, and the honest shape here is a
+// named gap.
+//
+// **What it asserted.** `exercise_entries.exercise_id references exercises (id)` is single-column
+// and NOT ownership-scoped, and foreign-key checks run with RLS bypassed — so the database permitted
+// an entry of account A's naming a PRIVATE exercise of account B's. The assertion built exactly that
+// row and proved that `public.daily_exercise_tonnage` still counted its kilograms, as an
+// `Unattributed` row with a null `muscle_group`, agreeing with `daily_tonnage` at 680 kg. Under an
+// **inner** join it read 500 against 680 — short by precisely the 180 kg of the unreadable exercise.
+//
+// **Why it cannot be written any more.** The migration
+// `20260815..._scope_exercise_entries_to_visible_exercises.sql` refuses that row at insert and at
+// update. The assertion did not merely stop being interesting: it died in SETUP, because `logWorkout`
+// throws when an insert is refused, and `npm run test:integration` runs every suite — so leaving it
+// in place would have reddened the gate rather than reported a finding. There is also no weaker
+// version to fall back on: under RLS the hazard row is, by construction, visible to neither account,
+// and constructing one needs a `service_role` key that `vitest.integration.config.ts` strips from
+// the process on purpose.
+//
+// **THE GUARANTEE IT WAS HOLDING IS STILL LOAD-BEARING AND IS NOW UNGUARDED.** The `left join` in
+// `public.daily_exercise_tonnage` must stay. The trigger is a `before` trigger, so it does not
+// validate rows already stored; and it runs its visibility check as the caller, so `postgres` and
+// `service_role` — which bypass RLS — are not constrained by it at all. A hazard row therefore
+// remains possible from those two directions and from any row predating 2026-08-15.
+//
+// **No mutation available today breaks the guarantee.** The exact future edit that would is
+// `left join public.exercises` → `join public.exercises` inside that view. Nothing in this repository
+// would notice it. Whoever makes that edit is removing the only thing that keeps such a row's
+// kilograms in the account's own weekly figure, and will see two plausible numbers stop agreeing
+// with no error anywhere.
+//
+// The closure of the source defect is proven instead by `tests/integration/account-boundary.test.ts`
+// assertions 1 and 2 — which is a different claim, and does not restore this one.
+// ------------------------------------------------------------------------------------------------

@@ -136,13 +136,27 @@ without changing the test and saying so.**
   - **Under `security_invoker`, a JOIN is a FILTER.** The group lives on `public.exercises`, whose
     select policy is `user_id is null or (select auth.uid()) = user_id`;
     `exercise_entries.exercise_id` is a **single-column** foreign key, is **not** ownership-scoped,
-    and foreign-key checks bypass RLS — so a row can exist in which account A's entry points at
+    and foreign-key checks bypass RLS — so a row could exist in which account A's entry points at
     account B's private exercise. An **inner** join inside `public.daily_exercise_tonnage` would drop
     that set's kilograms from **A's own** breakdown while `daily_tonnage` still counted them, with no
     error and both figures plausible. The view uses **`left join`**, and an unreadable exercise keeps
-    its kilograms as an `Unattributed` row. **Assertion 9 of
-    `tests/integration/tonnage-breakdown.test.ts` constructs that hazard row on purpose** — it is the
-    only thing here that would notice the `left` being "simplified" away.
+    its kilograms as an `Unattributed` row.
+    - **An `authenticated` caller can no longer CREATE that row, and that changes nothing about the
+      `left join`.** `20260815090000_scope_exercise_entries_to_visible_exercises.sql` refuses it on
+      insert and on `update of exercise_id`, with a `security invoker` trigger whose visibility check
+      **is** the `exercises` select policy (§ the access-control trigger in
+      `context/foundation/access-control.md`). Assertions 1 and 2 of
+      `tests/integration/account-boundary.test.ts` are what would notice it being dropped, narrowed to
+      `insert`, or flipped to `security definer`. **What is NOT closed**: rows stored before
+      2026-08-15, and anything acting as `postgres` or `service_role` — both bypass RLS, so the check
+      admits everything on those paths.
+    - **Nothing in this repository would notice the `left` being "simplified" away, and that is a
+      known gap rather than an oversight.** Assertion 9 of `tests/integration/tonnage-breakdown.test.ts`
+      used to construct the hazard row on purpose; `cross-account-isolation` refused that row at the
+      source on 2026-08-15, so the assertion died in setup and was **retired**. Its reasoning is
+      preserved at the foot of that file. The guarantee did **not** retire with it: the trigger is a
+      `before` trigger and validates nothing already stored, and it binds `authenticated` only, so
+      `postgres` and `service_role` are unconstrained. **Keep the `left join`.**
   - **A muscle-group correction is retroactive by construction, and it cannot move the weekly total.**
     Nothing stores the group — not `sets`, not `exercise_entries` — so changing
     `exercises.muscle_group` moves historical tonnage **between** buckets on the next read, with no
@@ -182,11 +196,12 @@ an identifier directly. This is enforced in the database, not only in the UI.
   per-operation, per-role policies. A table without RLS is a defect, not a follow-up.
 - Tests for this must assert against **persisted state**, not just the response status code.
 
-### The four shapes live in `context/foundation/access-control.md` — read it before writing a migration
+### The five shapes live in `context/foundation/access-control.md` — read it before writing a migration
 
 **Creating a table, or a view over one, without opening that file is how this guardrail breaks.** It
 carries the SQL to copy and the reason each line is there. They are not interchangeable, and each has
-one thing that bites in silence:
+one thing that bites in silence. **Four are declarative and the fifth is a trigger**, whose whole
+cost is that it is invisible in the table definition a reader inspects first:
 
 | Shape                            | Use it when                                                                                         | What bites, silently                                                                                                                                                          |
 | -------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -194,6 +209,7 @@ one thing that bites in silence:
 | **The shared-catalogue variant** | some rows belong to everybody (`public.exercises`)                                                  | only the **select** policy changes; the ordinary owner check is what makes seeded rows unwritable, and that protection is invisible in the policy text                        |
 | **The nested-ownership variant** | the row hangs off another owned row (`exercise_entries`, `sets`)                                    | **the plain template alone is a defect at depth 2** — a policy never looks at the parent. Closed by a composite foreign key, which must be the **only** key between each pair |
 | **The derived-view variant**     | the read is a view (`set_estimates`, `personal_records`, `daily_tonnage`, `daily_exercise_tonnage`) | **without `security_invoker = true` a view executes as its OWNER** and hands every account's training to every account, with no error                                         |
+| **The access-control trigger**   | the reference is INTO the shared catalogue, where a composite key cannot reach (`exercise_entries.exercise_id`) | **`security definer` disables it while the SQL still reads correctly** — the function then runs as `postgres`, sees every row, and admits everything. It binds `authenticated` only |
 
 - **`(select auth.uid())`, never bare `auth.uid()`.** The subselect is evaluated once as an InitPlan
   instead of once per row. Required, not stylistic — see § Cloudflare traps.
@@ -531,6 +547,16 @@ reader could not infer from there.
   - `performed_on` is a `date` the user states, not an instant.
   - `exercise_id` carries `on delete restrict`, so **an exercise with logged history can no longer be
     deleted at all** — whoever builds catalogue editing will meet that.
+  - **`exercise_id` is the one reference NOT closed by a composite key**, because it points into the
+    shared catalogue and `MATCH SIMPLE` equality can never match the 38 null-owner rows. It is closed
+    by a trigger instead — § the access-control trigger in `context/foundation/access-control.md`,
+    and the paragraph under "a JOIN is a FILTER" above for what that closure does and does not cover.
+    **Two things follow that a reader will not guess.** A `BEFORE` trigger fires ahead of constraint
+    checks, so it is now the trigger — not the plain foreign key — that raises for a genuinely
+    missing exercise as well; and the endpoint needed **no change at all**, because the trigger raises
+    `23503` and its message does not name `exercise_entries_workout_owner_fkey`. `account-boundary`
+    assertion 7 and `workout-endpoints`' "tells a missing exercise apart from a workout that is not
+    the caller's" both depend on that message rule.
   - **A failed impact read answers a non-2xx `impact_unavailable`, never `{ impact: [] }`.** An empty
     list is a positive claim — "no record is at stake" — and the screen renders it as reassurance.
     The **opposite** of the rule `/api/sets` follows for the save-time badge, and deliberately: there

@@ -174,7 +174,7 @@ and `http://localhost:4321/**` for local work.
 | `/api/auth/signout`     | POST. Always → `/auth/signin`, so returning requires authenticating again                                                |
 | `/api/exercises`        | POST, **JSON** (not a form post — the caller is a hydrated island). Creates a custom exercise for the signed-in account  |
 | `/api/workouts`         | POST, JSON. Creates a workout from `{ performedOn, note? }`                                                              |
-| `/api/exercise-entries` | POST, JSON. Adds an exercise to a workout; choosing one already there returns the existing entry rather than an error    |
+| `/api/exercise-entries` | POST, JSON. Adds an exercise to a workout; choosing one already there returns the existing entry rather than an error. **An exercise the caller cannot see is refused exactly like one that does not exist** — same 404, same message code |
 | `/api/sets`             | POST, JSON. Logs a set. **The weight unit is not in the body** — it is read from the account's profile on the server     |
 | `/api/profile`          | PATCH, JSON. Replaces all three preferences at once. Writes only the row named by `locals.user.id`; no route parameter   |
 
