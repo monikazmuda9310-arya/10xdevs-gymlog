@@ -894,6 +894,31 @@ No schema change. No migration. `delete_own_account()` already exists
   and looks exactly like a correctly refused forgery. Written up where the claim lives —
   `tests/middleware/_shared/session.ts` header — per `lessons.md` § "An assertion you keep because it
   cannot fail YET".
+- **P3.a a signed-out caller is refused at the GRANT layer, not filtered by RLS** — measured
+  2026-08-16, and it changed assertion 2's shape. The expectation written first was "the read comes
+  back empty"; the read instead **threw**, `permission denied for table workouts` — SQLSTATE
+  **`42501`**. A jar with the session cookie removed authenticates as `anon`, and `anon` holds no
+  `select` grant on `workouts` at all (§ the table template in `context/foundation/access-control.md`
+  revokes before granting, to `authenticated` only), so the request never reaches a policy. Both
+  outcomes are "no data" and they are **different guarantees**: the assertion now pins the SQLSTATE,
+  so the day somebody widens that grant and turns a refusal into a filtered zero, this suite says
+  which of the two moved rather than staying green through the change.
+- **P3.b assertion 2's ORDER decides which failure the mutation lands on, measured under mutation
+  3.6** — with `signout.ts` made to skip `supabase.auth.signOut()`, the same test went red **three
+  different ways** depending on where the data read sat: on the cleared-cookie name when that check
+  led (`expected [] to include 'sb-…-auth-token'`), on `locals.user` when the redirect block led
+  (`expected {…user object…} to be null`), and only with the read placed first on the thing US-04
+  actually asks about (`expected [ 't2c-signout-note-…' ] to not include 't2c-signout-note-…'`). The
+  first two are true, weaker, and leave the read **unexecuted** — the plan's own criterion 3.6 ("not
+  merely the cookie count") is satisfied by the third alone. Recorded because the defect is invisible
+  in a green run and reappears the moment somebody tidies the assertions back into narrative order:
+  `lessons.md` § "A mutation that fails for the WRONG REASON has not confirmed the guard".
+- **P3.c `astro:env/server` CAN be replaced per-test, so assertion 5 asserts the real branch** — the
+  plan allowed a fallback to a direct `createClient` unit call if the no-credentials case could not
+  be reached without restarting the runner. It could: `vi.resetModules()` + `vi.doMock`, then a
+  dynamic `import("@/middleware")`, gives the real `onRequest` over a real `createClient` with two
+  string constants doubled. **Fallback not needed**; what it costs is stated in the test's own
+  comment — the assertion cannot notice the env SCHEMA changing shape, only the branch behaviour.
 - **P4.1 `wrangler dev` starts with `dist/server/.dev.vars` deleted** — pending
 - **P4.2 `CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV` + `CLOUDFLARE_INCLUDE_PROCESS_ENV` behave as read** — pending
 - **P4.3 the served worker is provably talking to `gymlog-test`** — pending
@@ -938,31 +963,31 @@ No schema change. No migration. `delete_own_account()` already exists
 
 #### Automated
 
-- [x] 2.1 `npm run test:middleware` passes
-- [x] 2.2 `npm run lint` and `npm run typecheck` pass
-- [x] 2.3 The suite is repeatable — two consecutive green runs, no `t2c-` account left behind
-- [x] 2.4 The three Vitest globs still cannot see each other's files
+- [x] 2.1 `npm run test:middleware` passes — 5999a05
+- [x] 2.2 `npm run lint` and `npm run typecheck` pass — 5999a05
+- [x] 2.3 The suite is repeatable — two consecutive green runs, no `t2c-` account left behind — 5999a05
+- [x] 2.4 The three Vitest globs still cannot see each other's files — 5999a05
 
 #### Manual
 
-- [x] 2.5 Assertion 1 proven by hardcoding `locals.user` — red, then reverted
-- [x] 2.6 Assertion 2 proven by swapping `getUser()` for `getSession()` — red, then reverted
-- [x] 2.7 The `envDir` guard proven by planting a `.env` — throws, then removed
-- [x] 2.8 No `rls-owner-*` or `s09i-*` fixture touched
+- [x] 2.5 Assertion 1 proven by hardcoding `locals.user` — red, then reverted — 5999a05
+- [x] 2.6 Assertion 2 proven by swapping `getUser()` for `getSession()` — red, then reverted — 5999a05
+- [x] 2.7 The `envDir` guard proven by planting a `.env` — throws, then removed — 5999a05
+- [x] 2.8 No `rls-owner-*` or `s09i-*` fixture touched — 5999a05
 
 ### Phase 3: The session lifecycle — three cookie states, both directions (risk #3)
 
 #### Automated
 
-- [ ] 3.1 `npm run test:middleware` passes with both suites
-- [ ] 3.2 Repeatable — two consecutive green runs, no `t2c-session-*` account left behind
-- [ ] 3.3 `npm run lint` and `npm run typecheck` pass
+- [x] 3.1 `npm run test:middleware` passes with both suites
+- [x] 3.2 Repeatable — two consecutive green runs, no `t2c-session-*` account left behind
+- [x] 3.3 `npm run lint` and `npm run typecheck` pass
 
 #### Manual
 
-- [ ] 3.4 Assertion 3 proven by removing `/workouts` from `PROTECTED_ROUTES` — red, then reverted
-- [ ] 3.5 Assertion 4 proven by deleting the `AUTH_ROUTES` block — red, then reverted
-- [ ] 3.6 Assertion 2 proven by making `signout.ts` skip `signOut()` — the data read goes red, then reverted
+- [x] 3.4 Assertion 3 proven by removing `/workouts` from `PROTECTED_ROUTES` — red, then reverted
+- [x] 3.5 Assertion 4 proven by deleting the `AUTH_ROUTES` block — red, then reverted
+- [x] 3.6 Assertion 2 proven by making `signout.ts` skip `signOut()` — the data read goes red, then reverted
 
 ### Phase 4: Measure Option B's three conditions
 

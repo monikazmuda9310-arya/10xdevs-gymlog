@@ -42,6 +42,34 @@ const BASE64_PREFIX = "base64-";
 
 export type Jar = Map<string, string>;
 
+/**
+ * Apply a `setAll` batch to a jar the way a BROWSER would, which is not the same as recording it.
+ *
+ * `@supabase/ssr` clears a cookie by writing `value: ""` with `maxAge: 0`; a browser drops it. A jar
+ * that merely collected those writes would still be holding the live session under the old value,
+ * and a suite replaying it would prove nothing about signing out.
+ *
+ * **The direction matters and is the whole reason this is a function rather than two inline loops.**
+ * A sign-out test must replay the writes ON TOP OF the live jar, never the writes alone: with the
+ * writes alone, a `signOut()` that was never called produces an EMPTY header, the next request has
+ * no session, and the assertion passes for exactly the wrong reason
+ * (`lessons.md` § "A guard you have not mutated may not guard").
+ */
+export function applyCookieWrites(
+  jar: Jar,
+  writes: readonly { name: string; value: string; options?: unknown }[],
+): Jar {
+  for (const { name, value, options } of writes) {
+    const maxAge = (options as { maxAge?: unknown } | undefined)?.maxAge;
+    if (value === "" || (typeof maxAge === "number" && maxAge === 0)) {
+      jar.delete(name);
+    } else {
+      jar.set(name, value);
+    }
+  }
+  return jar;
+}
+
 function required(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -106,14 +134,7 @@ export async function mintSessionCookies(email: string, password: string): Promi
     cookies: {
       getAll: () => [...jar].map(([name, value]) => ({ name, value })),
       setAll: (toSet) => {
-        for (const { name, value, options } of toSet) {
-          // A cleared cookie is `value: ""` with `maxAge: 0`; a browser drops it, so the jar must too.
-          if (value === "" || options.maxAge === 0) {
-            jar.delete(name);
-          } else {
-            jar.set(name, value);
-          }
-        }
+        applyCookieWrites(jar, toSet);
       },
     },
   });
