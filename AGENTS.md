@@ -205,13 +205,13 @@ fail in opposite directions** — the trigger enforces procedurally, so its rule
 table definition a reader inspects first; the RPC deliberately escapes RLS, and is the only shape here
 where being wrong hands out **more** than it should rather than less:
 
-| Shape                            | Use it when                                                                                         | What bites, silently                                                                                                                                                          |
-| -------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **The table template**           | every data-bearing table                                                                            | Supabase's implicit `ALL` grant to `anon`/`authenticated` — **revoke before granting**. `UPDATE` needs both `using` and `with check`                                          |
-| **The shared-catalogue variant** | some rows belong to everybody (`public.exercises`)                                                  | only the **select** policy changes; the ordinary owner check is what makes seeded rows unwritable, and that protection is invisible in the policy text                        |
-| **The nested-ownership variant** | the row hangs off another owned row (`exercise_entries`, `sets`)                                    | **the plain template alone is a defect at depth 2** — a policy never looks at the parent. Closed by a composite foreign key, which must be the **only** key between each pair |
-| **The derived-view variant**     | the read is a view (`set_estimates`, `personal_records`, `daily_tonnage`, `daily_exercise_tonnage`) | **without `security_invoker = true` a view executes as its OWNER** and hands every account's training to every account, with no error                                         |
-| **The access-control trigger**   | the reference is INTO the shared catalogue, where a composite key cannot reach (`exercise_entries.exercise_id`) | **`security definer` disables it while the SQL still reads correctly** — the function then runs as `postgres`, sees every row, and admits everything. It binds `authenticated` only |
+| Shape                            | Use it when                                                                                                                                                    | What bites, silently                                                                                                                                                                                                                      |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The table template**           | every data-bearing table                                                                                                                                       | Supabase's implicit `ALL` grant to `anon`/`authenticated` — **revoke before granting**. `UPDATE` needs both `using` and `with check`                                                                                                      |
+| **The shared-catalogue variant** | some rows belong to everybody (`public.exercises`)                                                                                                             | only the **select** policy changes; the ordinary owner check is what makes seeded rows unwritable, and that protection is invisible in the policy text                                                                                    |
+| **The nested-ownership variant** | the row hangs off another owned row (`exercise_entries`, `sets`)                                                                                               | **the plain template alone is a defect at depth 2** — a policy never looks at the parent. Closed by a composite foreign key, which must be the **only** key between each pair                                                             |
+| **The derived-view variant**     | the read is a view (`set_estimates`, `personal_records`, `daily_tonnage`, `daily_exercise_tonnage`)                                                            | **without `security_invoker = true` a view executes as its OWNER** and hands every account's training to every account, with no error                                                                                                     |
+| **The access-control trigger**   | the reference is INTO the shared catalogue, where a composite key cannot reach (`exercise_entries.exercise_id`)                                                | **`security definer` disables it while the SQL still reads correctly** — the function then runs as `postgres`, sees every row, and admits everything. It binds `authenticated` only                                                       |
 | **The `security definer` RPC**   | the operation is IMPOSSIBLE under RLS by construction (`public.delete_own_account()` — `authenticated` has no `DELETE` on `auth.users` and must never get one) | the default `EXECUTE` grant on a **function** goes to **`PUBLIC`**, so a revoke naming only `anon`/`authenticated` leaves it callable by anybody. Takes **no parameters**, and a null `auth.uid()` must RAISE rather than match zero rows |
 
 - **`(select auth.uid())`, never bare `auth.uid()`.** The subselect is evaluated once as an InitPlan
@@ -515,14 +515,35 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
   **build-time only** — the Worker needs its own `wrangler secret put`. No pipeline can catch this;
   check it by signing in against the deployed URL.
 - **`astro dev` already runs the real workerd runtime** (adapter v13 bundles
-  `@cloudflare/vite-plugin`). Do not add a `wrangler dev` step — it is legacy for this stack, and
-  `platformProxy` was removed.
+  `@cloudflare/vite-plugin`). Do not add a `wrangler dev` step **to the development loop** — it is
+  legacy there, and `platformProxy` was removed. **That sentence is about the dev loop only and does
+  not foreclose running the BUILT worker as a test harness**, where credential resolution genuinely
+  differs — see the third bullet below.
   - **It reads its Supabase credentials from `.dev.vars`, which points at PRODUCTION, and a
-    process-env override does not displace them.** So the dev server cannot be aimed at
+    process-env override does not displace them.** The mechanism, so nobody re-litigates it: the
+    adapter does `Object.assign(process.env, parseEnv(readFileSync(".dev.vars")))` in
+    `astro:config:done`, and Vite's `loadEnv` applies `process.env` **last**, after every `.env*`
+    file — so `.dev.vars` beats a shell variable, `.env` and `.env.<mode>` alike. In dev the value is
+    then **inlined** into the `astro:env/server` virtual module, so the workerd env is not even
+    consulted. There is no flag, no mode and no second file. The dev server cannot be aimed at
     `gymlog-test`, and any scripted check that signs in and writes rows would be writing them into
     the database the owner trains against. Verify write paths by calling the exported handlers from
     an integration suite instead (`tests/integration/workout-endpoints.test.ts` is the pattern);
     reserve the dev server for read-only probes and for a human clicking through.
+  - **`npm run build` copies the production credentials into `dist/server/.dev.vars`**, emitted by
+    `@cloudflare/vite-plugin` from the root file. `astro preview` and `wrangler dev` read them from
+    **there**, not from the repository root — so the build output is aimed at production too, by
+    default, through a file no test author would think to look at. It is gitignored, so this is a
+    local hazard rather than a commit one. Anything that launches the built worker must **delete that
+    file and assert its absence immediately before launch**, not once at setup: an ordinary rebuild
+    re-creates it.
+  - **The built worker resolves its credentials at REQUEST time, and that is the one aimable path.**
+    Unlike dev, the build emits `_internalGetSecret("SUPABASE_URL")` against the workerd env rather
+    than an inlined value, so a launcher that strips the environment and sets the test pair controls
+    what the worker sees. The failure mode when the launcher is bypassed is **absent** credentials,
+    not production ones — `src/lib/supabase.ts` returns `null`, every protected route redirects, and a
+    browser suite goes red on its first step. Measured 2026-08-16;
+    `context/changes/testing-browser-layer/research.md` carries the file:line evidence.
 - Adapter v13 also removed `Astro.locals.runtime` and `cloudflareModules`, and flipped `imageService`
   to default `cloudflare-binding`. Guidance written for v12 or earlier is wrong.
 - **The Workers Free plan caps CPU at 10 ms per invocation** — a hard kill (Error 1102), not a

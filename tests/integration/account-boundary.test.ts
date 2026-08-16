@@ -54,10 +54,13 @@
 // publishable key; never a `service_role` key; throw in `beforeAll` when a variable is missing,
 // because a check must never skip its way to green.
 //
-// MARK is `s09i-` — not a prefix of, and not prefixed by, any of the ten marks this repository
-// uses (`s01-signup-`, `s03-`, `s03-endpoints-`, `s03-page-`, `s04-`, `s05-`, `s05m-`, `s06-`,
-// `s07-`, `s08-`). Deliberately not `s09-`, which is a strict prefix of this one and of anything the
-// sibling slice picks.
+// MARK is `s09i-` — not a prefix of, and not prefixed by, any of the twelve marks this repository
+// uses (`s01-signup-`, `s02-`, `s03-`, `s03-endpoints-`, `s03-page-`, `s04-`, `s05-`, `s05m-`,
+// `s06-`, `s07-`, `s08-`, `s09d-`). Deliberately not `s09-`, which is a strict prefix of this one and
+// of the sibling slice's `s09d-`. **The list is the thing that rots** — it was written naming ten and
+// silently omitted `s02-` (`exercises-rls.test.ts:94`), so anyone picking a new mark from it was
+// checking against an incomplete set. Re-derive it with `grep -rn "const MARK" tests/integration/`
+// rather than trusting this line.
 //
 // **This suite owns its three accounts and never touches `rls-owner-a/b`.** Every other suite
 // shares that fixture pair, and the sibling slice `account-deletion` is developing in a parallel
@@ -65,14 +68,21 @@
 // ends its account's session, which no other assertion may inherit.
 //
 // **They are a FIXED POOL, not throwaway accounts per run, and the reason is durability rather than
-// tidiness.** Run-unique addresses looked safer — nothing another run could collide with — but
-// nothing in this repository can delete an `auth.users` row (that needs `auth.admin.deleteUser` and
-// a `service_role` key, which `vitest.integration.config.ts` strips), so every run leaked three
+// tidiness.** Run-unique addresses looked safer — nothing another run could collide with — but at the
+// time nothing in this repository could delete an `auth.users` row (that needed `auth.admin.deleteUser`
+// and a `service_role` key, which `vitest.integration.config.ts` strips), so every run leaked three
 // accounts permanently; and an interrupted run's ROWS were worse still, because no later run knew
 // those account ids and RLS hides them from every other account. Fixed addresses plus the
 // `beforeAll` reset below make the garbage self-healing, which is the reason every sibling RLS suite
 // resets at the START of a run (`workout-log-rls.test.ts`, `exercises-rls.test.ts`). Run-uniqueness
 // is kept where it is actually load-bearing — in the row MARKS, via `RUN_ID`.
+//
+// **That premise stopped being true on 2026-08-15 and this pool stays anyway.** `delete_own_account()`
+// (`20260815140000_delete_own_account.sql`) lets a caller delete its OWN account with no
+// `service_role` key, so a per-run account is now disposable and new suites should prefer one. What
+// it does not do is rescue an INTERRUPTED run: the cleanup call is the thing that did not happen, and
+// the orphaned account is the only thing that could have made it. The self-healing `beforeAll` reset
+// below is what covers that, which is why this suite keeps its fixed pool rather than being converted.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
