@@ -1,7 +1,7 @@
 ---
 change_id: testing-browser-layer
 title: Browser layer — test-plan rollout phase 2 (risks #2, #3, #4)
-status: planned
+status: implementing
 created: 2026-08-16
 updated: 2026-08-16
 archived_at: null

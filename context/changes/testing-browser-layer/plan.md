@@ -853,9 +853,36 @@ No schema change. No migration. `delete_own_account()` already exists
 > Filled in by Phases 1 and 4 as they run. Each entry: date, exact command, result, and — where the
 > result differed from what the source read suggested — what changed in the plan.
 
-- **P1.a `astro:middleware` resolves under `getViteConfig` + `configFile: false`** — pending
-- **P1.b `astro:env/server` reports the seeded `process.env` value** — pending
-- **P1.c `vite.envDir` binds (decoy `.env` probe)** — pending
+- **P1.a `astro:middleware` resolves under `getViteConfig` + `configFile: false`** — **PASSED**,
+  2026-08-16. `MIDDLEWARE_PROBE_MODE=seeded npx vitest run --config vitest.middleware.config.ts`.
+  `import { onRequest } from "@/middleware"` resolved with no `resolve.alias` at all and
+  `typeof onRequest === "function"`. **Fallback 1 was not needed** — Astro's own
+  `astro:middleware` → `astro/virtual-modules/middleware.js` alias is present under `getViteConfig`,
+  which research had only read (`create-vite.js:214-216`). The `@/` alias resolved too, from
+  `tsconfig.json` paths, exactly as `tests/render/` already relies on.
+- **P1.b `astro:env/server` reports the seeded `process.env` value** — **PASSED**, 2026-08-16. Same
+  command, no decoy on disk. `astro:env/server` reported `https://nfmrwvevntbzulsmrmel.supabase.co`,
+  which is `SUPABASE_TEST_URL`. Production is a **different** project ref
+  (`cdzybmwxtefhbanfytna`, confirmed by `node -e` printing both hostnames from `.env`), so the
+  strip-then-seed genuinely re-aimed the runner rather than coinciding with what was already there.
+- **P1.c `vite.envDir` binds (decoy `.env` probe)** — **PASSED**, 2026-08-16, measured as the
+  difference between three runs with `printf 'SUPABASE_URL=https://decoy.invalid\n' >
+  tests/middleware/no-env/.env`:
+  1. decoy present, seed **withheld** → reported `https://decoy.invalid`. The env **directory** is
+     genuinely what `loadEnv` reads — and, the load-bearing half, the **repository root's `.env` is
+     not**, because that one names production and production is what did not appear.
+  2. decoy present, seed applied → reported the test URL. `process.env` is applied last
+     (`config.js:9417-9418`), as read.
+  3. **Mutation, to prove the probe was not inert**: decoy **removed**, still asserting the decoy →
+     red, and red for its own reason — `expected undefined to be 'https://decoy.invalid'`. The
+     observed value was **`undefined`**, not production's URL. That is the property the whole plan
+     rests on stated as a measurement rather than an intention: with the strip applied and nothing
+     in the env directory, being wrong yields an **absent** credential, never a production one.
+- **P1 artefacts** — `tests/middleware/no-env/.gitkeep` and `vitest.middleware.config.ts` kept (the
+  latter as the first draft, without the `readdirSync` guard, which is Phase 2's and which probe (c)
+  had to be able to violate). Decoy `.env` and `tests/middleware/probe.test.ts` deleted; the
+  config's `MIDDLEWARE_PROBE_MODE` branch went with the probe rather than being left as a knob that
+  can withhold the seed.
 - **P4.1 `wrangler dev` starts with `dist/server/.dev.vars` deleted** — pending
 - **P4.2 `CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV` + `CLOUDFLARE_INCLUDE_PROCESS_ENV` behave as read** — pending
 - **P4.3 the served worker is provably talking to `gymlog-test`** — pending
@@ -886,15 +913,15 @@ No schema change. No migration. `delete_own_account()` already exists
 
 #### Automated
 
-- [ ] 1.1 The probe suite runs under `vitest.middleware.config.ts`
-- [ ] 1.2 `onRequest` imports and is callable (probe a)
-- [ ] 1.3 `astro:env/server` reports the seeded test URL (probe b)
-- [ ] 1.4 The decoy `.env` in the env directory is what `loadEnv` reads when `process.env` is unseeded (probe c)
-- [ ] 1.5 Decoy file removed and probe test deleted
+- [x] 1.1 The probe suite runs under `vitest.middleware.config.ts`
+- [x] 1.2 `onRequest` imports and is callable (probe a)
+- [x] 1.3 `astro:env/server` reports the seeded test URL (probe b)
+- [x] 1.4 The decoy `.env` in the env directory is what `loadEnv` reads when `process.env` is unseeded (probe c)
+- [x] 1.5 Decoy file removed and probe test deleted
 
 #### Manual
 
-- [ ] 1.6 Result recorded in "Measurement record", with the fallback taken if any probe failed
+- [x] 1.6 Result recorded in "Measurement record", with the fallback taken if any probe failed
 
 ### Phase 2: The fourth Vitest project, and the cookie → identity boundary (risk #2)
 
