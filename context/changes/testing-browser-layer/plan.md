@@ -919,9 +919,54 @@ No schema change. No migration. `delete_own_account()` already exists
   dynamic `import("@/middleware")`, gives the real `onRequest` over a real `createClient` with two
   string constants doubled. **Fallback not needed**; what it costs is stated in the test's own
   comment — the assertion cannot notice the env SCHEMA changing shape, only the branch behaviour.
-- **P4.1 `wrangler dev` starts with `dist/server/.dev.vars` deleted** — pending
-- **P4.2 `CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV` + `CLOUDFLARE_INCLUDE_PROCESS_ENV` behave as read** — pending
-- **P4.3 the served worker is provably talking to `gymlog-test`** — pending
+- **P4.0 the build DOES write production's credentials to `dist/server/.dev.vars`** — **CONFIRMED**,
+  2026-08-16. `npm run build` logs `Using secrets defined in .dev.vars` and emits a **118-byte** file
+  holding exactly the key names `SUPABASE_URL`, `SUPABASE_KEY` (names read, values never printed).
+  Research had this from `@cloudflare/vite-plugin`'s source; it is now a fact about this build. It
+  was deleted and its absence confirmed by `ls -a dist/server/` **before any server was started**,
+  which is the accident this whole phase exists to prevent.
+- **P4.1 `wrangler dev` starts with `dist/server/.dev.vars` deleted** — **PASSED**, 2026-08-16.
+  `npx wrangler dev --config dist/server/wrangler.json --port 8788`, launched from a process whose
+  environment had been stripped and re-seeded with the test pair. `GET /auth/signin` → **200**, 9105
+  bytes, containing `Sign in`. **The zero-byte-file fallback the plan held in reserve is not needed**;
+  the launcher's assert can be "absent", the stronger of the two shapes.
+- **P4.2 the two `CLOUDFLARE_*` gates are what carries the credentials, proven by WITHHOLDING them**
+  — **PASSED**, 2026-08-16, and this is the entry that matters most. With
+  `CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=true` + `CLOUDFLARE_INCLUDE_PROCESS_ENV=true`, a deliberately
+  wrong sign-in through the served `/api/auth/signin` answered `302 /auth/signin?error=sign_in_failed`
+  — a code only a real provider round trip can produce. **Negative control, same script with the two
+  variables withheld**: every probe answered `?error=not_configured`, the branch `signin.ts:30-32`
+  takes when `locals.supabase` is null.
+  - **So the failure mode when the launcher is bypassed is ABSENT, not PRODUCTION** — the property
+    research:411-417 asserted, now measured end to end rather than inferred from a null-return in
+    `supabase.ts:9-11`. That is the entire safety argument for Option B, and it is no longer a
+    reading.
+  - **The gates are load-bearing rather than belt-and-braces.** Withholding them broke exactly the
+    thing they claim to do, so no "mutation that breaks nothing" finding applies here.
+- **P4.3 the served worker is provably talking to `gymlog-test`** — **PASSED**, 2026-08-16, in two
+  steps, and the **order is a deliberate strengthening of the plan's measurement 3**. The plan wrote
+  the account first and checked afterwards; a worker aimed at production would then already have
+  written the row before anything noticed. So a **write-free discriminator ran first**: an account
+  created directly against `SUPABASE_TEST_URL` (`t2e-probe-a-<run>@gymlog-test.dev`) was signed in
+  **through the served worker** → `302 /dashboard`. That address exists in `gymlog-test` and nowhere
+  else, and a failed sign-in writes nothing anywhere, so the wrong answer costs nothing.
+  Only then the plan's own probe: signup through the served `/api/auth/signup`
+  (`t2e-probe-b-<run>@`) → `302 /dashboard`, and that address then authenticated against
+  `SUPABASE_TEST_URL` (user `033e7060-…`). Both accounts removed via `delete_own_account()` (`204`),
+  each teardown **proven from outside** by re-attempting sign-in and requiring it to fail.
+- **P4.4 Astro's CSRF check answers 403 to a form POST carrying no `Origin`, and it read exactly like
+  an absent credential** — found while taking P4.2, 2026-08-16, and recorded because it cost a run.
+  `security.checkOrigin` is on by default for `output: "server"`, so the first scripted probes came
+  back `403` (and once `500`, from `request.formData()` on a rejected request) **with no `Location`
+  header at all**. The first draft's discriminator read "the answer does not say `not_configured`,
+  therefore the credentials arrived" — which a 403 that never reached the handler satisfies. An
+  absence of output read as a pass, `lessons.md` § "A hook that never fires and a hook that passes
+  are the SAME observation". The discriminator was re-aimed to require `sign_in_failed`
+  **positively**. A real browser sends `Origin` itself, so this does not touch Phase 6; **any
+  scripted probe against the served worker must set it**, and the launcher's notes should say so.
+- **P4 fallbacks: none taken.** All three conditions held, so Phase 5 ships the strong shapes — delete
+  rather than truncate `dist/server/.dev.vars`, assert **absence** rather than emptiness, and pass the
+  credentials through the process environment rather than `--var` on a command line.
 
 ## References
 
@@ -979,28 +1024,28 @@ No schema change. No migration. `delete_own_account()` already exists
 
 #### Automated
 
-- [x] 3.1 `npm run test:middleware` passes with both suites
-- [x] 3.2 Repeatable — two consecutive green runs, no `t2c-session-*` account left behind
-- [x] 3.3 `npm run lint` and `npm run typecheck` pass
+- [x] 3.1 `npm run test:middleware` passes with both suites — cb5778b
+- [x] 3.2 Repeatable — two consecutive green runs, no `t2c-session-*` account left behind — cb5778b
+- [x] 3.3 `npm run lint` and `npm run typecheck` pass — cb5778b
 
 #### Manual
 
-- [x] 3.4 Assertion 3 proven by removing `/workouts` from `PROTECTED_ROUTES` — red, then reverted
-- [x] 3.5 Assertion 4 proven by deleting the `AUTH_ROUTES` block — red, then reverted
-- [x] 3.6 Assertion 2 proven by making `signout.ts` skip `signOut()` — the data read goes red, then reverted
+- [x] 3.4 Assertion 3 proven by removing `/workouts` from `PROTECTED_ROUTES` — red, then reverted — cb5778b
+- [x] 3.5 Assertion 4 proven by deleting the `AUTH_ROUTES` block — red, then reverted — cb5778b
+- [x] 3.6 Assertion 2 proven by making `signout.ts` skip `signOut()` — the data read goes red, then reverted — cb5778b
 
 ### Phase 4: Measure Option B's three conditions
 
 #### Automated
 
-- [ ] 4.1 Measurement 3's probe account found in `gymlog-test` and removed
+- [x] 4.1 Measurement 3's probe account found in `gymlog-test` and removed
 
 #### Manual
 
-- [ ] 4.2 P4.1 recorded — `wrangler dev` with `dist/server/.dev.vars` deleted
-- [ ] 4.3 P4.2 recorded — the two `CLOUDFLARE_*` gates
-- [ ] 4.4 P4.3 recorded — the served worker is provably aimed at `gymlog-test`
-- [ ] 4.5 Fallback (if any) chosen and written into the plan before Phase 5 starts
+- [x] 4.2 P4.1 recorded — `wrangler dev` with `dist/server/.dev.vars` deleted
+- [x] 4.3 P4.2 recorded — the two `CLOUDFLARE_*` gates
+- [x] 4.4 P4.3 recorded — the served worker is provably aimed at `gymlog-test`
+- [x] 4.5 Fallback (if any) chosen and written into the plan before Phase 5 starts
 
 ### Phase 5: The browser harness — build, delete, assert, launch
 
