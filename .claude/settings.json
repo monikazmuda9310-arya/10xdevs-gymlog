@@ -1,5 +1,34 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_response.filePath // .tool_input.file_path // empty' | tr -d '\\r' | { read -r f; case \"$f\" in *.ts|*.tsx|*.astro) npx eslint --cache --cache-location .eslintcache \"$f\" || exit 2;; esac; }",
+            "timeout": 120,
+            "asyncRewake": true,
+            "statusMessage": "eslint on the edited file"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if git status --porcelain -- '*.ts' '*.tsx' '*.astro' | grep -q .; then npm run typecheck || exit 2; fi",
+            "timeout": 300,
+            "asyncRewake": true,
+            "statusMessage": "astro check across the project"
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "deny": [
       "Bash(rm -rf:*)",

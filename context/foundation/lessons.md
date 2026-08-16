@@ -399,7 +399,7 @@
     breakdown, and answered with `left join`. That closed the consequence, not the cause.
   - **And it had a second end nobody was looking for.** `exercises.user_id` cascades from
     `auth.users`, so deleting account B cascades into B's private exercises — and the `on delete
-    restrict` above then **blocks that cascade**. One account could permanently prevent a stranger
+restrict` above then **blocks that cascade**. One account could permanently prevent a stranger
     from deleting their own account, which is a baseline data-protection duty. Same row, same
     defect, a consequence in a completely different feature, and nothing surfaces but a database
     error.
@@ -445,6 +445,26 @@
   and any plan step phrased as "X will fail because Y runs first". More generally: the cheapest step
   in a plan is often the one deciding whether the expensive ones are aimed correctly, and it is the
   first one dropped once a design already feels settled.
+
+## A hook that never fires and a hook that passes are the SAME observation — prove it by breaking something
+
+- **Context**: the edit-time `PostToolUse` lint hook in `.claude/settings.json`, written 2026-08-16
+  for Phase 1 of `context/foundation/test-plan.md`.
+- **Problem**: the hook extracts the edited file's path from the JSON on stdin and matches it against
+  `*.ts|*.tsx|*.astro` before running the linter. On this machine **`jq` terminates its output with
+  CRLF**, so `read -r f` captured a trailing `\r`, the `case` pattern never matched, and the hook
+  exited 0 without running anything. The first two probes — a clean file, then a non-TypeScript file
+  — both returned 0 and were read as "works". **They proved nothing**: a hook that ran and found
+  nothing, and a hook that never ran at all, produce the identical observation of exit 0 and no
+  output. Only the third probe, a file carrying a real lint error, showed the guard was dead.
+- **Rule**: **a hook is proven by making it fail, never by watching it pass.** Write the violation,
+  confirm the non-zero exit and the message, then remove it. And **pipe-test the command exactly as
+  the JSON stores it** — read it back out with `jq -r` and run that string — because the escaping
+  between the file and the shell is a second place the guard can die silently.
+- **Applies to**: every hook, and to any check whose success signal is the absence of output. It is
+  the same failure as "a guard you have not mutated may not guard", one layer further out: there the
+  assertion was empty, here the whole check never started. Related: a check copied from documentation
+  is a claim about somebody else's shell.
 
 ## Measurement record — the evidence behind the rules in `AGENTS.md`
 
@@ -568,3 +588,23 @@
   breaks — `ts(2344) Type 'false' does not satisfy the constraint 'true'`. This is the same discipline
   as "A guard you have not mutated may not guard" above, applied at the type level, where F-03's
   first attempt had resolved to `never` and silently passed.
+
+### What the two edit-time checks actually cost, and why the layering ignores the course example
+
+- **Backs**: `context/foundation/test-plan.md` § 5 → the `edit-time lint + typecheck` gate, and the
+  hook shapes in `.claude/settings.json`.
+- **Measured** on 2026-08-16: `npx` alone **1.9 s**. `eslint` on a **single file**, cold, **68.7 s**;
+  warm **11.1 s**; with `--cache` on an unchanged file **5.5 s**. `astro check` across all 126 files
+  **43.8 s**.
+- **Why linting one file can cost more than type-checking the whole repository**: `eslint.config.js`
+  extends `strictTypeChecked` and `stylisticTypeChecked` with `projectService`, so linting any file
+  builds the entire TypeScript program first. That is the price of the rules that catch what `tsc`
+  does not, and it is not a defect to optimise away.
+- **What follows**: the course module's example wires both checks as blocking `PostToolUse` with 10 s
+  and 30 s budgets. **Both budgets are wrong here by a factor of two to four**, so the example was
+  dropped and its own rule kept instead — a check costing more than a few seconds moves a layer out.
+  Lint stays per-edit but `asyncRewake`, so a clean edit never stalls and a real error still wakes the
+  agent with its message; type-check moves to `Stop`, runs once per turn, and is skipped entirely
+  (0.06 s) when `git status` shows no `.ts`/`.tsx`/`.astro` change.
+- **Note for anyone changing this**: `timeout` in `.claude/settings.json` is **in seconds**, not the
+  milliseconds the module's example implies.

@@ -70,13 +70,13 @@ Each row is a discrete rollout phase that will open its own change folder via `/
 moves left-to-right through the values below; the orchestrator updates Status as artifacts appear on
 disk.
 
-| #   | Phase name           | Goal (one line)                                                                  | Risks covered | Test types               | Status      | Change folder |
-| --- | -------------------- | -------------------------------------------------------------------------------- | ------------- | ------------------------ | ----------- | ------------- |
-| 1   | Edit-time gates      | Lock the floor: lint and typecheck fire at edit time, not at commit time         | cross-cutting | gates                    | not started | —             |
-| 2   | Browser layer        | Prove the boundary and the flow through a real session, against the test project | #2, #3, #4    | e2e                      | not started | —             |
-| 3   | Silent-failure audit | A failure that is caught must still be told to the caller                        | #5            | integration + regression | not started | —             |
-| 4   | Week-boundary seam   | The week the screen shows is bounded by the zone the profile holds               | #1            | integration + render     | not started | —             |
-| 5   | Environment parity   | Prove the two projects agree, and that a deploy can still sign somebody in       | #6, #7        | script + CI + smoke      | not started | —             |
+| #   | Phase name           | Goal (one line)                                                                  | Risks covered | Test types               | Status      | Change folder                   |
+| --- | -------------------- | -------------------------------------------------------------------------------- | ------------- | ------------------------ | ----------- | ------------------------------- |
+| 1   | Edit-time gates      | Lock the floor: lint and typecheck fire at edit time, not at commit time         | cross-cutting | gates                    | complete    | — (no change folder — see §6.6) |
+| 2   | Browser layer        | Prove the boundary and the flow through a real session, against the test project | #2, #3, #4    | e2e                      | not started | —                               |
+| 3   | Silent-failure audit | A failure that is caught must still be told to the caller                        | #5            | integration + regression | not started | —                               |
+| 4   | Week-boundary seam   | The week the screen shows is bounded by the zone the profile holds               | #1            | integration + render     | not started | —                               |
+| 5   | Environment parity   | Prove the two projects agree, and that a deploy can still sign somebody in       | #6, #7        | script + CI + smoke      | not started | —                               |
 
 Phases 1–3 are course deliverables (module 3, items 3, 4 and 5) and come first for that reason.
 Phase 4 covers the highest-scoring risk on the map and is deliberately **not** first: it is cheap,
@@ -192,7 +192,14 @@ named against it.
 
 ### 6.6 Per-rollout-phase notes
 
-(Filled in as phases land.)
+**Phase 1 — Edit-time gates (complete, 2026-08-16).** Shipped directly rather than through a change
+folder: the work was one settings key plus a measurement, and four skills around it would have cost
+more than the change. Two findings outlive it. **The course example's hook budgets are wrong for this
+repository by two to four times** — linting one file costs more than type-checking all of it, because
+the ESLint config is type-aware — so lint runs per-edit but asynchronously, and type-check moved to
+the end of the turn. **And the first version of the hook never ran at all**, silently, because `jq`
+emits CRLF here and the extension match never fired; a clean-file probe could not tell that apart
+from success. Both recorded in `lessons.md`. Prove any future hook by breaking something.
 
 ## 7. What We Deliberately Don't Test
 

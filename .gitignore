@@ -4,6 +4,9 @@ dist/
 # generated types
 .astro/
 
+# eslint cache, written by the edit-time hook in .claude/settings.json
+.eslintcache
+
 # dependencies
 node_modules/
 
