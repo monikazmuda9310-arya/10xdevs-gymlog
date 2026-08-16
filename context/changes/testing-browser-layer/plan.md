@@ -1038,14 +1038,14 @@ No schema change. No migration. `delete_own_account()` already exists
 
 #### Automated
 
-- [x] 4.1 Measurement 3's probe account found in `gymlog-test` and removed
+- [x] 4.1 Measurement 3's probe account found in `gymlog-test` and removed — 808c8ff
 
 #### Manual
 
-- [x] 4.2 P4.1 recorded — `wrangler dev` with `dist/server/.dev.vars` deleted
-- [x] 4.3 P4.2 recorded — the two `CLOUDFLARE_*` gates
-- [x] 4.4 P4.3 recorded — the served worker is provably aimed at `gymlog-test`
-- [x] 4.5 Fallback (if any) chosen and written into the plan before Phase 5 starts
+- [x] 4.2 P4.1 recorded — `wrangler dev` with `dist/server/.dev.vars` deleted — 808c8ff
+- [x] 4.3 P4.2 recorded — the two `CLOUDFLARE_*` gates — 808c8ff
+- [x] 4.4 P4.3 recorded — the served worker is provably aimed at `gymlog-test` — 808c8ff
+- [x] 4.5 Fallback (if any) chosen and written into the plan before Phase 5 starts — 808c8ff
 
 ### Phase 5: The browser harness — build, delete, assert, launch
 
