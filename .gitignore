@@ -20,6 +20,12 @@ pnpm-debug.log*
 .env
 .env.production
 
+# vitest.middleware.config.ts points `vite.envDir` at this directory BECAUSE it holds no
+# credentials: Vite's loadEnv reads `.env*` from the env directory, so a file here would silently
+# re-aim the middleware project at whatever it names. The config throws at load time if one appears;
+# this line is the second defence, so an accidental file can never be committed either.
+tests/middleware/no-env/.env*
+
 # cloudflare
 .dev.vars
 .wrangler/

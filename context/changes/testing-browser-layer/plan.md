@@ -883,6 +883,17 @@ No schema change. No migration. `delete_own_account()` already exists
   had to be able to violate). Decoy `.env` and `tests/middleware/probe.test.ts` deleted; the
   config's `MIDDLEWARE_PROBE_MODE` branch went with the probe rather than being left as a knob that
   can withhold the seed.
+- **P2 the session cookie does NOT chunk today, and the chunk handling is therefore a tripwire** —
+  measured 2026-08-16 with a throwaway `t2c-chunkprobe-*` account (created, measured, removed via
+  `delete_own_account()`). A freshly signed-in `gymlog-test` session writes **one** cookie,
+  `sb-nfmrwvevntbzulsmrmel-auth-token`, of **3034 chars** — 146 below `MAX_CHUNK_SIZE` (3180), a
+  4.6% margin. So no assertion in Phase 2 exercises the multi-chunk path and no mutation available
+  today breaks it. Kept anyway, through the library's own `combineChunks`/`createChunks`, because the
+  edits that cross that margin are ordinary (one more JWT claim, a longer address, any
+  `user_metadata` at signup) and the failure is silent: a partial reassembly fails to authenticate
+  and looks exactly like a correctly refused forgery. Written up where the claim lives —
+  `tests/middleware/_shared/session.ts` header — per `lessons.md` § "An assertion you keep because it
+  cannot fail YET".
 - **P4.1 `wrangler dev` starts with `dist/server/.dev.vars` deleted** — pending
 - **P4.2 `CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV` + `CLOUDFLARE_INCLUDE_PROCESS_ENV` behave as read** — pending
 - **P4.3 the served worker is provably talking to `gymlog-test`** — pending
@@ -913,31 +924,31 @@ No schema change. No migration. `delete_own_account()` already exists
 
 #### Automated
 
-- [x] 1.1 The probe suite runs under `vitest.middleware.config.ts`
-- [x] 1.2 `onRequest` imports and is callable (probe a)
-- [x] 1.3 `astro:env/server` reports the seeded test URL (probe b)
-- [x] 1.4 The decoy `.env` in the env directory is what `loadEnv` reads when `process.env` is unseeded (probe c)
-- [x] 1.5 Decoy file removed and probe test deleted
+- [x] 1.1 The probe suite runs under `vitest.middleware.config.ts` — 4755d2f
+- [x] 1.2 `onRequest` imports and is callable (probe a) — 4755d2f
+- [x] 1.3 `astro:env/server` reports the seeded test URL (probe b) — 4755d2f
+- [x] 1.4 The decoy `.env` in the env directory is what `loadEnv` reads when `process.env` is unseeded (probe c) — 4755d2f
+- [x] 1.5 Decoy file removed and probe test deleted — 4755d2f
 
 #### Manual
 
-- [x] 1.6 Result recorded in "Measurement record", with the fallback taken if any probe failed
+- [x] 1.6 Result recorded in "Measurement record", with the fallback taken if any probe failed — 4755d2f
 
 ### Phase 2: The fourth Vitest project, and the cookie → identity boundary (risk #2)
 
 #### Automated
 
-- [ ] 2.1 `npm run test:middleware` passes
-- [ ] 2.2 `npm run lint` and `npm run typecheck` pass
-- [ ] 2.3 The suite is repeatable — two consecutive green runs, no `t2c-` account left behind
-- [ ] 2.4 The three Vitest globs still cannot see each other's files
+- [x] 2.1 `npm run test:middleware` passes
+- [x] 2.2 `npm run lint` and `npm run typecheck` pass
+- [x] 2.3 The suite is repeatable — two consecutive green runs, no `t2c-` account left behind
+- [x] 2.4 The three Vitest globs still cannot see each other's files
 
 #### Manual
 
-- [ ] 2.5 Assertion 1 proven by hardcoding `locals.user` — red, then reverted
-- [ ] 2.6 Assertion 2 proven by swapping `getUser()` for `getSession()` — red, then reverted
-- [ ] 2.7 The `envDir` guard proven by planting a `.env` — throws, then removed
-- [ ] 2.8 No `rls-owner-*` or `s09i-*` fixture touched
+- [x] 2.5 Assertion 1 proven by hardcoding `locals.user` — red, then reverted
+- [x] 2.6 Assertion 2 proven by swapping `getUser()` for `getSession()` — red, then reverted
+- [x] 2.7 The `envDir` guard proven by planting a `.env` — throws, then removed
+- [x] 2.8 No `rls-owner-*` or `s09i-*` fixture touched
 
 ### Phase 3: The session lifecycle — three cookie states, both directions (risk #3)
 
