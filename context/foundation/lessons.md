@@ -466,6 +466,29 @@ restrict` above then **blocks that cascade**. One account could permanently prev
   assertion was empty, here the whole check never started. Related: a check copied from documentation
   is a claim about somebody else's shell.
 
+## The assertion carrying the claim goes FIRST — order decides which failure a mutation lands on
+
+- **Context**: any test whose assertions could all fail from the same defect, and every
+  mutation-testing step that checks one. Found in `tests/middleware/session-lifecycle.test.ts`
+  assertion 2 on 2026-08-16; measured in `context/changes/testing-browser-layer/plan.md`
+  § Measurement record P3.b.
+- **Problem**: assertion 2 claims "signing out ends access AND the training is no longer readable".
+  Written in narrative order — the cookie write, then the redirect, then the data read — the mutation
+  that makes `signout.ts` skip `supabase.auth.signOut()` went red **three different ways** depending
+  on where the read sat: on the cleared-cookie name, then on `locals.user`, and only with the read
+  placed first on the training itself coming back. The first two are true, weaker, and leave the
+  load-bearing read **unexecuted** — so the plan's own criterion ("not merely the cookie count") was
+  satisfied by exactly one of the three arrangements, and a green run afterwards looks identical in
+  all three.
+- **Rule**: **put the assertion carrying the test's claim ahead of the cheaper corroborating ones,
+  then run the mutation and confirm it is that line which fails.** Narrative order — setup,
+  mechanism, consequence — reads well and buries the claim behind assertions that short-circuit
+  first. Keep the cheap ones if they earn their place, but move them below and say in a comment that
+  they are diagnostic rather than load-bearing.
+- **Applies to**: implement, impl-review, plan. Most of all where several assertions in one test
+  share a cause, and every `#### Manual Verification` mutation step whose wording names WHICH
+  assertion must go red — that wording is unenforceable unless the ordering puts it first.
+
 ## Measurement record — the evidence behind the rules in `AGENTS.md`
 
 > **These entries are not rules and must not be read as ones.** They are the measurements and
