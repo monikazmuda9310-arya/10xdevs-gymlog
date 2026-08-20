@@ -1152,7 +1152,7 @@ No schema change. No migration. `delete_own_account()` already exists
 
 #### Automated
 
-- [x] 7.1 The full eight-step gate passes locally, in order
+- [x] 7.1 The full eight-step gate passes locally, in order — cc0cb9d
 - [ ] 7.2 A CI run on a PR is green and shows both new steps
 - [ ] 7.3 Two concurrent CI runs do not overlap
 
