@@ -843,30 +843,30 @@ No migration. No schema change, no new column, no new policy. `npm run db:push` 
 
 #### Automated
 
-- [x] 3.1 `npm run test:integration` passes
-- [x] 3.2 The `/api/sets` assertion is red when the verdict catch is mutated to a 500
-- [x] 3.3 Its positive control is red when the verdict is mutated to always return null
-- [x] 3.4 The `/api/account` assertions are red with the `try`/`catch` and the `if` guard removed in turn
-- [x] 3.5 The suite passes twice in a row and leaves no `t3s-` account behind
-- [x] 3.6 `npm run lint` and `npm run typecheck` pass
+- [x] 3.1 `npm run test:integration` passes — 626e9e0
+- [x] 3.2 The `/api/sets` assertion is red when the verdict catch is mutated to a 500 — 626e9e0
+- [x] 3.3 Its positive control is red when the verdict is mutated to always return null — 626e9e0
+- [x] 3.4 The `/api/account` assertions are red with the `try`/`catch` and the `if` guard removed in turn — 626e9e0
+- [x] 3.5 The suite passes twice in a row and leaves no `t3s-` account behind — 626e9e0
+- [x] 3.6 `npm run lint` and `npm run typecheck` pass — 626e9e0
 
 #### Manual
 
-- [x] 3.7 The auth user list holds no `t3s-` address after a full run
+- [x] 3.7 The auth user list holds no `t3s-` address after a full run — 626e9e0
 
 ### Phase 4: The four `loadFailed` branches
 
 #### Automated
 
-- [ ] 4.1 `npm run test:render` passes with the new suite
-- [ ] 4.2 Each failure assertion is red when its page's catch stops setting `loadFailed`
-- [ ] 4.3 Each positive control is red when its page's success branch renders nothing
-- [ ] 4.4 The stub's unstubbed-table throw fires when a page is given a fifth read
-- [ ] 4.5 `npm run lint` and `npm run typecheck` pass
+- [x] 4.1 `npm run test:render` passes with the new suite
+- [x] 4.2 Each failure assertion is red when its page's catch stops setting `loadFailed`
+- [x] 4.3 Each positive control is red when its page's success branch renders nothing
+- [x] 4.4 The stub's unstubbed-table throw fires when a page is given a fifth read
+- [x] 4.5 `npm run lint` and `npm run typecheck` pass
 
 #### Manual
 
-- [ ] 4.6 `records.astro`'s three states read as three different things to a person
+- [x] 4.6 `records.astro`'s three states read as three different things to a person
 
 ### Phase 5: Write the phase down in `test-plan.md` §6
 
