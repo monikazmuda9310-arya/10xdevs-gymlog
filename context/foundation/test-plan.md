@@ -155,6 +155,22 @@ the race that group exists to prevent. **The middleware and e2e steps join it by
 workflow that declares it** — they are steps of the existing `ci` job, not a new workflow, and a new
 workflow would **not** inherit the group.
 
+**"Required" became enforced on 2026-08-20, and until then it was not.** Every gate above said
+"required" while nothing stopped a red PR from being merged — discovered by merging one with its
+check still running, which `gh pr merge --auto` permitted because the repository had no required
+status checks configured. `main` now carries branch protection requiring the **`ci`** check, with
+**`enforce_admins: true`**, which is the load-bearing half: this is a single-maintainer repository,
+so protection that exempts admins exempts everyone and is theatre. Proven by breaking it — a direct
+push to `main` is refused with `GH006 … Required status check "ci" is expected`.
+
+- **It lives in repository settings, not in this repository, so nothing in the gate can see it** —
+  the same class as `site_url` (`AGENTS.md` § Environment). Re-checkable with
+  `gh api repos/<owner>/<repo>/branches/main/protection`.
+- **The context string must match the job name exactly.** A typo produces an identical-looking
+  success — protection on, pushes refused — and a permanently unmergeable `main`, because GitHub
+  waits for a status nothing emits. The next PR that merges green is what proves the name.
+- Emergency path: `gh api --method DELETE …/branches/main/protection`, merge, then re-apply.
+
 ## 6. Cookbook Patterns
 
 How to add new tests in this project. A sub-section marked TBD is filled in by the rollout phase

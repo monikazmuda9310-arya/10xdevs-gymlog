@@ -270,6 +270,20 @@ non-interactive Vitest run.
   `src/middleware.ts`, `src/lib/supabase.ts` or the adapter**, and required in CI on every PR. It is
   last because it consumes a build, and it is the only step that can tell a screen that renders from
   a screen that works.
+- **`main` is protected and the `ci` check is REQUIRED, admins included** (since 2026-08-20). A red or
+  still-running PR cannot be merged and a direct push to `main` is refused —
+  `GH006 … Required status check "ci" is expected`. **`enforce_admins` is the load-bearing half**:
+  this is a single-maintainer repository, so protection exempting admins exempts everyone. Before
+  that date every gate here said "required" and **nothing enforced any of it**; it was found by a
+  merge that `gh pr merge --auto` allowed with the check still in flight, because with no required
+  checks configured there was nothing for `--auto` to wait for.
+  - **It lives in repository settings, not in this repository, so nothing in the gate can see it** —
+    same class as `site_url` in § Environment. Read it back with
+    `gh api repos/<owner>/<repo>/branches/main/protection`; the emergency path is
+    `--method DELETE` on that endpoint, merge, then re-apply.
+  - **The required context string must equal the job name exactly.** A typo looks identical to
+    working protection and leaves `main` permanently unmergeable, because GitHub waits for a status
+    nothing emits.
 
 **There are FOUR Vitest projects and they cannot see each other's files** — deliberately, by include
 glob: `src/**` for `npm test`, `tests/integration/**`, `tests/render/**`, `tests/middleware/**`.
