@@ -23,9 +23,13 @@
 // that may not delete its own, re-creating them in every test. The leak is bounded by how often this
 // suite is red, and every leaked address carries the `s09d-` mark so it is identifiable later.
 //
-// MARK is `s09d-` — not a prefix of, and not prefixed by, any of the eleven marks in use
-// (`s01-signup-`, `s03-`, `s03-endpoints-`, `s03-page-`, `s04-`, `s05-`, `s05m-`, `s06-`, `s07-`,
-// `s08-`, `s09i-`). Deliberately not `s09-`, which is a strict prefix of `s09i-` and of this one.
+// MARK is `s09d-` — not a prefix of, and not prefixed by, any of the twelve marks in use
+// (`s01-signup-`, `s02-`, `s03-`, `s03-endpoints-`, `s03-page-`, `s04-`, `s05-`, `s05m-`, `s06-`,
+// `s07-`, `s08-`, `s09i-`). Deliberately not `s09-`, which is a strict prefix of `s09i-` and of this
+// one. **The list is the thing that rots** — it was written naming eleven and silently omitted `s02-`
+// (`exercises-rls.test.ts:94`), so anyone picking a new mark from it was checking against an
+// incomplete set. Re-derive it with `grep -rn "const MARK" tests/integration/` rather than trusting
+// this line.
 //
 // **Rules this file follows** (`AGENTS.md` § Testing): `gymlog-test` only, with that project's
 // publishable key; never a `service_role` key — `vitest.integration.config.ts` strips it, which is why

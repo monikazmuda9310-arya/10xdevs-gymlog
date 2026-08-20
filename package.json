@@ -15,6 +15,8 @@
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:render": "vitest run --config vitest.render.config.ts",
+    "test:middleware": "vitest run --config vitest.middleware.config.ts",
+    "test:e2e": "node scripts/e2e-build.mjs && playwright test",
     "db:status": "node scripts/supabase-db.mjs status",
     "db:push": "node scripts/supabase-db.mjs push",
     "db:types": "node scripts/supabase-db.mjs types && prettier --write src/db/database.types.ts"
@@ -45,6 +47,7 @@
   "devDependencies": {
     "@eslint/compat": "^2.0.3",
     "@eslint/js": "^9.29.0",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^26.2.0",
     "eslint": "^9.29.0",
     "eslint-config-prettier": "^10.1.8",

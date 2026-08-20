@@ -84,7 +84,16 @@ export default tseslint.config(
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
       parserOptions: { projectService: false, project: false },
-      globals: { console: "readonly", process: "readonly", URL: "readonly" },
+      // Declared explicitly rather than pulling in a whole `globals.node` set: what these scripts
+      // are allowed to reach is part of what they are. `fetch` and `setTimeout` are the readiness
+      // probe in `e2e-serve.mjs`.
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        URL: "readonly",
+        fetch: "readonly",
+        setTimeout: "readonly",
+      },
     },
     rules: {
       // An ops script's output is its interface.

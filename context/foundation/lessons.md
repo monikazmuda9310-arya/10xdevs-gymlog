@@ -12,7 +12,8 @@
 
 ## A slice that ends in a screen needs a deployment phase
 
-- **Context**: `context/changes/exercise-catalogue/plan.md` — five phases ending at documentation.
+- **Context**: the **`exercise-catalogue`** change folder's `plan.md` — five phases ending at
+  documentation.
   Found during /10x-impl-review on 2026-08-10 (finding F4).
 - **Problem**: S-01 deployed in its Phase 4; S-02 had no deployment step at all. Because
   `npm run db:push` writes to **both** databases while application code reaches production only
@@ -419,7 +420,7 @@ restrict` above then **blocks that cascade**. One account could permanently prev
 ## The ORDER database-internal actions fire in is a fact about the catalogue — and reading the catalogue is still not measuring
 
 - **Context**: `public.delete_own_account()` and step 1.2 of
-  `context/changes/account-deletion/plan.md`, 2026-08-15.
+  the **`account-deletion`** change folder's `plan.md`, 2026-08-15.
 - **Problem**: planning needed to know whether `delete from auth.users` would abort for an account
   owning a custom exercise referenced by its own entry — `exercise_entries.exercise_id` carries the
   schema's only `on delete restrict`. The migration files cannot answer that: they declare the
@@ -465,6 +466,79 @@ restrict` above then **blocks that cascade**. One account could permanently prev
   the same failure as "a guard you have not mutated may not guard", one layer further out: there the
   assertion was empty, here the whole check never started. Related: a check copied from documentation
   is a claim about somebody else's shell.
+
+## The assertion carrying the claim goes FIRST — order decides which failure a mutation lands on
+
+- **Context**: any test whose assertions could all fail from the same defect, and every
+  mutation-testing step that checks one. Found in `tests/middleware/session-lifecycle.test.ts`
+  assertion 2 on 2026-08-16; measured in the **`testing-browser-layer`** change folder's `plan.md`
+  § Measurement record P3.b.
+- **Problem**: assertion 2 claims "signing out ends access AND the training is no longer readable".
+  Written in narrative order — the cookie write, then the redirect, then the data read — the mutation
+  that makes `signout.ts` skip `supabase.auth.signOut()` went red **three different ways** depending
+  on where the read sat: on the cleared-cookie name, then on `locals.user`, and only with the read
+  placed first on the training itself coming back. The first two are true, weaker, and leave the
+  load-bearing read **unexecuted** — so the plan's own criterion ("not merely the cookie count") was
+  satisfied by exactly one of the three arrangements, and a green run afterwards looks identical in
+  all three.
+- **Rule**: **put the assertion carrying the test's claim ahead of the cheaper corroborating ones,
+  then run the mutation and confirm it is that line which fails.** Narrative order — setup,
+  mechanism, consequence — reads well and buries the claim behind assertions that short-circuit
+  first. Keep the cheap ones if they earn their place, but move them below and say in a comment that
+  they are diagnostic rather than load-bearing.
+- **Applies to**: implement, impl-review, plan. Most of all where several assertions in one test
+  share a cause, and every `#### Manual Verification` mutation step whose wording names WHICH
+  assertion must go red — that wording is unenforceable unless the ordering puts it first.
+
+## A `fill()` before hydration is lost SILENTLY — and what it breaks is the assertion that proves ABSENCE
+
+- **Context**: `tests/e2e/`, and any browser interaction with a **controlled** React input inside a
+  `client:load` island — which in this product is every input there is. Found in
+  `tests/e2e/critical-flow.spec.ts` during `testing-browser-layer` Phase 6, 2026-08-20; measured in
+  that plan's § Measurement record, P6.b.
+- **Problem**: Playwright's `fill()` sets the DOM value and dispatches an `input` event. If the
+  island has not hydrated yet, no handler is attached, the event is lost, and hydration then restores
+  React's own (empty) state. **Measured at one run in three.** The flake is the visible half and the
+  cheap one. The dangerous half is silent: the spec filled a run-unique NOTE into a workout, and
+  assertion 3 proved signing out by looking for that note and finding **nothing** — which a note that
+  was never saved satisfies perfectly. A lost fill there does not go red. It turns the load-bearing
+  assertion of the suite into one that passes for the wrong reason and reports green, and no run,
+  green or red, looks any different.
+- **Rule**: **Retry the fill until the target's own state reflects it** — wrap `fill` plus a
+  state-reflecting check in `expect(async () => {…}).toPass()`, which is waiting on state rather than
+  sleeping and is therefore not a `waitForTimeout` in disguise. **And give every assertion that
+  proves something by ABSENCE a positive control** establishing that the thing was present first.
+  Prefer a check that reflects FRAMEWORK state (a client-side filter having narrowed the list) over
+  one that only reads the DOM (an input's `value`), because the DOM is exactly what lies in this
+  failure.
+- **Applies to**: implement, impl-review, plan — for any browser-level phase. More generally: **an
+  assertion that something is absent is only as strong as the proof it was ever present**, and that
+  proof belongs in the same test, not in the author's head.
+
+## A pointer INTO `context/changes/` dies the day that change is archived — cite the folder by NAME
+
+- **Context**: every foundation document that cites evidence living in a change folder —
+  `AGENTS.md`, `lessons.md`, `roadmap.md`, `access-control.md`, `test-plan.md`. Found 2026-08-20
+  while checking `testing-browser-layer`'s own documentation criterion.
+- **Problem**: `/10x-archive` moves `context/changes/<id>/` to
+  `context/archive/<archive-date>-<id>/`. Every path-shaped pointer at the old location breaks, and
+  **the new name carries the archive DATE, so the eventual path cannot be written in advance** — this
+  is not carelessness that a more careful author would avoid. **Three were already dead when this was
+  written** (`lessons.md`'s own first entry, and two in `roadmap.md`), and one `roadmap.md` sentence
+  cited two records side by side with one path corrected and the other not, which reads as an
+  oversight rather than as the systematic failure it is. The rot is silent in the worst way: nothing
+  checks markdown paths, so the pointer looks authoritative until somebody follows it, and what they
+  conclude is that the evidence never existed — exactly when they are deciding whether to trust the
+  claim it was supporting.
+- **Rule**: **cite a change folder by its NAME, never by its path** — "the `owned-persistence-baseline`
+  change folder's `plan.md`", not `context/changes/owned-persistence-baseline/plan.md`. A name is
+  findable by grep in either location and survives the move; a path is only correct until the work it
+  describes is finished, which is precisely when it starts being cited. The same applies to an
+  `context/archive/` path: correct today, and still a path.
+- **Applies to**: implement, impl-review, plan, research — anything that writes a durable document
+  citing in-flight work. More generally: **a reference whose target is scheduled to move is a
+  reference that will be wrong, and the fix belongs at the moment of writing, not at the moment of
+  moving** — nobody is watching at the moment of moving.
 
 ## Measurement record — the evidence behind the rules in `AGENTS.md`
 
