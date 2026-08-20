@@ -55,6 +55,14 @@ test("a person signs up, logs a set, and sees what it is worth", async ({ page }
   // value. Measured 2026-08-20: **one run in three** lost the exercise picker's search this way.
   // `toPass()` retries the fill until the island's own state reflects it — waiting on state, which
   // is the rule, rather than sleeping, which is not.
+  //
+  // **This retry verifies through `toHaveValue`, which is the WEAKER form, and that is a deliberate
+  // exception rather than an oversight** (`test-plan.md` §6.3 warns against it: the DOM is what lies
+  // in this failure, so the value can read back while React's state is still empty). There is no
+  // framework-state observable on this form before it is submitted — nothing here filters, counts or
+  // re-renders. What closes the gap is the **positive control after navigation**: the note has to be
+  // on the workout page, which only a value that reached React, the API and the database can put
+  // there. The picker below has a real observable and uses it.
   const noteField = page.getByLabel("Note");
   await expect(async () => {
     await noteField.fill(NOTE);

@@ -1060,6 +1060,20 @@ No schema change. No migration. `delete_own_account()` already exists
   - **`gh workflow run` cannot be used for this**: the workflow declares only `push` on `main` and
     `pull_request` on `main`, with no `workflow_dispatch`. Recorded because it was suggested and was
     wrong.
+- **P7.c the concurrency group holds — PASS on every clause of P7.b**, 2026-08-20. Runs
+  `32355323200` (first) and `32355438390` (second, pushed ~80 s later), polled every 20 s:
+  - the second sat **`pending` for eleven consecutive polls (~4 min)** while the first was
+    `in_progress` — **at no point were two runs executing steps**;
+  - the first completed **`success` in 5m23s** and was **not cancelled**;
+  - the second flipped to `in_progress` on the very next poll after that, and completed **`success`**,
+    **9m6s** wall-clock of which roughly four minutes was queue.
+  - **That last figure is the price of the group, now measured rather than predicted.** § Performance
+    Considerations said the wall-clock cost is paid serially against other runs and is not
+    negotiable; a second concurrent PR run now costs ~4 min of waiting, and the two steps added by
+    this change are part of what the next run waits behind.
+  - `workflow_dispatch` was added to the workflow so the next such check costs no commits — **but it
+    only takes effect once that file is on `main`**, because GitHub reads the trigger from the
+    default branch. This measurement still cost two pushes.
 
 ## References
 
@@ -1175,7 +1189,7 @@ No schema change. No migration. `delete_own_account()` already exists
 
 - [x] 7.1 The full eight-step gate passes locally, in order — cc0cb9d
 - [x] 7.2 A CI run on a PR is green and shows both new steps
-- [ ] 7.3 Two concurrent CI runs do not overlap
+- [x] 7.3 Two concurrent CI runs do not overlap
 
 #### Manual
 

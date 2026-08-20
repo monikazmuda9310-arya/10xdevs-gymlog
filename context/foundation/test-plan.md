@@ -223,6 +223,10 @@ named against it.
   not, and hydration restores the empty value. Measured at **one run in three**. Retry the fill until
   the island's own state reflects it (`expect(async () => {…}).toPass()` — waiting on state, not
   sleeping).
+  - **Not every "state" check is one.** Verify through something only the FRAMEWORK could have
+    produced — a client-side filter having narrowed a list, a row having appeared — rather than
+    through the DOM value of the field you just filled: the DOM is exactly what lies in this failure,
+    so `toHaveValue` can report success while React's state is still empty.
 - **Assert the EFFECT of an interaction, never the presence of an element**, and **give every
   absence-assertion a positive control**. "The note is gone after signing out" is satisfied perfectly
   by a note that was never saved; without a control proving it was on screen first, the strongest
