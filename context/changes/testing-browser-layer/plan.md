@@ -1040,6 +1040,27 @@ No schema change. No migration. `delete_own_account()` already exists
   reachability at a phone width. That half of risk #4 has no assigned layer in `test-plan.md` §2 and
   this spec adds none. Stated in the file's own header as well as here.
 
+- **P7.a CI is green on a PR with both new steps** — 2026-08-20, run `32354427994`, **5m20s**, every
+  step ✓ including `npm run test:middleware`, `npx playwright install --with-deps chromium` and
+  `npm run test:e2e`. **This is also the first time the browser harness has ever run on Linux** —
+  every measurement behind it was taken on Windows. The launcher was changed to spawn wrangler's bin
+  directly rather than `npx` through a shell, so the pid is the server and a POSIX runner can stop
+  it; that step did not hang. **Stated precisely: it passed, it was not measured.** Whether it passed
+  BECAUSE of that change is unknown, and would need a run with the previous shape to answer.
+- **P7.b what 7.3 measures, written BEFORE the run** (`lessons.md` § "Write the threshold into the
+  plan BEFORE taking the measurement"). Two `pull_request` runs are triggered a few tens of seconds
+  apart, well inside the 5m20s a run takes.
+  - **PASS** = the second run does **not** execute steps while the first is in progress: it sits
+    pending on `concurrency: gymlog-test-fixtures`, starts only after the first completes, and
+    **neither is cancelled** (`cancel-in-progress: false`).
+  - **FAIL** = `gh run list` shows two runs `in_progress` at the same time, or the first is
+    `cancelled`. Either would mean the added steps write to `gymlog-test` concurrently with another
+    run's, which is the exact interleaving the group exists to prevent — and which now costs more
+    than it did, because two more steps write there.
+  - **`gh workflow run` cannot be used for this**: the workflow declares only `push` on `main` and
+    `pull_request` on `main`, with no `workflow_dispatch`. Recorded because it was suggested and was
+    wrong.
+
 ## References
 
 - Research: `context/changes/testing-browser-layer/research.md` (ground truth for this phase)
@@ -1153,7 +1174,7 @@ No schema change. No migration. `delete_own_account()` already exists
 #### Automated
 
 - [x] 7.1 The full eight-step gate passes locally, in order — cc0cb9d
-- [ ] 7.2 A CI run on a PR is green and shows both new steps
+- [x] 7.2 A CI run on a PR is green and shows both new steps
 - [ ] 7.3 Two concurrent CI runs do not overlap
 
 #### Manual
