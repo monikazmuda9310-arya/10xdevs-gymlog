@@ -872,8 +872,8 @@ No migration. No schema change, no new column, no new policy. `npm run db:push` 
 
 #### Automated
 
-- [x] 5.1 `npm run lint` passes
-- [x] 5.2 The full eight-step gate passes in order
+- [x] 5.1 `npm run lint` passes — 1880fe9
+- [x] 5.2 The full eight-step gate passes in order — 1880fe9
 - [ ] 5.3 The PR's `ci` check is green before merge
 
 #### Manual
