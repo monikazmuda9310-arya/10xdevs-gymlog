@@ -26,6 +26,12 @@ pnpm-debug.log*
 # this line is the second defence, so an accidental file can never be committed either.
 tests/middleware/no-env/.env*
 
+# playwright output (`npm run test:e2e`)
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
 # cloudflare
 .dev.vars
 .wrangler/

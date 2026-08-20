@@ -967,6 +967,36 @@ No schema change. No migration. `delete_own_account()` already exists
 - **P4 fallbacks: none taken.** All three conditions held, so Phase 5 ships the strong shapes — delete
   rather than truncate `dist/server/.dev.vars`, assert **absence** rather than emptiness, and pass the
   credentials through the process environment rather than `--var` on a command line.
+- **P5.a `process.loadEnvFile()` does not overwrite an EMPTY-STRING variable either** — measured
+  2026-08-16 with `SUPABASE_TEST_URL= node -e "process.loadEnvFile(); …"`: the key stayed `""` while
+  an absent key was filled from `.env`. Recorded because it is what makes the launcher's strip proof
+  performable at all: "unset it in the shell and watch it refuse" does **not** work here — `.env`
+  simply refills it and the run proves nothing. The proof command is
+  `SUPABASE_TEST_URL= node scripts/e2e-serve.mjs`, and it is written into the launcher's own header
+  so the next reader does not re-derive it.
+- **P5.b the absence-assert refuses, proven against the REAL hazard rather than a dummy** — 2026-08-16.
+  An ordinary `npm run build` re-created `dist/server/.dev.vars`; `node scripts/e2e-serve.mjs` run
+  directly then exited **1** with the message naming `npm run test:e2e` as the fix. The positive
+  control is the green `npm run test:e2e` in the same session — so the launcher is not simply a script
+  that refuses everything.
+- **P5.c the two build-output checks are ORDERED, and the order is load-bearing** — a finding of this
+  phase, not of the plan. `dist/server/.dev.vars` is trivially absent when there was **no build at
+  all**, so asserting its absence first passes for the wrong reason on a clean checkout and leaves the
+  guard inert (`lessons.md` § "A hook that never fires and a hook that passes are the SAME
+  observation"). The launcher therefore requires `dist/server/wrangler.json` to **exist** (3a) before
+  requiring `.dev.vars` to be **gone** (3b). Mutated to confirm it fires: with `wrangler.json` moved
+  aside the launcher exited **1** naming the missing build, and restoring it restored the green run.
+- **P5.d the aim proven through the real harness, not a scripted `fetch`** — 2026-08-16, via a
+  throwaway `tests/e2e/aim-probe.spec.ts` (deleted at the end of the phase, as Phase 1's probe was).
+  A **browser** completed `/auth/signup` → `302 /api/auth/signup` → `/dashboard`, and that address then
+  authenticated against `SUPABASE_TEST_URL`. `globalTeardown` removed it and **proved the removal from
+  outside** by re-attempting sign-in (`removed t2e-…@gymlog-test.dev (it no longer signs in)`). This
+  is P4.3 repeated through the shipping harness and is the check to repeat after any edit to
+  `scripts/e2e-serve.mjs`.
+  - **The owner accepted this scripted evidence for 5.4/5.5/5.6 on 2026-08-20** and deferred the
+    eyes-on half of 5.6 to Phase 6's `--headed` run, where the same signup is the first step of the
+    real flow. Recorded rather than left implicit: 5.6 is checked on the measurement above, not on a
+    human having watched it, and Phase 6 is where that changes.
 
 ## References
 
@@ -1051,15 +1081,15 @@ No schema change. No migration. `delete_own_account()` already exists
 
 #### Automated
 
-- [ ] 5.1 `npm run test:e2e` starts the server and the smoke spec finds the `Sign in` heading
-- [ ] 5.2 `npm run lint` and `npm run typecheck` pass over the new files
-- [ ] 5.3 `npm run build` still passes
+- [x] 5.1 `npm run test:e2e` starts the server and the smoke spec finds the `Sign in` heading
+- [x] 5.2 `npm run lint` and `npm run typecheck` pass over the new files
+- [x] 5.3 `npm run build` still passes
 
 #### Manual
 
-- [ ] 5.4 The absence-assert proven by planting `dist/server/.dev.vars` — the launcher refuses
-- [ ] 5.5 The strip proven by unsetting `SUPABASE_TEST_URL` — the launcher refuses
-- [ ] 5.6 The aim proven — a browser-created account is found in `gymlog-test`
+- [x] 5.4 The absence-assert proven by planting `dist/server/.dev.vars` — the launcher refuses
+- [x] 5.5 The strip proven by unsetting `SUPABASE_TEST_URL` — the launcher refuses
+- [x] 5.6 The aim proven — a browser-created account is found in `gymlog-test`
 
 ### Phase 6: The critical flow in a real browser (risk #4)
 
