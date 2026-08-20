@@ -44,15 +44,15 @@ failure but RE-THROWS anything that is not an `AuthError`.** Two failure shapes,
 
 **Coverage state, measured rather than assumed** (`grep` over `tests/`, 2026-08-20):
 
-| Thing                                            | Witness today                                                                      |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `GET /api/sets/[id]/impact` failure              | `workout-mutations-rls.test.ts:369-398` (assertion 13) + its non-vacuity control 14 |
-| `GET /api/workouts/[id]/impact`                  | **nothing — imported by no test in the repository**                                |
-| `GET /api/exercise-entries/[id]/impact`          | **nothing — imported by no test in the repository**                                |
-| `/api/sets` record-badge swallow                 | **nothing**                                                                        |
-| `/api/account` post-deletion `signOut` swallow   | **nothing**                                                                        |
-| `records` / `workouts` / `workouts/[id]` / `exercises` `loadFailed` | **nothing — `tests/render/` holds three files, none touching these pages** |
-| `signout.ts` failure path                        | **nothing, at any layer** — `session-lifecycle.test.ts:227-276` covers success only |
+| Thing                                                               | Witness today                                                                       |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `GET /api/sets/[id]/impact` failure                                 | `workout-mutations-rls.test.ts:369-398` (assertion 13) + its non-vacuity control 14 |
+| `GET /api/workouts/[id]/impact`                                     | **nothing — imported by no test in the repository**                                 |
+| `GET /api/exercise-entries/[id]/impact`                             | **nothing — imported by no test in the repository**                                 |
+| `/api/sets` record-badge swallow                                    | **nothing**                                                                         |
+| `/api/account` post-deletion `signOut` swallow                      | **nothing**                                                                         |
+| `records` / `workouts` / `workouts/[id]` / `exercises` `loadFailed` | **nothing — `tests/render/` holds three files, none touching these pages**          |
+| `signout.ts` failure path                                           | **nothing, at any layer** — `session-lifecycle.test.ts:227-276` covers success only |
 
 ### Key Discoveries
 
@@ -180,7 +180,7 @@ first, or a mutation reddens a weaker line and leaves the claim unexecuted.
 
 ### Overview
 
-Make a failed sign-out distinguishable from a successful one — and make it *true* on this device —
+Make a failed sign-out distinguishable from a successful one — and make it _true_ on this device —
 then pin both with assertions in the middleware suite, which is the only project that can ask what
 identity a real cookie produces.
 
@@ -200,7 +200,7 @@ outcomes (`sign_in_failed`, `sign_up_failed`, `rate_limited`). `AuthMessageCode`
 inference; no other change. The sentence must be **honest about what did and did not happen**: the
 device is signed out, the session may still be live elsewhere, and signing in again is the retry.
 It belongs in `AUTH_MESSAGES` (red box) rather than `AUTH_NOTICES` — `AUTH_NOTICES` is documented at
-`:74-82` as the catalogue for *deliberate, successful* actions, and this is neither.
+`:74-82` as the catalogue for _deliberate, successful_ actions, and this is neither.
 
 #### 2. Cookie clearing, in the module that owns cookie knowledge
 
@@ -858,22 +858,22 @@ No migration. No schema change, no new column, no new policy. `npm run db:push` 
 
 #### Automated
 
-- [x] 4.1 `npm run test:render` passes with the new suite
-- [x] 4.2 Each failure assertion is red when its page's catch stops setting `loadFailed`
-- [x] 4.3 Each positive control is red when its page's success branch renders nothing
-- [x] 4.4 The stub's unstubbed-table throw fires when a page is given a fifth read
-- [x] 4.5 `npm run lint` and `npm run typecheck` pass
+- [x] 4.1 `npm run test:render` passes with the new suite — a020a7a
+- [x] 4.2 Each failure assertion is red when its page's catch stops setting `loadFailed` — a020a7a
+- [x] 4.3 Each positive control is red when its page's success branch renders nothing — a020a7a
+- [x] 4.4 The stub's unstubbed-table throw fires when a page is given a fifth read — a020a7a
+- [x] 4.5 `npm run lint` and `npm run typecheck` pass — a020a7a
 
 #### Manual
 
-- [x] 4.6 `records.astro`'s three states read as three different things to a person
+- [x] 4.6 `records.astro`'s three states read as three different things to a person — a020a7a
 
 ### Phase 5: Write the phase down in `test-plan.md` §6
 
 #### Automated
 
-- [ ] 5.1 `npm run lint` passes
-- [ ] 5.2 The full eight-step gate passes in order
+- [x] 5.1 `npm run lint` passes
+- [x] 5.2 The full eight-step gate passes in order
 - [ ] 5.3 The PR's `ci` check is green before merge
 
 #### Manual
