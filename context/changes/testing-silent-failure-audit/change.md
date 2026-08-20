@@ -1,7 +1,7 @@
 ---
 change_id: testing-silent-failure-audit
 title: Silent-failure audit — a failure that is caught must still be told to the caller
-status: implementing
+status: implemented
 created: 2026-08-20
 updated: 2026-08-20
 archived_at: null

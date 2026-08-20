@@ -874,9 +874,9 @@ No migration. No schema change, no new column, no new policy. `npm run db:push` 
 
 - [x] 5.1 `npm run lint` passes — 1880fe9
 - [x] 5.2 The full eight-step gate passes in order — 1880fe9
-- [ ] 5.3 The PR's `ci` check is green before merge
+- [x] 5.3 The PR's `ci` check is green before merge — 1880fe9
 
 #### Manual
 
-- [ ] 5.4 §6's new entries are findable by layer, not by phase
-- [ ] 5.5 The three named gaps read as deliberate carries with an assigned owner
+- [x] 5.4 §6's new entries are findable by layer, not by phase — 1880fe9
+- [x] 5.5 The three named gaps read as deliberate carries with an assigned owner — 1880fe9
