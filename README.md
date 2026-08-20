@@ -173,7 +173,7 @@ and `http://localhost:4321/**` for local work.
 | `/workouts/[id]`        | Protected. One workout: add exercises, log sets, see each set's estimated 1RM. **404 for a workout that is not yours**   |
 | `/records`              | Protected. Current records per exercise — best estimated 1RM and heaviest weight, each with the set and date behind it   |
 | `/settings`             | Protected. Weight unit, estimation formula, and the timezone the training week runs in. One form, one Save               |
-| `/api/auth/signout`     | POST. Always → `/auth/signin`, so returning requires authenticating again                                                |
+| `/api/auth/signout`     | POST. Always → `/auth/signin`, so returning requires authenticating again. **If the provider refuses, the session is ended on this device anyway and the destination carries `?error=sign_out_failed`** — the status is `302` either way, so it cannot carry the difference |
 | `/api/exercises`        | POST, **JSON** (not a form post — the caller is a hydrated island). Creates a custom exercise for the signed-in account  |
 | `/api/workouts`         | POST, JSON. Creates a workout from `{ performedOn, note? }`                                                              |
 | `/api/exercise-entries` | POST, JSON. Adds an exercise to a workout; choosing one already there returns the existing entry rather than an error. **An exercise the caller cannot see is refused exactly like one that does not exist** — same 404, same message code |

@@ -351,6 +351,20 @@ through `astro:env/server`. Endpoints are `src/pages/api/auth/{signin,signup,sig
   `AUTH_MESSAGES`, the catalogue of every sentence an auth screen can show**. It **imports nothing**,
   on purpose: both auth forms are `client:load` islands, so everything reachable from it ships to the
   browser.
+- **A REDIRECT-SHAPED endpoint signals failure by its DESTINATION, because the status cannot.**
+  `/api/auth/signout` answers `302` whether it worked or not, which is why `signout.ts` once
+  discarded `signOut()`'s result and nobody noticed: a provider refusal left the cookie live, the
+  route still sent the user to `/auth/signin`, and `AUTH_ROUTES` bounced them straight back to
+  `/dashboard`. It now does two things on failure, and **both are needed** — it clears the jar
+  through `clearSessionCookies` in `src/lib/supabase.ts`, so the sign-out is true on this device and
+  the middleware has no session left to bounce; and it redirects to `?error=sign_out_failed`, so the
+  caller can tell. **Two failure shapes**: `signOut()` resolves `{ error }` for an ordinary auth
+  failure and **re-throws** anything that is not an `AuthError` (`src/pages/api/account/index.ts`
+  handles the same pair) — a route written as `if (error)` alone handles one and lets the other
+  escape as a generic HTML 500. Assertions 6 and 7 of `tests/middleware/session-lifecycle.test.ts`
+  are what would notice either half being dropped. **The message is deliberately partial**: the
+  refresh token survives at the provider, and the sentence says "on this device" rather than
+  claiming a global sign-out.
 - **The redirect carries a message CODE, never text.** `?error=sign_in_failed`, resolved by
   `messageForCode()` on the page. Passing prose through the query string turns every auth page into a
   phishing kit — `?error=Account+locked.+Call+500-123-456` rendered as a genuine system message on

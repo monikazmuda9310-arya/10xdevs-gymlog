@@ -210,6 +210,18 @@ describe("messageForCode", () => {
     expect(messageForCode("")).toBeNull();
   });
 
+  it("resolves sign_out_failed to its own sentence rather than the generic one", () => {
+    // **The failure this catches is silent by construction.** `/api/auth/signout` redirects with
+    // `?error=sign_out_failed` when the provider refuses; a code with no catalogue entry does not
+    // throw, does not warn, and does not render blank — it falls through to `unexpected` and reads
+    // as an ordinary hiccup. The user would then be told "something went wrong" about a session
+    // that is half-ended, which is the one thing this whole phase exists to prevent.
+    expect(messageForCode("sign_out_failed")).toBe(AUTH_MESSAGES.sign_out_failed);
+    expect(messageForCode("sign_out_failed")).not.toBe(AUTH_MESSAGES.unexpected);
+    // It must not overclaim: the session survives at the provider, and the sentence says so.
+    expect(AUTH_MESSAGES.sign_out_failed).toContain("this device");
+  });
+
   it("refuses to put a crafted link's words in the application's mouth", () => {
     // The finding this exists for: `?error=Account+locked.+Call+500-123-456` used to render
     // verbatim, styled as a genuine system message on our own domain.
