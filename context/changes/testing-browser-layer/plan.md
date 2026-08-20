@@ -1075,6 +1075,27 @@ No schema change. No migration. `delete_own_account()` already exists
     only takes effect once that file is on `main`**, because GitHub reads the trigger from the
     default branch. This measurement still cost two pushes.
 
+- **P7.d what 7.4–7.7 were closed ON, stated precisely because these rows will be cited.**
+  - **7.6 is a FACT and was checked as one**, 2026-08-20. Every place that could imply coverage was
+    read: the risk row still names both halves (§2 row 4); § "Named gap, carried deliberately" is
+    intact; the new §6.6 entry says "no assigned layer, in this phase or any other"; §6.5 still says
+    the render check cannot see viewport; the spec's own header refuses viewport assertions; and
+    **`playwright.config.ts` sets no viewport at all**, so nothing implies a tested width. Nothing
+    claims coverage.
+  - **7.7 is a FACT**: `change.md` carries `updated: 2026-08-20`, and `STATE.md` landed as `8badb71`
+    in the separate `handoff` repository — header, badge table rows 5 and 6, the working-mode
+    eight-step line, a rewritten NEXT STEP section, and a correction to the Cloudflare bullet that
+    had been read as forbidding `wrangler dev` for the built worker.
+  - **7.4 and 7.5 are JUDGEMENTS and were closed on a NARROWER basis than the criterion implies.**
+    The owner was shown §6.3, §6.7 and the three `AGENTS.md` regions in conversation on 2026-08-20,
+    engaged with them, and directed two changes out of that reading: the "not every state check is
+    one" caveat in §6.3, and the change-folder pointer fix that turned out to have three already-dead
+    instances. **That is a real review of the CONTENT and it is not a fresh reader following the
+    cookbook to write a test.** Nobody has yet added a test using §6.3 or §6.7 without this plan
+    open, which is what the criterion literally asks. Recorded rather than smoothed over: the first
+    person to add an e2e or middleware test is the real check, and if either section fails them, that
+    is a finding about these sections and not about them.
+
 ## References
 
 - Research: `context/changes/testing-browser-layer/research.md` (ground truth for this phase)
@@ -1193,7 +1214,7 @@ No schema change. No migration. `delete_own_account()` already exists
 
 #### Manual
 
-- [ ] 7.4 `test-plan.md` §6.3 and the new §6.7 are followable without this plan
-- [ ] 7.5 `AGENTS.md` gate sentence, Vitest-projects paragraph and § Cloudflare traps all agree with what shipped
-- [ ] 7.6 The phone-width gap is still stated as a gap and implied nowhere to be covered
-- [ ] 7.7 `change.md` and `STATE.md` updated
+- [x] 7.4 `test-plan.md` §6.3 and the new §6.7 are followable without this plan
+- [x] 7.5 `AGENTS.md` gate sentence, Vitest-projects paragraph and § Cloudflare traps all agree with what shipped
+- [x] 7.6 The phone-width gap is still stated as a gap and implied nowhere to be covered
+- [x] 7.7 `change.md` and `STATE.md` updated
