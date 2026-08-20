@@ -260,13 +260,20 @@ existence oracle in one.
 Scripts, local Supabase setup, and deploy steps: @README.md
 
 The gate, in the order CI runs it: `npm run lint` → `npm run typecheck` → `npm test` →
-`npm run test:render` → `npm run test:integration` → `npm run build`. Run all **six** before claiming
-a change is done — the integration check needs network and the test project's credentials, so it is
-the one that fails first on a fresh clone. `npm run typecheck` is `astro check`, covering `.astro`
-and `.ts` alike; `npm test` is a single non-interactive Vitest run.
+`npm run test:render` → `npm run test:integration` → `npm run test:middleware` → `npm run build` →
+`npm run test:e2e`. Run all **eight** before claiming a change is done — the integration check needs
+network and the test project's credentials, so it is the one that fails first on a fresh clone.
+`npm run typecheck` is `astro check`, covering `.astro` and `.ts` alike; `npm test` is a single
+non-interactive Vitest run.
 
-**There are three Vitest projects and they cannot see each other's files** — deliberately, by
-include glob: `src/**` for `npm test`, `tests/integration/**`, `tests/render/**`. See § Testing.
+- **`test:e2e` is required locally before claiming done on anything touching pages, islands,
+  `src/middleware.ts`, `src/lib/supabase.ts` or the adapter**, and required in CI on every PR. It is
+  last because it consumes a build, and it is the only step that can tell a screen that renders from
+  a screen that works.
+
+**There are FOUR Vitest projects and they cannot see each other's files** — deliberately, by include
+glob: `src/**` for `npm test`, `tests/integration/**`, `tests/render/**`, `tests/middleware/**`.
+Playwright is a fifth runner over `tests/e2e/**`, outside Vitest entirely. See § Testing.
 
 **There is no local database stack and none is wanted.** Every migration and every data-touching
 check runs against a hosted project through `--db-url`. There are **two**: `gymlog` is production and
@@ -279,6 +286,8 @@ is what the deployed Worker serves; `gymlog-test` is what CI and the integration
 | `npm run db:types`         | regenerates `src/db/database.types.ts` from the **production** schema   |
 | `npm run test:integration` | the RLS check against `gymlog-test`; never runs inside `npm test`       |
 | `npm run test:render`      | renders pages through Astro's container and asserts on the HTML         |
+| `npm run test:middleware`  | drives `onRequest` with real `gymlog-test` session cookies              |
+| `npm run test:e2e`         | builds the worker, strips its credentials, serves it, drives Chromium   |
 
 - **There is deliberately no single-target push.** Advancing one schema and forgetting the other is
   the only way the two drift, so forgetting is not an available mistake. If the production push fails
@@ -433,6 +442,36 @@ through `astro:env/server`. Endpoints are `src/pages/api/auth/{signin,signup,sig
     password"** compares the provider's `status`, `code` _and_ `message` across both cases, because
     asserting only that both fail would pass against a real account-existence oracle sitting
     underneath a neutral message.
+- **Cookie / middleware checks live in `tests/middleware/`**, under `vitest.middleware.config.ts`,
+  run by `npm run test:middleware`. The one question the other three cannot ask: **what identity does
+  a real cookie produce?** Everything between an inbound HTTP request and `locals.user` executes
+  **zero times** in the gate without it, because every integration suite hands a handler a hand-built
+  `locals` whose client and user id agree by construction.
+  - **Its credential guarantee has TWO parts and neither is sufficient alone.** The subtractive strip
+    (`vitest.integration.config.ts`'s, copied) removes production from `process.env`; **`vite.envDir`**
+    pointed at the committed, credential-free `tests/middleware/no-env/` closes the second door,
+    because this project loads Astro's Vite pipeline and `loadEnv` reads `.env*` from the env
+    directory as well. A load-time `readdirSync` guard throws if anything `.env*` appears there.
+  - **Three cookie states, and the third is the dangerous one**: valid, cleared, and
+    **invalid/forged** — dangerous because a forgery that was silently mis-built behaves exactly like
+    one that was correctly refused. **Every forged cookie needs a positive control** in the same
+    test: the identical reassemble/re-encode path with the original claims must still authenticate.
+  - **No `LIKE` sweeps in this project.** Accounts are per-run and removed through
+    `delete_own_account()` on the client that owns them. Mark: `t2c-`.
+- **The browser layer lives in `tests/e2e/`**, under `playwright.config.ts`, run by
+  `npm run test:e2e`. Chromium only. It answers the question no other runner can: **does a screen
+  that renders also DO anything?** Every island is `client:load`.
+  - **The harness is the BUILT worker under `wrangler dev`, never `astro dev`** — dev **inlines**
+    whatever `.dev.vars` names (production) into `astro:env/server` and cannot be re-aimed by any
+    per-process mechanism, while the build defers to the workerd env at request time.
+    `scripts/e2e-build.mjs` deletes `dist/server/.dev.vars`; `scripts/e2e-serve.mjs` **asserts its
+    absence before every launch** and is the only way the server starts. **The delete and the assert
+    are in different processes on purpose**, so the refusal is provable rather than unfireable.
+  - **A `fill()` that lands before an island hydrates is SILENTLY LOST** — the DOM takes the text,
+    React's state does not, hydration restores the empty value. Measured at **one run in three**.
+    Retry the fill until the island's own state reflects it, and give any assertion that proves
+    something by ABSENCE a positive control, or a lost fill turns it into a vacuous pass.
+  - One per-run account, mark `t2e-`, removed in `globalTeardown`. Never a shared fixture.
 - **E2E locators**: `getByRole` / `getByLabel` / `getByText` first. `getByTestId` only when
   accessibility attributes are genuinely ambiguous. Never CSS selectors, XPath, or DOM structure.
 - **Never `page.waitForTimeout()`.** Wait on state: `toBeVisible()`, `waitForURL()`,
@@ -533,10 +572,17 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
   - **`npm run build` copies the production credentials into `dist/server/.dev.vars`**, emitted by
     `@cloudflare/vite-plugin` from the root file. `astro preview` and `wrangler dev` read them from
     **there**, not from the repository root — so the build output is aimed at production too, by
-    default, through a file no test author would think to look at. It is gitignored, so this is a
-    local hazard rather than a commit one. Anything that launches the built worker must **delete that
-    file and assert its absence immediately before launch**, not once at setup: an ordinary rebuild
-    re-creates it.
+    default, through a file no test author would think to look at. **118 bytes, both key names
+    present** — measured 2026-08-16. It is gitignored and the adapter's own `.assetsignore` lists
+    `.dev.vars`, so nothing leaks to the CDN; the hazard is entirely local, and it is that any harness
+    pointed at the build output inherits production **silently**. Anything that launches the built
+    worker must **delete that file and assert its absence immediately before launch**, not once at
+    setup: an ordinary rebuild re-creates it.
+    - **`scripts/e2e-build.mjs` deletes it; `scripts/e2e-serve.mjs` asserts its absence and refuses.
+      The two live in different processes deliberately** — a launcher that deleted the file and then
+      checked for it would hold an assertion that can never fire, and a check that never fires is
+      indistinguishable from one that passes. Kept apart, the refusal is provable by planting the
+      file and running the launcher directly.
   - **The built worker resolves its credentials at REQUEST time, and that is the one aimable path.**
     Unlike dev, the build emits `_internalGetSecret("SUPABASE_URL")` against the workerd env rather
     than an inlined value, so a launcher that strips the environment and sets the test pair controls
@@ -560,9 +606,12 @@ reader could not infer from there.
   build fails against the Cloudflare adapter (`Could not find the prerender entry point`), reproduced
   on 7.1.6 and 7.2.0. Do not "helpfully" bump it; full record in
   `context/changes/bootstrap-verification/verification.md`.
-- CI (`.github/workflows/ci.yml`) runs the six gate steps in order on every push and PR to `main`,
-  with a `concurrency` group so two runs cannot race the shared fixture rows. The browser test is not
-  wired yet.
+- CI (`.github/workflows/ci.yml`) runs the **eight** gate steps in order on every push and PR to
+  `main`, with a `concurrency` group so two runs cannot race the shared fixture rows.
+  `test:middleware` and `test:e2e` are steps of the **existing `ci` job** rather than a new workflow,
+  which is what puts them inside that group — a separate workflow would **not** join it and would
+  reintroduce the race the group exists to prevent. **No new repository secret was needed**: the five
+  existing ones cover both, and neither step carries a production credential.
 - **Five tables.** `public.profiles` (one row per account, created by a trigger on `auth.users` and
   backfilled); `public.exercises` (the catalogue — **38 seeded rows** with `user_id is null` plus
   custom rows private to their owner, § shared-catalogue variant in `context/foundation/access-control.md`); and `public.workouts` →

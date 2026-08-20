@@ -78,7 +78,7 @@ disk.
 | #   | Phase name           | Goal (one line)                                                                  | Risks covered | Test types               | Status        | Change folder                            |
 | --- | -------------------- | -------------------------------------------------------------------------------- | ------------- | ------------------------ | ------------- | ---------------------------------------- |
 | 1   | Edit-time gates      | Lock the floor: lint and typecheck fire at edit time, not at commit time         | cross-cutting | gates                    | complete      | — (no change folder — see §6.6)          |
-| 2   | Browser layer        | Prove the boundary and the flow through a real session, against the test project | #2, #3, #4    | integration + e2e        | planned       | `context/changes/testing-browser-layer/` |
+| 2   | Browser layer        | Prove the boundary and the flow through a real session, against the test project | #2, #3, #4    | integration + e2e        | complete      | `context/changes/testing-browser-layer/` |
 | 3   | Silent-failure audit | A failure that is caught must still be told to the caller                        | #5            | integration + regression | not started   | —                                        |
 | 4   | Week-boundary seam   | The week the screen shows is bounded by the zone the profile holds               | #1            | integration + render     | not started   | —                                        |
 | 5   | Environment parity   | Prove the two projects agree, and that a deploy can still sign somebody in       | #6, #7        | script + CI + smoke      | not started   | —                                        |
@@ -115,7 +115,8 @@ Two consequences reshaped this phase:
 | unit          | Vitest                       | ^4.1.10          | `src/**` glob; hermetic; `TZ` pinned to `America/New_York`, load-bearing      |
 | integration   | Vitest (separate config)     | ^4.1.10          | `tests/integration/**`; real network to `gymlog-test`; env allowlist enforced |
 | render        | Vitest (separate config)     | ^4.1.10          | `tests/render/**`; Astro container; `configFile: false` is mandatory          |
-| e2e           | none yet — see §3 Phase 2    | —                | Playwright is not a dependency; no config, no spec directory                  |
+| middleware    | Vitest (separate config)     | ^4.1.10          | `tests/middleware/**`; real cookies; subtractive strip **plus** `vite.envDir` |
+| e2e           | `@playwright/test`           | 1.62.1           | `tests/e2e/**`; **Chromium only**; the BUILT worker, never `astro dev`. installed 2026-08-20 |
 | API mocking   | none — not needed            | —                | No third-party HTTP boundary in the product                                   |
 | accessibility | none yet                     | —                | Role-based locators in Phase 2 give partial coverage as a side effect         |
 | lint / format | ESLint / Prettier            | ^9.29.0 / ^3.8.3 | Type-checked rules; pre-commit via husky + lint-staged                        |
@@ -144,12 +145,15 @@ Two consequences reshaped this phase:
 | build                          | local + CI             | required                  | adapter and bundling failures                              |
 | pre-commit (staged files)      | local                  | required                  | lint and format drift before a commit lands                |
 | edit-time lint + typecheck     | local (agent loop)     | required after §3 Phase 1 | regressions at the moment they are written                 |
-| e2e on the critical flow       | CI on PR               | required after §3 Phase 2 | broken sign-in, routing, hydration, cross-account boundary |
+| middleware / cookie check      | local + CI             | required                  | a request bound to the wrong identity; the three cookie states |
+| e2e on the critical flow       | local + CI on PR       | required                  | broken sign-in, routing, hydration, cross-account boundary |
 | schema parity between projects | CI or manual, pre-push | required after §3 Phase 5 | two databases believed identical that are not              |
 | post-deploy smoke              | after deploy           | required after §3 Phase 5 | a green deploy that cannot authenticate anybody            |
 
 Any new job that writes to `gymlog-test` joins the existing CI concurrency group, or it reintroduces
-the race that group exists to prevent.
+the race that group exists to prevent. **The middleware and e2e steps join it by living in the
+workflow that declares it** — they are steps of the existing `ci` job, not a new workflow, and a new
+workflow would **not** inherit the group.
 
 ## 6. Cookbook Patterns
 
@@ -185,13 +189,58 @@ named against it.
 
 ### 6.3 Adding an e2e test
 
-- TBD — see §3 Phase 2.
+- **Location**: `tests/e2e/`, under `playwright.config.ts`. Chromium only.
+- **The harness is the BUILT worker under `wrangler dev`, never `astro dev`.** Dev **inlines**
+  whatever `.dev.vars` names — production — into `astro:env/server` and cannot be re-aimed by any
+  per-process mechanism (`@astrojs/cloudflare/dist/index.js:292-303` +
+  `vite/dist/node/chunks/…/config.js:9417-9418`). The build defers to the workerd env at request
+  time instead, and that is the only aimable path.
+- **`scripts/e2e-serve.mjs` is the only way the server starts.** It strips the environment, requires
+  the three test credentials, requires `dist/server/wrangler.json` to exist, asserts
+  `dist/server/.dev.vars` is **absent**, seeds the test pair and checks the seed, then spawns
+  wrangler. The absence-assert runs **immediately before every launch**, because an ordinary
+  `npm run build` re-creates that file. `scripts/e2e-build.mjs` is what deletes it — **the delete and
+  the assert live in different processes on purpose**, so the refusal can be proven by planting the
+  file rather than being an assertion that can never fire.
+- **If the launcher is bypassed the credentials are ABSENT, not production's.** Every protected route
+  redirects and the suite goes red on its first step. That is the whole safety argument, and it was
+  measured by withholding the two `CLOUDFLARE_*` gates and watching every request answer
+  `?error=not_configured`.
+- **One per-run account, mark `t2e-`**, named in `playwright.config.ts` and removed in
+  `globalTeardown` through `delete_own_account()`, with the removal **proven from outside** by
+  re-attempting sign-in. Never a shared fixture; never `rls-owner-*` or an `s09i-` address. The RPC
+  cannot rescue an interrupted run, so the mark is the recovery path.
+- **Locators**: `getByRole` / `getByLabel` / `getByText` only. Never CSS, never XPath, never
+  `page.waitForTimeout()` — wait on state.
+  - Two traps in this product: **both password visibility toggles carry the identical
+    `aria-label="Show password"`** (`PasswordToggle.tsx:14`), so scope or `.first()`; and the set
+    fields' labels **repeat per entry** (ids are `reps-<entryId>`), so scope with
+    `getByRole("listitem").filter({ hasText: … })` once a second exercise is on screen.
+  - **Success is a NAVIGATION, not a message** on `/workouts` (`NewWorkoutForm.tsx:52` assigns
+    `window.location.href`) — wait on the URL, not for a confirmation that never appears.
+- **A `fill()` that lands before the island hydrates is SILENTLY LOST.** Every input here is a
+  controlled React input inside a `client:load` island: the DOM takes the text, React's state does
+  not, and hydration restores the empty value. Measured at **one run in three**. Retry the fill until
+  the island's own state reflects it (`expect(async () => {…}).toPass()` — waiting on state, not
+  sleeping).
+- **Assert the EFFECT of an interaction, never the presence of an element**, and **give every
+  absence-assertion a positive control**. "The note is gone after signing out" is satisfied perfectly
+  by a note that was never saved; without a control proving it was on screen first, the strongest
+  assertion in a spec passes for the wrong reason and reports green.
+- **The estimate is a number only for 1–12 reps at positive load**, so a flow must land inside that
+  range for the assertion to mean anything: 5 reps at 100 kg is `100 × 36 / (37 − 5)` = **112.5**
+  under the default Brzycki. Outside it the slot holds a sentence instead.
+- **Reference test**: `tests/e2e/critical-flow.spec.ts`; `tests/e2e/smoke.spec.ts` for the harness.
+- **Run locally**: `npm run test:e2e`. To watch it: `E2E_SLOWMO=500 npm run test:e2e -- --headed`.
 
 ### 6.4 Adding a test for a new API endpoint
 
 - **Test type**: integration, driving the exported handler directly with a real session. Do not
   drive it over HTTP against the dev server — that server's credentials point at production and
-  cannot be displaced.
+  cannot be displaced (`@astrojs/cloudflare/dist/index.js:292-303` assigns `.dev.vars` into
+  `process.env` at `astro:config:done`; `vite/dist/node/chunks/…/config.js:9417-9418` applies
+  `process.env` **last**, so it beats `.env`, `.env.<mode>` and a shell variable alike). Recorded here
+  so the next reader does not re-derive it.
 - **Assert on both** the response and the persisted row, read back as an entitled caller.
 - **Reference test**: `tests/integration/workout-endpoints.test.ts`.
 - **When to add e2e instead**: only when the failure needs the full deployed shape — cookie,
@@ -209,6 +258,43 @@ named against it.
 - **Reference test**: `tests/render/dashboard-tonnage.test.ts`.
 - **Run locally**: `npm run test:render`.
 
+### 6.7 Adding a middleware / cookie test
+
+- **Location**: `tests/middleware/`, under `vitest.middleware.config.ts`.
+- **What this project can see that no other can**: what identity a **real cookie** produces.
+  Everything between an inbound HTTP request and `locals.user` — `src/middleware.ts`,
+  `src/lib/supabase.ts` — executes **zero times** in the rest of the gate, because every integration
+  suite hands a handler a hand-built `locals` whose client and user id agree by construction. A
+  middleware binding the *wrong* identity to a request is invisible to all of them.
+- **The credential guarantee has two parts and NEITHER is sufficient alone.**
+  1. The **subtractive strip** removes production from `process.env` after `loadEnvFile` deliberately
+     pulled it in. Anything that merely *supplies* the right value wins a precedence contest and
+     loses silently the day a flag is forgotten.
+  2. **`vite.envDir`** pointed at the committed, credential-free `tests/middleware/no-env/`. This
+     project loads Astro's Vite pipeline, and `loadEnv` reads `.env*` **from the env directory** as
+     well — so stripping the process alone leaves the repository root's `.env`, which names
+     production, readable from disk. A load-time `readdirSync` guard throws if anything `.env*`
+     appears there, and `.gitignore` is the second defence.
+  - Measured: with the strip applied and the directory empty, the reported value is **`undefined`** —
+    being wrong yields an **absent** credential, never a production one.
+- **Three cookie states — valid, cleared, and invalid/forged — and the third is the dangerous one**,
+  because a forgery can behave silently like a valid cookie. **Every forged cookie needs a positive
+  control in the same test**: the identical reassemble/re-encode path with the original claims must
+  still authenticate. Without it, a tamper that silently missed and a tamper that was correctly
+  refused are the same observation.
+- **What is real and what is doubled** is named in `tests/middleware/_shared/context.ts`: real are
+  the `Cookie` header parse, `createServerClient`, the `auth.getUser()` round trip, the `locals`
+  derivation and the two route arrays; doubled are `AstroCookies` and `redirect`, because Astro's
+  package exports do not expose them.
+- **Mark `t2c-`, per-run accounts, and NO `LIKE` sweeps anywhere in this project** — accounts are
+  removed through `delete_own_account()` on the client that owns them.
+- **A signed-out caller is refused at the GRANT layer, not filtered by RLS** (`42501`, `permission
+  denied for table workouts`). Both outcomes are "no data" and they are different guarantees; pin the
+  SQLSTATE so a widened grant does not slip past as a filtered zero.
+- **Reference tests**: `tests/middleware/cookie-identity.test.ts`,
+  `tests/middleware/session-lifecycle.test.ts`.
+- **Run locally**: `npm run test:middleware`.
+
 ### 6.6 Per-rollout-phase notes
 
 **Phase 1 — Edit-time gates (complete, 2026-08-16).** Shipped directly rather than through a change
@@ -219,6 +305,20 @@ the ESLint config is type-aware — so lint runs per-edit but asynchronously, an
 the end of the turn. **And the first version of the hook never ran at all**, silently, because `jq`
 emits CRLF here and the extension match never fired; a clean-file probe could not tell that apart
 from success. Both recorded in `lessons.md`. Prove any future hook by breaking something.
+
+**Phase 2 — Browser layer (complete, 2026-08-20).** Two things outlived it, and both were wrong in
+the plan before they were measured. **The real gap behind risks #2 and #3 was never the browser** — it
+was the cookie, and closing it needed a fourth _Vitest_ project rather than a browser at all; that
+half shipped first and stands whether or not the browser half ever had. **And the build output ships
+production's credentials to disk** (`dist/server/.dev.vars`, 118 bytes), which is what made a browser
+against the _built_ worker aimable in the first place, and is a hazard nothing in this repository had
+recorded. A third finding is the one most likely to bite the next author: **a `fill()` before an
+island hydrates is silently lost, one run in three**, and what it threatens is not the flake but any
+assertion that proves something by ABSENCE — see §6.3.
+
+**What did NOT get covered, and is implied to be covered nowhere**: the phone-width half of risk #4.
+"The control is unusable at a phone width" still has no assigned layer, in this phase or any other.
+It stays a named gap in §2.
 
 ## 7. What We Deliberately Don't Test
 

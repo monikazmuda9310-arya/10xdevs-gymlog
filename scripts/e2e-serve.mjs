@@ -28,6 +28,8 @@
 
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
@@ -108,7 +110,16 @@ console.log(`e2e-serve: worker will be handed ${new URL(TEST_URL).hostname} on $
 // ---------------------------------------------------------------- 5. spawn, and wait for the port
 // The two gates are what carry `SUPABASE_URL` / `SUPABASE_KEY` from this process into the workerd
 // env; withholding them was measured to produce `not_configured` on every request (P4.2).
-const child = spawn("npx", ["wrangler", "dev", "--config", WRANGLER_CONFIG, "--port", String(PORT)], {
+// **`node <bin>`, not `npx wrangler` through a shell.** With `shell: true` the pid is the SHELL's,
+// so what gets signalled on teardown is a wrapper and the real server can outlive it holding the
+// port — which on a POSIX runner leaves Playwright waiting for a port that never closes. Resolving
+// the bin makes `child` the wrangler process itself.
+const wranglerBin = join(
+  dirname(createRequire(import.meta.url).resolve("wrangler/package.json")),
+  "bin",
+  "wrangler.js",
+);
+const child = spawn(process.execPath, [wranglerBin, "dev", "--config", WRANGLER_CONFIG, "--port", String(PORT)], {
   cwd: ROOT,
   env: {
     ...process.env,
@@ -116,12 +127,12 @@ const child = spawn("npx", ["wrangler", "dev", "--config", WRANGLER_CONFIG, "--p
     CLOUDFLARE_INCLUDE_PROCESS_ENV: "true",
   },
   stdio: "inherit",
-  shell: true,
 });
 
 function stop() {
   if (process.platform === "win32") {
-    // `shell: true` makes `child.pid` the shell's, so the tree flag is what actually reaches wrangler.
+    // Windows has no process groups to signal, and wrangler runs workerd as its OWN child — so the
+    // tree flag is what actually stops the thing listening on the port.
     spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
   } else {
     child.kill("SIGTERM");

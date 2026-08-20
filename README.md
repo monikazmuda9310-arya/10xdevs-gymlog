@@ -60,6 +60,8 @@ npm run dev
 - `npm run test:watch` - Run the unit tests in watch mode
 - `npm run test:integration` - Run the RLS check against the `gymlog-test` project (needs network)
 - `npm run test:render` - Render pages through Astro's container and assert on the resulting HTML (hermetic)
+- `npm run test:middleware` - Drive `onRequest` with real `gymlog-test` session cookies (needs network)
+- `npm run test:e2e` - Build the worker, strip its credentials, serve it, and drive Chromium against it (needs network)
 - `npm run db:status` - Print both projects' migration histories — the drift check
 - `npm run db:push` - Apply pending migrations to both projects, `gymlog-test` first
 - `npm run db:types` - Regenerate `src/db/database.types.ts` from the production schema
@@ -303,17 +305,19 @@ Set `SUPABASE_URL` and `SUPABASE_KEY` as secrets in your Cloudflare dashboard or
 
 ## CI
 
-GitHub Actions runs lint, typecheck, unit tests, the render check, the integration check and build on every push and PR to `main`. The workflow carries a `concurrency` group so two runs cannot race the integration check's shared fixture rows.
+GitHub Actions runs **eight** steps in order on every push and PR to `main`: lint, typecheck, unit tests, the render check, the integration check, the middleware check, build, and the browser check. The workflow carries a `concurrency` group so two runs cannot race the integration check's shared fixture rows — and the two new steps live in that same job precisely so they inherit it.
 
 `npm run test:render` needs no secrets and no network — it renders pages through Astro's container and asserts on the HTML. It is in the gate because it holds the only check that would notice the 418-entry timezone list being passed as an island prop, and a check outside the gate rots.
 
+`npm run test:middleware` and `npm run test:e2e` write to `gymlog-test` and **carry no production credential**. The browser check builds the worker itself, deletes the credentials that build writes to disk, and serves it through a launcher that refuses to start if they are still there. If that launcher is ever bypassed the worker's credentials are **absent**, not production's, so the failure is a red test rather than a write into real training data.
+
 Five repository secrets:
 
-| Secret                                   | Project       | Used by                       |
-| ---------------------------------------- | ------------- | ----------------------------- |
-| `SUPABASE_URL`, `SUPABASE_KEY`           | `gymlog`      | the typecheck and build steps |
-| `SUPABASE_TEST_URL`, `SUPABASE_TEST_KEY` | `gymlog-test` | `npm run test:integration`    |
-| `GYMLOG_TEST_PASSWORD`                   | `gymlog-test` | its two fixture accounts      |
+| Secret                                   | Project       | Used by                                            |
+| ---------------------------------------- | ------------- | -------------------------------------------------- |
+| `SUPABASE_URL`, `SUPABASE_KEY`           | `gymlog`      | the typecheck and build steps                      |
+| `SUPABASE_TEST_URL`, `SUPABASE_TEST_KEY` | `gymlog-test` | `test:integration`, `test:middleware`, `test:e2e`  |
+| `GYMLOG_TEST_PASSWORD`                   | `gymlog-test` | its two fixture accounts, and every per-run account |
 
 **CI holds no production database credential and never will.** Migrations are applied by hand from a developer machine, deliberately: putting a database-owner connection string in repository secrets would let any merge rewrite the schema.
 

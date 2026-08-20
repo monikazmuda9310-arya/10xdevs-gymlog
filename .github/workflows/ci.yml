@@ -49,7 +49,33 @@ jobs:
           SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
           SUPABASE_TEST_KEY: ${{ secrets.SUPABASE_TEST_KEY }}
           GYMLOG_TEST_PASSWORD: ${{ secrets.GYMLOG_TEST_PASSWORD }}
+      # The fourth Vitest project. It is the only thing in this repository that executes
+      # `src/middleware.ts` or `src/lib/supabase.ts` at all — every other suite hands a handler a
+      # hand-built `locals`, so the client and the user id agree by construction and a middleware
+      # binding the WRONG identity to a request is invisible to all of them. Writes to gymlog-test,
+      # and is inside the concurrency group above BECAUSE it lives in this job.
+      - run: npm run test:middleware
+        env:
+          SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+          SUPABASE_TEST_KEY: ${{ secrets.SUPABASE_TEST_KEY }}
+          GYMLOG_TEST_PASSWORD: ${{ secrets.GYMLOG_TEST_PASSWORD }}
       - run: npm run build
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      # Chromium only: risk #4 asks whether islands hydrate, and three engines would triple the
+      # cost of this step for no additional signal.
+      - run: npx playwright install --with-deps chromium
+      # The browser layer, and it answers the one question the other four runners cannot: does a
+      # screen that renders correctly also DO anything? Every island is `client:load`.
+      #
+      # **NO PRODUCTION CREDENTIAL ON THIS STEP, and that is the guarantee rather than an omission.**
+      # `npm run test:e2e` rebuilds through scripts/e2e-build.mjs, and both env vars are declared
+      # optional, so the build succeeds without them and the served worker is handed the test pair by
+      # scripts/e2e-serve.mjs alone. If that launcher is ever bypassed the credentials are ABSENT, not
+      # production's — every protected route redirects and this step goes red on its first assertion.
+      - run: npm run test:e2e
+        env:
+          SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+          SUPABASE_TEST_KEY: ${{ secrets.SUPABASE_TEST_KEY }}
+          GYMLOG_TEST_PASSWORD: ${{ secrets.GYMLOG_TEST_PASSWORD }}

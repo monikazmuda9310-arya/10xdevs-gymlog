@@ -1137,22 +1137,22 @@ No schema change. No migration. `delete_own_account()` already exists
 
 #### Automated
 
-- [x] 6.1 `npm run test:e2e` passes from a clean `dist/`, and again immediately
-- [x] 6.2 No `t2e-` account survives a green run
-- [x] 6.3 `npm run lint` and `npm run typecheck` pass
+- [x] 6.1 `npm run test:e2e` passes from a clean `dist/`, and again immediately — 81b7974
+- [x] 6.2 No `t2e-` account survives a green run — 81b7974
+- [x] 6.3 `npm run lint` and `npm run typecheck` pass — 81b7974
 
 #### Manual
 
-- [x] 6.4 Assertion 1 proven by removing `client:load` from `WorkoutDetail` — red at "Add set", then reverted
-- [x] 6.5 Assertion 2 proven by widening the estimator's rep range — red, then reverted
-- [x] 6.6 The flow watched once with `--headed`
-- [x] 6.7 No shared fixture and no production row touched
+- [x] 6.4 Assertion 1 proven by removing `client:load` from `WorkoutDetail` — red at "Add set", then reverted — 81b7974
+- [x] 6.5 Assertion 2 proven by widening the estimator's rep range — red, then reverted — 81b7974
+- [x] 6.6 The flow watched once with `--headed` — 81b7974
+- [x] 6.7 No shared fixture and no production row touched — 81b7974
 
 ### Phase 7: The gate, the documentation, and the cookbook
 
 #### Automated
 
-- [ ] 7.1 The full eight-step gate passes locally, in order
+- [x] 7.1 The full eight-step gate passes locally, in order
 - [ ] 7.2 A CI run on a PR is green and shows both new steps
 - [ ] 7.3 Two concurrent CI runs do not overlap
 
