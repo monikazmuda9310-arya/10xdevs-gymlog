@@ -6,7 +6,7 @@
 >
 > Refresh: re-run `/10x-test-plan --refresh` when stale (see §8).
 >
-> Last updated: 2026-08-16
+> Last updated: 2026-08-20
 
 ## 1. Strategy
 
@@ -37,15 +37,15 @@ The top failure scenarios this project must protect against, ordered by risk = i
 Risks are failure scenarios in user / business terms, not test names. The Source column cites the
 _evidence that surfaced this risk_ — never a specific file as "where the failure lives" (§1 #3).
 
-| #   | Risk (failure scenario)                                                                                               | Impact | Likelihood | Source (evidence — not anchor)                                                                                 |
-| --- | --------------------------------------------------------------------------------------------------------------------- | ------ | ---------- | -------------------------------------------------------------------------------------------------------------- |
-| 1   | The week's figures are computed from the wrong days after a timezone change; the number looks correct and is believed | High   | High       | interview Q3; hot-spot `src/lib/services/` — 53 changes/30d                                                    |
-| 2   | Account B reaches account A's training by naming an identifier directly (**abuse scenario**)                          | High   | Medium     | `prd.md` § Guardrails; `prd.md` US-04 AC1; `infrastructure.md` § Risk register (M×H row asks for exactly this) |
-| 3   | A signed-out visitor returns and is shown training data, or a signed-in visitor is bounced between routes             | High   | Medium     | `prd.md` US-04 AC3; interview Q4; hot-spot `src/` — 16 changes/30d at root of the source tree                  |
-| 4   | A screen renders correctly and does nothing — the island never hydrates, or the control is unusable at a phone width  | High   | Medium     | interview Q4; `roadmap.md` § Done — four of five shipped defects were browser-visible and pipeline-invisible   |
-| 5   | An operation fails, the failure is logged, and the caller is told it succeeded                                        | High   | Medium     | module 3 M3L5 (OWASP A10); `prd.md` § Deleting your account — a refusal must be distinguishable from a success |
-| 6   | A migration proven against the empty test project meets real rows for the first time on production                    | High   | Medium     | interview Q2; `AGENTS.md` § Commands — migration histories are compared, schemas are not                       |
-| 7   | The Worker deploys green, serves 200s, and nobody can sign in because runtime secrets are absent                      | High   | Medium     | `infrastructure.md` § Risk register (H×H row; mitigation proposed 2026-08-08, never built)                     |
+| #   | Risk (failure scenario)                                                                                               | Impact | Likelihood | Source (evidence — not anchor)                                                                                                                                                                      |
+| --- | --------------------------------------------------------------------------------------------------------------------- | ------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | The week's figures are computed from the wrong days after a timezone change; the number looks correct and is believed | High   | High       | interview Q3; hot-spot `src/lib/services/` — 53 changes/30d                                                                                                                                         |
+| 2   | Account B reaches account A's training by naming an identifier directly (**abuse scenario**)                          | High   | Medium     | `prd.md` § Guardrails; `prd.md` US-04 AC1; `infrastructure.md` § Risk register (M×H row asks for exactly this)                                                                                      |
+| 3   | A signed-out visitor returns and is shown training data, or a signed-in visitor is bounced between routes             | High   | Medium     | `prd.md` US-04 AC3; interview Q4; hot-spot `src/` — 16 changes/30d at root of the source tree                                                                                                       |
+| 4   | A screen renders correctly and does nothing — the island never hydrates, or the control is unusable at a phone width  | High   | Medium     | interview Q4; `roadmap.md` § Done — four of five shipped defects were browser-visible and pipeline-invisible                                                                                        |
+| 5   | An operation fails, the failure is logged, and the caller is told it succeeded                                        | High   | Medium     | module 3 M3L5 (OWASP A10); `prd.md` § Deleting your account — a refusal must be distinguishable from a success. **Not hot-spot-led (corrected 2026-08-20)** — see the note under the guidance table |
+| 6   | A migration proven against the empty test project meets real rows for the first time on production                    | High   | Medium     | interview Q2; `AGENTS.md` § Commands — migration histories are compared, schemas are not                                                                                                            |
+| 7   | The Worker deploys green, serves 200s, and nobody can sign in because runtime secrets are absent                      | High   | Medium     | `infrastructure.md` § Risk register (H×H row; mitigation proposed 2026-08-08, never built)                                                                                                          |
 
 Risk #2 is the mandatory abuse row. The other three abuse classes were checked and are not top-N:
 untrusted input is validated by a shared zod schema at every endpoint and covered by seven suites;
@@ -54,15 +54,26 @@ provider, outside this repository.
 
 ### Risk Response Guidance
 
-| Risk | What would prove protection                                                                                               | Must challenge                                                                                                                                                                 | Context `/10x-research` must ground                                                                                                                                                                                             | Likely cheapest layer                | Anti-pattern to avoid                                                                                    |
-| ---- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| #1   | A screen shows a week bounded by the days of the profile's stored zone, not by UTC, including for a zone the form accepts | "The unit tests pin both DST transitions" — they pin a pure function, not what a screen does with a settable zone                                                              | Where the stored zone is read, what happens to an unknown one, whether form and validator share a list                                                                                                                          | integration + render                 | A guard left inert by the runner's ambient zone; asserting a figure without asserting which days made it |
-| #2   | After a real sign-in as B, a request naming A's identifier returns no data, and A's row reads back untouched as A         | "Fifteen integration suites already prove this" — they prove it at the client-library layer, not through a cookie; none of them touches `@supabase/ssr` or `src/middleware.ts` | The session/cookie shape, which layer answers 404, what persisted state proves the row survived                                                                                                                                 | integration (cookie path in-process) | Asserting the status code only; under RLS a zero-row write reports success                               |
-| #3   | Signing out ends access: returning to a protected route requires authenticating again before any data is shown            | "A redirect happened" is not "the session stopped working"                                                                                                                     | Both directions of route protection, where the user is resolved, what a stale cookie does — an INVALID or expired cookie is a third state, distinct from a cleared one, and the danger is it behaving silently like a valid one | integration (cookie path in-process) | Asserting the destination URL without attempting a data read                                             |
-| #4   | A person completes the full flow — sign up, create a workout, log a set, see its estimate — in a real browser             | "The HTML rendered" is not "it can be used"                                                                                                                                    | Which controls are islands, what hydration they need, the accessible name of each control; the estimate renders as a number only for 1–12 repetitions at positive load, so the flow must land inside that boundary              | e2e                                  | Asserting an element is present instead of asserting the effect of interacting with it                   |
-| #5   | A failed operation answers non-2xx and the persisted state confirms nothing was written                                   | **That every caught error is a defect** — three swallows in this project are deliberate and carry written rules                                                                | Which catch sites decorate a committed write, and which one _is_ the guarantee being offered                                                                                                                                    | integration + regression             | Reversing a deliberate swallow; asserting on log output instead of on the response and the stored row    |
-| #6   | The two projects' schemas are compared, not their migration histories                                                     | "`db:status` is green" — that compares which migrations were applied, not what they produced                                                                                   | What the status wrapper actually reads, and where the committed types are generated from                                                                                                                                        | script + CI gate                     | An e2e test where a schema comparison would answer it                                                    |
-| #7   | The deployed URL can authenticate an account, checked after the deploy                                                    | "The build passed and the deploy was green"                                                                                                                                    | What a missing runtime secret does to the request path, and what a visitor sees                                                                                                                                                 | post-deploy smoke                    | Wiring this into the per-commit gate, where there is nothing deployed to check                           |
+| Risk | What would prove protection                                                                                                                                                                                                            | Must challenge                                                                                                                                                                                                                  | Context `/10x-research` must ground                                                                                                                                                                                             | Likely cheapest layer                | Anti-pattern to avoid                                                                                                                      |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| #1   | A screen shows a week bounded by the days of the profile's stored zone, not by UTC, including for a zone the form accepts                                                                                                              | "The unit tests pin both DST transitions" — they pin a pure function, not what a screen does with a settable zone                                                                                                               | Where the stored zone is read, what happens to an unknown one, whether form and validator share a list                                                                                                                          | integration + render                 | A guard left inert by the runner's ambient zone; asserting a figure without asserting which days made it                                   |
+| #2   | After a real sign-in as B, a request naming A's identifier returns no data, and A's row reads back untouched as A                                                                                                                      | "Fifteen integration suites already prove this" — they prove it at the client-library layer, not through a cookie; none of them touches `@supabase/ssr` or `src/middleware.ts`                                                  | The session/cookie shape, which layer answers 404, what persisted state proves the row survived                                                                                                                                 | integration (cookie path in-process) | Asserting the status code only; under RLS a zero-row write reports success                                                                 |
+| #3   | Signing out ends access: returning to a protected route requires authenticating again before any data is shown                                                                                                                         | "A redirect happened" is not "the session stopped working"                                                                                                                                                                      | Both directions of route protection, where the user is resolved, what a stale cookie does — an INVALID or expired cookie is a third state, distinct from a cleared one, and the danger is it behaving silently like a valid one | integration (cookie path in-process) | Asserting the destination URL without attempting a data read                                                                               |
+| #4   | A person completes the full flow — sign up, create a workout, log a set, see its estimate — in a real browser                                                                                                                          | "The HTML rendered" is not "it can be used"                                                                                                                                                                                     | Which controls are islands, what hydration they need, the accessible name of each control; the estimate renders as a number only for 1–12 repetitions at positive load, so the flow must land inside that boundary              | e2e                                  | Asserting an element is present instead of asserting the effect of interacting with it                                                     |
+| #5   | A failed operation is DISTINGUISHABLE from a successful one to the caller — a code for a JSON endpoint, a **destination** for a redirect-shaped one — and the persisted state (a row **or a session**) confirms it did not take effect | **That every caught error is a defect** — several swallows here are deliberate and carry written rules; and **that a non-2xx status proves anything on a redirect-shaped endpoint**, where success and failure share one status | Which catch sites decorate a committed write, which one _is_ the guarantee being offered, and which operation reports success with no body at all                                                                               | middleware + integration + render    | Reversing a deliberate swallow; asserting on log output instead of on the response and the stored row; reading a `302` as proof of refusal |
+| #6   | The two projects' schemas are compared, not their migration histories                                                                                                                                                                  | "`db:status` is green" — that compares which migrations were applied, not what they produced                                                                                                                                    | What the status wrapper actually reads, and where the committed types are generated from                                                                                                                                        | script + CI gate                     | An e2e test where a schema comparison would answer it                                                                                      |
+| #7   | The deployed URL can authenticate an account, checked after the deploy                                                                                                                                                                 | "The build passed and the deploy was green"                                                                                                                                                                                     | What a missing runtime secret does to the request path, and what a visitor sees                                                                                                                                                 | post-deploy smoke                    | Wiring this into the per-commit gate, where there is nothing deployed to check                                                             |
+
+**Risk #5's guidance was rewritten on 2026-08-20 by Phase 3's research, and the three corrections are
+worth keeping visible.** The original criterion — "answers non-2xx and the persisted state confirms
+nothing was written" — would have scored the one real defect as **passing**: the operation it lives on
+answers `302` whether it worked or not, and writes no row at all, so neither clause has a subject
+there. **"Three swallows are deliberate" was an undercount**; the category is what matters, not the
+number (`lessons.md` § "The conversion constant has been miscounted twice"). And the **hot-spot
+citation was misleading for this risk**: churn in the window concentrates on the code whose failure
+branches were built and tested in that same window, while the file holding the defect had no commits
+in it at all. The evidence that raised the risk was real; it did not point where the failure lived,
+which is §1 principle #3 behaving exactly as designed.
 
 **Named gap, carried deliberately:** risk #4 has two halves and only one of them has a layer. "The
 island never hydrates" is answerable in a browser; **"the control is unusable at a phone width" is
@@ -75,13 +86,13 @@ Each row is a discrete rollout phase that will open its own change folder via `/
 moves left-to-right through the values below; the orchestrator updates Status as artifacts appear on
 disk.
 
-| #   | Phase name           | Goal (one line)                                                                  | Risks covered | Test types               | Status        | Change folder                            |
-| --- | -------------------- | -------------------------------------------------------------------------------- | ------------- | ------------------------ | ------------- | ---------------------------------------- |
-| 1   | Edit-time gates      | Lock the floor: lint and typecheck fire at edit time, not at commit time         | cross-cutting | gates                    | complete      | — (no change folder — see §6.6)          |
-| 2   | Browser layer        | Prove the boundary and the flow through a real session, against the test project | #2, #3, #4    | integration + e2e        | complete      | `testing-browser-layer`                  |
-| 3   | Silent-failure audit | A failure that is caught must still be told to the caller                        | #5            | integration + regression | not started   | —                                        |
-| 4   | Week-boundary seam   | The week the screen shows is bounded by the zone the profile holds               | #1            | integration + render     | not started   | —                                        |
-| 5   | Environment parity   | Prove the two projects agree, and that a deploy can still sign somebody in       | #6, #7        | script + CI + smoke      | not started   | —                                        |
+| #   | Phase name           | Goal (one line)                                                                  | Risks covered | Test types               | Status      | Change folder                   |
+| --- | -------------------- | -------------------------------------------------------------------------------- | ------------- | ------------------------ | ----------- | ------------------------------- |
+| 1   | Edit-time gates      | Lock the floor: lint and typecheck fire at edit time, not at commit time         | cross-cutting | gates                    | complete    | — (no change folder — see §6.6) |
+| 2   | Browser layer        | Prove the boundary and the flow through a real session, against the test project | #2, #3, #4    | integration + e2e        | complete    | `testing-browser-layer`         |
+| 3   | Silent-failure audit | A failure that is caught must still be told to the caller                        | #5            | integration + regression | complete    | `testing-silent-failure-audit`  |
+| 4   | Week-boundary seam   | The week the screen shows is bounded by the zone the profile holds               | #1            | integration + render     | not started | —                               |
+| 5   | Environment parity   | Prove the two projects agree, and that a deploy can still sign somebody in       | #6, #7        | script + CI + smoke      | not started | —                               |
 
 Phases 1–3 are course deliverables (module 3, items 3, 4 and 5) and come first for that reason.
 Phase 4 covers the highest-scoring risk on the map and is deliberately **not** first: it is cheap,
@@ -110,18 +121,18 @@ Two consequences reshaped this phase:
 
 ## 4. Stack
 
-| Layer         | Tool                         | Version          | Notes                                                                         |
-| ------------- | ---------------------------- | ---------------- | ----------------------------------------------------------------------------- |
-| unit          | Vitest                       | ^4.1.10          | `src/**` glob; hermetic; `TZ` pinned to `America/New_York`, load-bearing      |
-| integration   | Vitest (separate config)     | ^4.1.10          | `tests/integration/**`; real network to `gymlog-test`; env allowlist enforced |
-| render        | Vitest (separate config)     | ^4.1.10          | `tests/render/**`; Astro container; `configFile: false` is mandatory          |
-| middleware    | Vitest (separate config)     | ^4.1.10          | `tests/middleware/**`; real cookies; subtractive strip **plus** `vite.envDir` |
+| Layer         | Tool                         | Version          | Notes                                                                                        |
+| ------------- | ---------------------------- | ---------------- | -------------------------------------------------------------------------------------------- |
+| unit          | Vitest                       | ^4.1.10          | `src/**` glob; hermetic; `TZ` pinned to `America/New_York`, load-bearing                     |
+| integration   | Vitest (separate config)     | ^4.1.10          | `tests/integration/**`; real network to `gymlog-test`; env allowlist enforced                |
+| render        | Vitest (separate config)     | ^4.1.10          | `tests/render/**`; Astro container; `configFile: false` is mandatory                         |
+| middleware    | Vitest (separate config)     | ^4.1.10          | `tests/middleware/**`; real cookies; subtractive strip **plus** `vite.envDir`                |
 | e2e           | `@playwright/test`           | 1.62.1           | `tests/e2e/**`; **Chromium only**; the BUILT worker, never `astro dev`. installed 2026-08-20 |
-| API mocking   | none — not needed            | —                | No third-party HTTP boundary in the product                                   |
-| accessibility | none yet                     | —                | Role-based locators in Phase 2 give partial coverage as a side effect         |
-| lint / format | ESLint / Prettier            | ^9.29.0 / ^3.8.3 | Type-checked rules; pre-commit via husky + lint-staged                        |
-| typecheck     | `astro check`                | astro ^6.3.1     | Covers `.astro` and `.ts` alike; `tsc --noEmit` would not                     |
-| runtime       | Cloudflare Workers / workerd | wrangler ^4.90.0 | 10 ms CPU cap on the free plan constrains what may run in a request           |
+| API mocking   | none — not needed            | —                | No third-party HTTP boundary in the product                                                  |
+| accessibility | none yet                     | —                | Role-based locators in Phase 2 give partial coverage as a side effect                        |
+| lint / format | ESLint / Prettier            | ^9.29.0 / ^3.8.3 | Type-checked rules; pre-commit via husky + lint-staged                                       |
+| typecheck     | `astro check`                | astro ^6.3.1     | Covers `.astro` and `.ts` alike; `tsc --noEmit` would not                                    |
+| runtime       | Cloudflare Workers / workerd | wrangler ^4.90.0 | 10 ms CPU cap on the free plan constrains what may run in a request                          |
 
 **Stack grounding tools (current session):**
 
@@ -136,19 +147,19 @@ Two consequences reshaped this phase:
 
 ## 5. Quality Gates
 
-| Gate                           | Where                  | Required?                 | Catches                                                    |
-| ------------------------------ | ---------------------- | ------------------------- | ---------------------------------------------------------- |
-| lint + typecheck               | local + CI             | required                  | syntactic and type drift                                   |
-| unit                           | local + CI             | required                  | domain-calculation regressions                             |
-| render check                   | local + CI             | required                  | what a page's HTML actually contains                       |
-| integration                    | local + CI             | required                  | access-control and persisted-state regressions             |
-| build                          | local + CI             | required                  | adapter and bundling failures                              |
-| pre-commit (staged files)      | local                  | required                  | lint and format drift before a commit lands                |
-| edit-time lint + typecheck     | local (agent loop)     | required after §3 Phase 1 | regressions at the moment they are written                 |
+| Gate                           | Where                  | Required?                 | Catches                                                        |
+| ------------------------------ | ---------------------- | ------------------------- | -------------------------------------------------------------- |
+| lint + typecheck               | local + CI             | required                  | syntactic and type drift                                       |
+| unit                           | local + CI             | required                  | domain-calculation regressions                                 |
+| render check                   | local + CI             | required                  | what a page's HTML actually contains                           |
+| integration                    | local + CI             | required                  | access-control and persisted-state regressions                 |
+| build                          | local + CI             | required                  | adapter and bundling failures                                  |
+| pre-commit (staged files)      | local                  | required                  | lint and format drift before a commit lands                    |
+| edit-time lint + typecheck     | local (agent loop)     | required after §3 Phase 1 | regressions at the moment they are written                     |
 | middleware / cookie check      | local + CI             | required                  | a request bound to the wrong identity; the three cookie states |
-| e2e on the critical flow       | local + CI on PR       | required                  | broken sign-in, routing, hydration, cross-account boundary |
-| schema parity between projects | CI or manual, pre-push | required after §3 Phase 5 | two databases believed identical that are not              |
-| post-deploy smoke              | after deploy           | required after §3 Phase 5 | a green deploy that cannot authenticate anybody            |
+| e2e on the critical flow       | local + CI on PR       | required                  | broken sign-in, routing, hydration, cross-account boundary     |
+| schema parity between projects | CI or manual, pre-push | required after §3 Phase 5 | two databases believed identical that are not                  |
+| post-deploy smoke              | after deploy           | required after §3 Phase 5 | a green deploy that cannot authenticate anybody                |
 
 Any new job that writes to `gymlog-test` joins the existing CI concurrency group, or it reintroduces
 the race that group exists to prevent. **The middleware and e2e steps join it by living in the
@@ -200,7 +211,21 @@ named against it.
   fixtures, and damage surfaces as a different suite failing on a later run.
 - **Every negative assertion pairs with a read back as the row's owner.** The failure worth catching
   is a caller told "nothing happened" while the write landed.
-- **Reference test**: `tests/integration/workout-mutations-rls.test.ts`.
+- **To break ONE read without mocking the client, wrap it**: `new Proxy(client, { get })`
+  intercepting `from` and throwing for **named tables only**. **The asymmetry is the design, not a
+  shortcut.** On the impact routes, `impactOf` reads `personal_records` and `set_estimates` while
+  `getWorkout` / `getEntry` read `workouts` and `exercise_entries` — break everything and the route
+  answers `404` before it ever reaches the ranking, so a `503` assertion passes against a completely
+  different branch. A real database hiccup is partial; the fixture has to be too.
+  - **The `auth`-only variant** doubles `auth.signOut` and leaves `rpc` alone, which
+    `DELETE /api/account` needs: a Proxy that intercepted everything would leave the account alive
+    while the route reported success — the exact confusion the assertion exists to rule out.
+  - **A route that ALWAYS fails satisfies a failure assertion perfectly.** Measured 2026-08-20:
+    with both impact routes mutated to throw unconditionally, the two "answers `impact_unavailable`"
+    assertions stayed green and only the positive controls went red. Pair every failure assertion
+    with one proving the route can still answer.
+- **Reference tests**: `tests/integration/workout-mutations-rls.test.ts`;
+  `tests/integration/silent-failure.test.ts` for the Proxy shapes and for pinning a swallow.
 - **Run locally**: `npm run test:integration`.
 
 ### 6.3 Adding an e2e test
@@ -262,6 +287,17 @@ named against it.
   `process.env` **last**, so it beats `.env`, `.env.<mode>` and a shell variable alike). Recorded here
   so the next reader does not re-derive it.
 - **Assert on both** the response and the persisted row, read back as an entitled caller.
+- **"It answers non-2xx" is NOT the criterion.** Two different failures must stay two different
+  answers: `404 workout_not_found` and `503 impact_unavailable` are both non-2xx and are different
+  facts about the system, so a catch widened to swallow the not-found branch passes a non-2xx test
+  while the route has lost the ability to say anything specific. And for a **redirect-shaped**
+  endpoint, success and failure share one status entirely — the signal is the **destination** and
+  its `?error=` code. See §2's Risk #5 row, rewritten 2026-08-20 for exactly this reason.
+- **A caught error is not automatically a defect.** After a write has already committed, an error
+  invites a retry that duplicates it — so `/api/sets` keeps its `201` when the record verdict fails,
+  and `/api/account` keeps its `{ deleted: true }` when the post-deletion sign-out fails. The rule
+  is: log it and carry on **exactly when the caller's next action cannot be improved by knowing.**
+  Both are pinned in `tests/integration/silent-failure.test.ts`; do not "fix" either into a 500.
 - **Reference test**: `tests/integration/workout-endpoints.test.ts`.
 - **When to add e2e instead**: only when the failure needs the full deployed shape — cookie,
   middleware and handler crossing together.
@@ -275,7 +311,21 @@ named against it.
   perfectly and does nothing passes every check here. That gap is §3 Phase 2's subject.
 - **Do not assert anything runtime-specific here** — the config deliberately omits the Cloudflare
   adapter, so workerd-specific behaviour must be measured in workerd instead.
-- **Reference test**: `tests/render/dashboard-tonnage.test.ts`.
+- **The stub dispatches on table name and THROWS on an unstubbed one.** That throw is a tripwire,
+  not defensiveness: without it a new read gets a chain whose `.eq()` returns a non-thenable, `await`
+  hands it straight back, `error` is `undefined`, and the page sails on — leaving the suite green
+  against a read that never happened. It has now fired twice on purpose: S-08's breakdown read, and
+  a fifth read planted in `exercises.astro` on 2026-08-20 (`unstubbed table: sets`). **Write each
+  table's chain out separately** rather than sharing one permissive shape, so the mirror stays exact.
+- **Use `renderToResponse` when the outcome includes a STATUS**, `renderToString` otherwise.
+  `workouts/[id].astro` is the case: "absent or not yours" is a `404` and a **failed read must not
+  be**, because the database being unreachable is not evidence that a workout does not exist. The
+  HTML alone cannot tell those two apart. `ContainerRenderOptions.params` supplies the `[id]`.
+- **An empty state and a failed state are two different sentences, and both need asserting.** A page
+  that renders "you have nothing" for a failed read is the silent failure risk #5 is about, and it
+  is invisible to every other layer.
+- **Reference tests**: `tests/render/dashboard-tonnage.test.ts`;
+  `tests/render/page-load-failures.test.ts` for the four `loadFailed` branches and the status split.
 - **Run locally**: `npm run test:render`.
 
 ### 6.7 Adding a middleware / cookie test
@@ -285,10 +335,10 @@ named against it.
   Everything between an inbound HTTP request and `locals.user` — `src/middleware.ts`,
   `src/lib/supabase.ts` — executes **zero times** in the rest of the gate, because every integration
   suite hands a handler a hand-built `locals` whose client and user id agree by construction. A
-  middleware binding the *wrong* identity to a request is invisible to all of them.
+  middleware binding the _wrong_ identity to a request is invisible to all of them.
 - **The credential guarantee has two parts and NEITHER is sufficient alone.**
   1. The **subtractive strip** removes production from `process.env` after `loadEnvFile` deliberately
-     pulled it in. Anything that merely *supplies* the right value wins a precedence contest and
+     pulled it in. Anything that merely _supplies_ the right value wins a precedence contest and
      loses silently the day a flag is forgotten.
   2. **`vite.envDir`** pointed at the committed, credential-free `tests/middleware/no-env/`. This
      project loads Astro's Vite pipeline, and `loadEnv` reads `.env*` **from the env directory** as
@@ -309,10 +359,27 @@ named against it.
 - **Mark `t2c-`, per-run accounts, and NO `LIKE` sweeps anywhere in this project** — accounts are
   removed through `delete_own_account()` on the client that owns them.
 - **A signed-out caller is refused at the GRANT layer, not filtered by RLS** (`42501`, `permission
-  denied for table workouts`). Both outcomes are "no data" and they are different guarantees; pin the
+denied for table workouts`). Both outcomes are "no data" and they are different guarantees; pin the
   SQLSTATE so a widened grant does not slip past as a filtered zero.
+- **To inject an AUTH failure, substitute one call on the `locals` the harness already built.** The
+  route is handed a hand-built `locals`, so wrapping `supabase.auth.signOut` is a one-line change
+  with the real route, the real cookie plumbing and the real middleware still under test. Three
+  things make it work rather than merely run:
+  - **Two failure shapes, not one.** `signOut()` resolves `{ error }` for an ordinary auth failure
+    and **re-throws** anything that is not an `AuthError`. A route written as `if (error)` alone
+    handles the first and lets the second escape as a generic HTML 500 — which a form POST cannot
+    show. Drive both, and give the doubling a `"real"` outcome so the success path and the failure
+    paths differ in exactly one argument.
+  - **The doubled `AstroCookies` implements `set()` only** (`_shared/context.ts`), and
+    `applyCookieWrites` decodes a clear as `value: ""` / `maxAge: 0` — which is how `@supabase/ssr`
+    clears one. So production code that clears through `set` needs no harness change, and production
+    code that clears through `delete` reddens the harness rather than the product. **The jar
+    simulation models no `path`**, so a clear written with the wrong path would satisfy every
+    assertion while a real browser kept the cookie: assert the written `options` directly.
+  - **Copy the jar (`new Map(...)`), never mutate `session.jar`** — it is shared by four assertions,
+    and clearing it in place leaves later ones failing for an unrelated reason.
 - **Reference tests**: `tests/middleware/cookie-identity.test.ts`,
-  `tests/middleware/session-lifecycle.test.ts`.
+  `tests/middleware/session-lifecycle.test.ts` (assertions 6 and 7 for the injected auth failure).
 - **Run locally**: `npm run test:middleware`.
 
 ### 6.6 Per-rollout-phase notes
@@ -339,6 +406,49 @@ assertion that proves something by ABSENCE — see §6.3.
 **What did NOT get covered, and is implied to be covered nowhere**: the phone-width half of risk #4.
 "The control is unusable at a phone width" still has no assigned layer, in this phase or any other.
 It stays a named gap in §2.
+
+**Phase 3 — Silent-failure audit (complete, 2026-08-20).** Three things outlived it, and the first
+two were wrong in this document before they were measured.
+
+- **The churn evidence pointed at the best-defended code in the repository.** Risk #5's Source column
+  cited hot spots; the 30-day window concentrates on `dashboard.astro` (11 touches), `tonnage.ts` and
+  `records.astro` — every one of which had its failure branch **built and tested in that same
+  window**. `src/pages/api/auth/signout.ts`, which held the only real defect, had **zero** commits in
+  it. The evidence that raised the risk was real and it did not point where the failure lived, which
+  is §1 principle 3 behaving exactly as designed rather than failing.
+- **The original response criterion would have scored the defect as PASSING.** "A failed operation
+  answers non-2xx and the persisted state confirms nothing was written" has no subject on a
+  redirect-shaped endpoint: `/api/auth/signout` answered `302` whether it worked or not, and signing
+  out writes no row at all. Both clauses were rewritten (§2, and §6.4's "non-2xx is not the
+  criterion").
+- **41 of 43 catch sites were already correct**, so the audit's value was one route plus the pinning
+  of classes that were right and unwitnessed. The repository's error handling was not weak; the
+  _policy_ was enforced by comments and reviewer attention, and the one place predating the policy
+  was never revisited.
+
+**What Phase 3 deliberately did NOT close**, stated so a green gate is not read as covering it:
+
+- **The two class-E fallbacks**, which degrade silently by design and are compensated on `/settings`
+  only: `todayIn` answering in UTC for an unknown zone (`calendar.ts:26-35`), and
+  `Intl.supportedValuesOf("timeZone")` degrading from 418 entries to a 12-entry hardcoded list
+  (`timezones.ts:50-63`). Both are week-boundary-shaped and are **assigned to Phase 4**. Note the
+  **category** rather than a count: this document said "three swallows are deliberate" and there are
+  five, which is the same failure mode as `lessons.md` § "The conversion constant has been miscounted
+  twice, in the same direction".
+- **`records.astro`'s null-profile asymmetry.** It reads `profile?.weight_unit ?? "kg"` and prints
+  headline figures under a defaulted unit, where `dashboard.astro` and `settings.astro` treat the
+  identical input as a failed read. Assertion 4 of `tests/render/page-load-failures.test.ts` pins
+  **today's behaviour and says plainly that it is not an endorsement**: no path produces a null
+  profile (trigger-created row, no delete path), so a change there could not be proven. The edit that
+  makes it bite is **any change to the `profiles` SELECT policy**.
+- **A failed sign-out ends the session on this device only.** The refresh token survives at the
+  provider, the message says "on this device" rather than claiming a global sign-out, and nothing
+  here asserts anything stronger — matching the precision `session-lifecycle.test.ts` already states
+  about what `signOut` can and cannot do.
+- **The `if (signOut.error)` guard in `/api/account` is diagnostic-only, and deleting it breaks
+  nothing.** Measured 2026-08-20: all ten assertions stayed green. The assertion beside it pins the
+  **swallow**, not the log. Named rather than covered by an assertion that would only look like
+  coverage; the edit that would make it load-bearing is a caller learning to act on that log.
 
 ## 7. What We Deliberately Don't Test
 

@@ -31,7 +31,7 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { APIContext } from "astro";
+import type { APIContext, AstroCookies } from "astro";
 
 import type { Database } from "@/db/database.types";
 import { listWorkouts } from "@/lib/services/workouts";
@@ -156,17 +156,120 @@ async function readWorkoutNotes(locals: App.Locals, userId: string): Promise<Rea
   }
 }
 
-/** The slice of `APIContext` `POST /api/auth/signout` reads: the derived locals, and a redirect. */
-function signoutContext(locals: App.Locals, redirectedTo: string[]): APIContext {
+/**
+ * The slice of `APIContext` `POST /api/auth/signout` reads: the derived locals, a request whose
+ * `Cookie` header names what is there to clear, somewhere to write the clears, and a redirect.
+ *
+ * **`cookies` must be the HARNESS's own recording double, not a fresh one.** A second double would
+ * collect writes nothing else can see, and every assertion below reads them back through
+ * `harness.cookiesWritten` — so the test would report a jar cleared while the real response carried
+ * no `Set-Cookie` at all. `request` carries the live `Cookie` header for the same reason the route
+ * needs it: `clearSessionCookies` clears the names that are actually present rather than guessing
+ * how many chunks the payload was split into.
+ */
+function signoutContext(
+  locals: App.Locals,
+  redirectedTo: string[],
+  jar: { cookies: AstroCookies; cookieHeader: string },
+): APIContext {
   return {
     locals,
     params: {},
-    request: new Request("http://localhost/api/auth/signout", { method: "POST" }),
+    cookies: jar.cookies,
+    request: new Request("http://localhost/api/auth/signout", {
+      method: "POST",
+      headers: { cookie: jar.cookieHeader },
+    }),
     redirect(path: string) {
       redirectedTo.push(path);
       return new Response(null, { status: 302, headers: { Location: path } });
     },
   } as unknown as APIContext;
+}
+
+/**
+ * What `supabase.auth.signOut()` is made to do.
+ *
+ * `"real"` doubles nothing and is what assertion 2 uses — so the success path and the two failure
+ * paths below differ in **exactly one value**, and a comparison between them is a comparison of the
+ * route rather than of two differently-built harnesses.
+ */
+type SignOutOutcome = "real" | { error: { message: string } | null } | "throw";
+
+/**
+ * The same `locals` the middleware derived, with `auth.signOut` — and nothing else — replaced.
+ *
+ * **Everything that decides the outcome stays real**: the client still closes over the harness's
+ * `AstroCookies`, `clearSessionCookies` still reads the real request header, and the route is the
+ * real route. What is doubled is one library call, because the failure under test is one this
+ * project cannot provoke from outside — GoTrue answering `500` is not something a test may arrange.
+ *
+ * **Two outcomes, because the library has two.** `signOut()` resolves `{ error }` for an ordinary
+ * auth failure and **re-throws** anything that is not an `AuthError` — the behaviour
+ * `src/pages/api/account/index.ts:58-62` had to handle explicitly in its own copy of this call. A
+ * route written as `if (error)` alone handles the first and lets the second escape as a generic
+ * HTML 500, which the sign-out form cannot show.
+ */
+function withSignOutOutcome(locals: App.Locals, outcome: SignOutOutcome): App.Locals {
+  const real = locals.supabase;
+  if (!real) {
+    throw new Error("locals.supabase is null — credentials are absent, which is a different failure");
+  }
+  // Nothing doubled at all: assertion 2's path, kept in this function so every caller below shares
+  // one code path and differs only in this argument.
+  if (outcome === "real") {
+    return locals;
+  }
+
+  const supabase = new Proxy(real, {
+    get(target, prop, receiver) {
+      if (prop !== "auth") {
+        return Reflect.get(target, prop, receiver) as unknown;
+      }
+      return new Proxy(target.auth, {
+        get(auth, authProp, authReceiver) {
+          if (authProp !== "signOut") {
+            return Reflect.get(auth, authProp, authReceiver) as unknown;
+          }
+          return () =>
+            outcome === "throw"
+              ? Promise.reject(new TypeError("simulated non-AuthError failure inside signOut"))
+              : Promise.resolve(outcome);
+        },
+      });
+    },
+  });
+
+  return { ...locals, supabase };
+}
+
+/**
+ * Drive the real sign-out route with a chosen `signOut` outcome, then replay what it wrote onto a
+ * COPY of the live jar and ask what that jar can still reach.
+ *
+ * **The copy is not a detail.** `account.session.jar` is shared by assertions 1, 3, 4 and 5;
+ * clearing it in place would leave three later assertions failing for a reason unrelated to the
+ * code. And the writes are replayed ON TOP OF the live jar rather than alone — with the writes
+ * alone, a route that cleared nothing produces an empty header, the next request has no session,
+ * and the assertion passes for exactly the wrong reason (`_shared/session.ts` § applyCookieWrites).
+ */
+async function signOutWith(subject: Account, outcome: SignOutOutcome) {
+  const before = await derive("http://localhost/api/auth/signout", subject.session.cookieHeader);
+  expect(before.harness.context.locals.user?.id).toBe(subject.userId);
+
+  const redirectedTo: string[] = [];
+  const response = await signoutRoute(
+    signoutContext(withSignOutOutcome(before.harness.context.locals, outcome), redirectedTo, {
+      cookies: before.harness.context.cookies,
+      cookieHeader: subject.session.cookieHeader,
+    }),
+  );
+
+  const cleared: WrittenCookie[] = before.harness.cookiesWritten;
+  const surviving = applyCookieWrites(new Map(subject.session.jar), cleared);
+  const after = await derive("http://localhost/workouts", cookieHeaderFrom(surviving));
+
+  return { response, redirectedTo, cleared, after };
 }
 
 beforeAll(async () => {
@@ -227,22 +330,12 @@ describe("the three cookie states", () => {
   it("2. after signing out, the surviving jar is redirected AND obtains no training", async () => {
     // `/api/auth/signout` is in neither route array, so the middleware derives and hands on. The
     // client it builds closes over the harness's recording `AstroCookies`, which is how the
-    // `setAll` the route triggers is observable at all.
-    const before = await derive("http://localhost/api/auth/signout", signedOut.session.cookieHeader);
-    expect(before.harness.context.locals.user?.id).toBe(signedOut.userId);
-
-    const redirectedTo: string[] = [];
-    const response = await signoutRoute(signoutContext(before.harness.context.locals, redirectedTo));
+    // `setAll` the route triggers is observable at all. `"real"` doubles nothing — this assertion
+    // drives the genuine library call, and assertions 6 and 7 reuse this exact path with only that
+    // argument changed.
+    const { response, redirectedTo, cleared, after } = await signOutWith(signedOut, "real");
     expect(response.status).toBe(302);
     expect(redirectedTo).toEqual(["/auth/signin"]);
-
-    const cleared: WrittenCookie[] = before.harness.cookiesWritten;
-
-    // **On top of the live jar, never the writes alone.** Replaying only what `setAll` wrote would
-    // send an empty header, which a `signOut()` that never ran would also produce — the assertion
-    // would then pass for the wrong reason (`_shared/session.ts` § applyCookieWrites).
-    const surviving = applyCookieWrites(new Map(signedOut.session.jar), cleared);
-    const after = await derive("http://localhost/workouts", cookieHeaderFrom(surviving));
 
     // **THE CLAIM, AND FIRST BECAUSE IT IS THE CLAIM.** The redirect is what a screen shows; this
     // is whether the training was still reachable. Same read, same user id, same service — only the
@@ -288,6 +381,96 @@ describe("the three cookie states", () => {
     // "Redirected" and "rendered, then redirected" are different facts about the system, and only
     // this tells them apart: a page that ran and was then thrown away has already read the data.
     expect(anonymous.harness.reachedNext).toEqual([]);
+  });
+});
+
+// A SIGN-OUT THE PROVIDER REFUSES — the one operation in `src/` that used to report success without
+// looking (`signout.ts:8`, `await supabase.auth.signOut()` with the result discarded).
+//
+// **Why the discard mattered.** `@supabase/auth-js`'s `_signOut` has two early returns ahead of
+// `_removeSession()` — one for a session error, one for any `admin.signOut()` failure that is not
+// 404/401/403 — and `_removeSession()` is the ONLY thing that drives the `setAll` in
+// `src/lib/supabase.ts:20-24`. On either early return the cookie survives. The route redirected to
+// `/auth/signin` regardless, `middleware.ts:38-40` saw a live `locals.user` on an `AUTH_ROUTE`, and
+// the user landed back on `/dashboard` — a UI glitch in appearance, an unended session on a shared
+// machine in fact.
+//
+// **Retrying with `{ scope: "local" }` would not have helped**: `admin.signOut(accessToken, scope)`
+// is called BEFORE the `scope !== 'others'` branch, so it makes the same network call and dies at
+// the same early return. Read from the installed library on 2026-08-20, not inferred.
+//
+// **These two assertions are the whole reason this seam has a test at all**, and neither could be
+// written anywhere else: an integration suite hands a handler a hand-built `locals` whose client and
+// user id agree by construction, so it cannot ask what a surviving cookie still reaches.
+describe("a sign-out the provider refuses", () => {
+  it("6. { error } still ends the session on this device, and the destination says so", async () => {
+    const failed = await signOutWith(account, { error: { message: "simulated GoTrue 500" } });
+
+    // **THE CLAIM, AND FIRST BECAUSE IT IS THE CLAIM** (`lessons.md` § "The assertion carrying the
+    // claim goes FIRST"). US-04's third criterion is about DATA — returning must require
+    // authenticating again — so the load-bearing line is the read, not the redirect. Written in
+    // narrative order, a route that cleared nothing would redden on the cookie name or on
+    // `locals.user` first and leave this read unexecuted, which is how assertion 2 was measured.
+    const gone = await readWorkoutNotes(failed.after.harness.context.locals, account.userId);
+    expect(gone.notes).not.toContain(account.note);
+    expect(gone.notes).toEqual([]);
+    // Refused at the GRANT layer, one step before RLS would have filtered — the same distinction
+    // assertion 2 pins, and for the same reason: "came back empty" and "was refused" are two
+    // different guarantees.
+    expect(gone.refusal?.code).toBe("42501");
+
+    // **No session survives, so `AUTH_ROUTES` has nothing to bounce.** This is what makes the
+    // message reachable at all: with the cookie left live, `middleware.ts:38-40` would redirect the
+    // next request to `/dashboard` and the sentence would never be seen by anybody.
+    expect(failed.after.harness.context.locals.user).toBeNull();
+
+    // **The DESTINATION is the signal, because the status is not.** A redirect-shaped endpoint
+    // answers `302` whether it worked or not, which is exactly why "a failed operation answers
+    // non-2xx" would have scored this defect as passing (`test-plan.md` §2, corrected 2026-08-20).
+    expect(failed.response.status).toBe(302);
+    expect(failed.redirectedTo).toEqual(["/auth/signin?error=sign_out_failed"]);
+
+    // **POSITIVE CONTROL, in the same test.** Without it, an implementation that appends the code
+    // unconditionally satisfies every line above. It asserts the destination ALONE on purpose: the
+    // doubled success never reaches `_removeSession`, so it clears nothing — proving the clearing
+    // is assertion 2's job, with the real library call.
+    const succeeded = await signOutWith(account, { error: null });
+    expect(succeeded.redirectedTo).toEqual(["/auth/signin"]);
+
+    // **The one thing the jar simulation cannot see, asserted directly.** `applyCookieWrites` drops
+    // a cookie on `value === ""` OR `maxAge === 0` and models no `path` at all — so a clear written
+    // with the wrong path would satisfy every assertion above while a real browser kept the cookie.
+    // `@supabase/ssr` removes with `{ ...DEFAULT_COOKIE_OPTIONS, maxAge: 0 }`, and
+    // `DEFAULT_COOKIE_OPTIONS.path` is `"/"` (read from
+    // `node_modules/@supabase/ssr/dist/main/utils/constants.js`, 2026-08-20).
+    const clear = failed.cleared.find(({ name }) => name === account.session.storageKey);
+    expect(clear).toBeDefined();
+    expect(clear?.value).toBe("");
+    expect(clear?.options).toMatchObject({ path: "/", maxAge: 0 });
+  });
+
+  it("7. a signOut that THROWS is treated identically, not left to escape as a 500", async () => {
+    // **Two failure shapes, because the library has two.** `signOut()` resolves `{ error }` for an
+    // ordinary auth failure and re-throws anything that is not an `AuthError` — stated at
+    // `src/pages/api/account/index.ts:58-62`, where the same call is handled correctly. A route
+    // written as `if (error)` alone passes assertion 6 and lets this one escape: Astro answers a
+    // generic HTML 500 for a form POST, so the user sees a browser error page instead of a sign-in
+    // screen, and the cookie is never cleared.
+    const failed = await signOutWith(account, "throw");
+
+    // Same claim, same order, same reason as assertion 6.
+    const gone = await readWorkoutNotes(failed.after.harness.context.locals, account.userId);
+    expect(gone.notes).not.toContain(account.note);
+    expect(gone.notes).toEqual([]);
+    expect(gone.refusal?.code).toBe("42501");
+
+    expect(failed.after.harness.context.locals.user).toBeNull();
+    expect(failed.response.status).toBe(302);
+    expect(failed.redirectedTo).toEqual(["/auth/signin?error=sign_out_failed"]);
+
+    // Shares assertion 6's `{ error: null }` control by construction — both shapes reach the same
+    // branch, so one demonstration that the code is not appended unconditionally covers both.
+    expect(failed.cleared.map(({ name }) => name)).toContain(account.session.storageKey);
   });
 });
 

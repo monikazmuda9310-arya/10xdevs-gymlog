@@ -64,6 +64,13 @@ export const AUTH_MESSAGES = {
   // Provider outcomes, deliberately uninformative about whether an address has an account.
   sign_in_failed: "Invalid email or password",
   sign_up_failed: "We could not create that account. Check your details and try again.",
+  // **Deliberately partial, because the truth is partial.** When the provider refuses a sign-out the
+  // route clears this browser's session anyway, so the device IS signed out — but the refresh token
+  // survives at the provider and nothing here can recall it. A sentence claiming "you have been
+  // signed out" would overstate it; one claiming the sign-out failed would understate it and send
+  // the user looking for a session that is, locally, already gone.
+  sign_out_failed:
+    "We signed you out on this device, but could not end the session everywhere. Sign in again to retry.",
   rate_limited: "Too many attempts. Wait a moment and try again.",
   unexpected: "Something went wrong. Please try again.",
   not_configured: "Supabase is not configured",
