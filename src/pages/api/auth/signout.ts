@@ -44,9 +44,15 @@ export const POST: APIRoute = async (context) => {
   if (failure) {
     // The session did not end at the provider, so end it here. Anything less would report a
     // sign-out that did not happen.
-    clearSessionCookies(context.request.headers, context.cookies);
+    // **The result is read, not discarded** — which is the whole subject of this route. It answers
+    // `[]` when credentials are absent AND when the request carried no matching cookie, so a log
+    // asserting "cleared" without checking would be a claim the code never made.
+    const cleared = clearSessionCookies(context.request.headers, context.cookies);
     // eslint-disable-next-line no-console -- deliberate server-side diagnostic; nothing reaches the caller
-    console.error("[auth/signout] the provider refused; cleared this device's session instead", { error: failure });
+    console.error("[auth/signout] the provider refused; ended this device's session instead", {
+      cleared,
+      error: failure,
+    });
     // A message CODE, never prose: the page resolves it against AUTH_MESSAGES. Passing text through
     // the query string turns this page into a phishing kit (AGENTS.md § Architecture).
     return context.redirect(`${SIGN_IN_PAGE}?error=sign_out_failed`);

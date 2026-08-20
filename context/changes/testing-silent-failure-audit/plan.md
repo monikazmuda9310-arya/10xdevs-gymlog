@@ -188,7 +188,14 @@ identity a real cookie produces.
 
 #### 1. A catalogue entry for the outcome
 
-**File**: `src/lib/validation/auth.ts`
+**Files**: `src/lib/validation/auth.ts`, `src/lib/validation/auth.test.ts`
+
+> **`auth.test.ts` was added here on 2026-08-20 during implementation review.** Criterion 1.4
+> demands a unit test and this block named only the module under test, which is
+> `lessons.md` § "A criterion that demands a unit test must name the module that will hold it" —
+> a rule this repository recorded after S-03 and broke again here. Nothing went wrong, because the
+> catalogue's test file already existed and the location was obvious; that is the failure mode, not
+> an excuse for it.
 
 **Intent**: Add `sign_out_failed` to `AUTH_MESSAGES` so the redirect can carry a code that resolves
 to this project's own words. Without an entry, `messageForCode` falls through to the generic
@@ -498,8 +505,14 @@ leaked account is unrecoverable without the dashboard; the `finally` is the reco
 - `npm run test:integration` passes
 - The `/api/sets` assertion is red when the verdict `catch` is mutated to `return fail(500, "unexpected")`
 - Its positive control is red when the verdict is mutated to always return `null`
-- The `/api/account` assertions are red when the `try`/`catch` and the `if (signOut.error)` guard
-  are each removed in turn
+- The `/api/account` assertions are red when the `try`/`catch` lets the throw escape, and when the
+  `if (signOut.error)` guard is mutated to `return fail(500, …)` — **corrected 2026-08-20 during
+  implementation review.** As originally written this criterion said the guard being _removed_
+  would redden something; measurement showed it does not. Deleting it leaves all ten assertions
+  green, because `if (signOut.error) { console.error(…) }` is diagnostic-only and changes no
+  response. The assertion pins the **swallow**, not the log; the untested half is named in
+  `test-plan.md` §6.6 rather than covered by an assertion that would only look like coverage
+  (`lessons.md` § "When a mutation does not break anything, fix the claim — never the test")
 - Running the suite twice in a row passes both times, and leaves no `t3s-` account behind
 - `npm run lint` and `npm run typecheck` pass
 
@@ -846,7 +859,7 @@ No migration. No schema change, no new column, no new policy. `npm run db:push` 
 - [x] 3.1 `npm run test:integration` passes — 626e9e0
 - [x] 3.2 The `/api/sets` assertion is red when the verdict catch is mutated to a 500 — 626e9e0
 - [x] 3.3 Its positive control is red when the verdict is mutated to always return null — 626e9e0
-- [x] 3.4 The `/api/account` assertions are red with the `try`/`catch` and the `if` guard removed in turn — 626e9e0
+- [x] 3.4 The `/api/account` assertions are red when the `try`/`catch` lets the throw escape and when the `if` guard returns a 500 (corrected 2026-08-20: REMOVING the guard breaks nothing) — 626e9e0
 - [x] 3.5 The suite passes twice in a row and leaves no `t3s-` account behind — 626e9e0
 - [x] 3.6 `npm run lint` and `npm run typecheck` pass — 626e9e0
 

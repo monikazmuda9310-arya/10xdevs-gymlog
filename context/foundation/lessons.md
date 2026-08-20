@@ -95,6 +95,15 @@
   that will export X.** If no module can be named, X is not unit-testable as designed and the
   criterion describes a test that cannot be written. Prose describing a rule is not a location
   for it.
+- **It recurred on 2026-08-20**, in this repository, in a plan written by the same workflow that
+  records these lessons — the **`testing-silent-failure-audit`** change folder's Phase 1. Criterion
+  1.4 demanded that `messageForCode("sign_out_failed")` resolve to the new sentence and § Testing
+  Strategy repeated it, while Changes Required named only `src/lib/validation/auth.ts`. The test
+  landed in `auth.test.ts` because that location was obvious for a catalogue whose test file already
+  existed — which is exactly why the rule keeps being broken: **the failure is silent when the module
+  is easy to guess, and only bites when it is not.** S-03's instance needed a module invented
+  mid-phase and so produced friction somebody noticed; this one produced none. Treat "the location is
+  obvious" as the reason to write it down, not as a reason to skip it.
 - **Applies to**: every `/10x-plan` phase whose Success Criteria mention unit tests — especially
   rules that read as belonging to a UI component, because components are where untestable logic
   accumulates.
