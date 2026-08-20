@@ -29,12 +29,16 @@
 // and removes them in `beforeAll`, and must never call `delete_own_account()` on it.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { APIContext } from "astro";
 
 import type { Database } from "@/db/database.types";
+import { DELETE as deleteAccountRoute } from "@/pages/api/account/index";
 import { GET as entryImpactRoute } from "@/pages/api/exercise-entries/[id]/impact";
+import { POST as addSetRoute } from "@/pages/api/sets/index";
 import { GET as workoutImpactRoute } from "@/pages/api/workouts/[id]/impact";
+
+import { resetPreferences } from "./fixture-preferences";
 
 const EMAIL_A = "rls-owner-a@gymlog-test.dev";
 
@@ -48,6 +52,13 @@ interface Owner {
 }
 
 let ownerA: Owner;
+
+let url: string;
+let key: string;
+let password: string;
+
+/** Per-run accounts the deletion assertions own and destroy. Swept in `afterAll`. */
+const throwaways: { client: SupabaseClient<Database>; userId: string; email: string }[] = [];
 
 function required(name: string): string {
   const value = process.env[name];
@@ -78,6 +89,87 @@ function context(owner: Owner, id: string, client?: SupabaseClient<Database>): A
     params: { id },
     request: new Request(`http://localhost/api/x/${id}/impact`, { method: "GET" }),
   } as unknown as APIContext;
+}
+
+/** The slice `POST /api/sets` reads: a client, a user id, and a JSON body. */
+function jsonContext(owner: Owner, body: unknown, client?: SupabaseClient<Database>): APIContext {
+  return {
+    locals: { supabase: client ?? owner.client, user: { id: owner.userId } },
+    params: {},
+    request: new Request("http://localhost/api/sets", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  } as unknown as APIContext;
+}
+
+/** `DELETE /api/account` takes no route parameter and no body — the account is named by auth.uid(). */
+function accountContext(userId: string, client: SupabaseClient<Database>): APIContext {
+  return {
+    locals: { supabase: client, user: { id: userId } },
+    params: {},
+    request: new Request("http://localhost/api/account", { method: "DELETE" }),
+  } as unknown as APIContext;
+}
+
+/**
+ * A brand-new account for this run alone.
+ *
+ * **Never a shared fixture**, because the assertions below DELETE their subject. Reusing
+ * `rls-owner-a/b` or an `s09i-` address would remove a permanent fixture and surface as an unrelated
+ * suite failing on a later run.
+ */
+async function throwawayAccount(label: string) {
+  const email = `${MARK}${label}-${RUN_ID}@gymlog-test.dev`;
+  const client = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  const { data, error } = await client.auth.signUp({ email, password });
+  if (error) {
+    throw new Error(`could not create ${email}: ${error.message}`);
+  }
+  if (!data.session) {
+    throw new Error(
+      `${email} was created without a session. Email confirmation has been switched on for ` +
+        `gymlog-test, which breaks every suite that bootstraps an account without an inbox.`,
+    );
+  }
+
+  const account = { client, userId: data.session.user.id, email };
+  throwaways.push(account);
+  return account;
+}
+
+/** What `auth.signOut()` is made to do, mirroring the two shapes the library actually produces. */
+type SignOutOutcome = { error: { message: string } } | "throw";
+
+/**
+ * A client whose `auth.signOut` fails and whose `rpc` still works.
+ *
+ * **`rpc` must pass through or the assertion measures the Proxy rather than the endpoint** —
+ * `deleteOwnAccount` calls `supabase.rpc("delete_own_account")`, and a Proxy that intercepted
+ * everything would leave the account alive while the route reported success, which is the very
+ * confusion these assertions exist to rule out.
+ */
+function withFailingSignOut(client: SupabaseClient<Database>, outcome: SignOutOutcome): SupabaseClient<Database> {
+  return new Proxy(client, {
+    get(target, prop, receiver) {
+      if (prop !== "auth") {
+        return Reflect.get(target, prop, receiver) as unknown;
+      }
+      return new Proxy(target.auth, {
+        get(auth, authProp, authReceiver) {
+          if (authProp !== "signOut") {
+            return Reflect.get(auth, authProp, authReceiver) as unknown;
+          }
+          return () =>
+            outcome === "throw"
+              ? Promise.reject(new TypeError("simulated non-AuthError failure inside signOut"))
+              : Promise.resolve(outcome);
+        },
+      });
+    },
+  });
 }
 
 interface Logged {
@@ -182,18 +274,45 @@ async function report(what: string, response: Response): Promise<ImpactBody> {
 }
 
 beforeAll(async () => {
-  const url = required("SUPABASE_TEST_URL");
-  const key = required("SUPABASE_TEST_KEY");
-  const password = required("GYMLOG_TEST_PASSWORD");
+  url = required("SUPABASE_TEST_URL");
+  key = required("SUPABASE_TEST_KEY");
+  password = required("GYMLOG_TEST_PASSWORD");
 
   ownerA = await authenticate(url, key, EMAIL_A, password);
 
+  // **This suite DEPENDS on `weight_unit`, so it establishes it rather than trusting whoever last
+  // changed it.** `logExercise` inserts its sets with `weight_unit: "kg"` directly, while
+  // `POST /api/sets` stamps the unit from the profile — so with the profile left on `lb`, the
+  // 130 logged through the endpoint would be 58.97 kg against a stored 100 kg, would beat nothing,
+  // and assertion 8's record announcement would vanish for a reason that has nothing to do with the
+  // swallow it is controlling for. Teardown protects the happy path; only setup protects the next
+  // run (`lessons.md` § "A `finally` that restores shared state does not survive a killed process").
+  await resetPreferences(ownerA.client, ownerA.userId);
+
   // Workouts first: the cascade releases the `on delete restrict` on the exercises. The reverse
-  // order fails. Reset in `beforeAll` rather than trusting a previous run's teardown — a killed
-  // process skips a `finally` (`lessons.md` § "A `finally` that restores shared state does not
-  // survive a killed process").
+  // order fails.
   await ownerA.client.from("workouts").delete().like("note", `${MARK}%`).eq("user_id", ownerA.userId);
   await ownerA.client.from("exercises").delete().like("name", `${MARK}%`).eq("user_id", ownerA.userId);
+});
+
+afterAll(async () => {
+  // **A sweep that tolerates an account already gone.** These accounts are the SUBJECT of the
+  // deletion assertions, so on a green run every one of them is already removed and signing in
+  // fails — that is success, not an error. What this catches is the other case: an assertion that
+  // failed BEFORE reaching the deletion, leaving a live per-run account behind. This project has no
+  // `LIKE` sweep over accounts, deliberately, so a leak is invisible until somebody counts
+  // addresses in the dashboard months later.
+  for (const subject of throwaways) {
+    const probe = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data } = await probe.auth.signInWithPassword({ email: subject.email, password });
+    if (!data.session) {
+      continue;
+    }
+    const { error } = await probe.rpc("delete_own_account");
+    if (error) {
+      throw new Error(`could not remove leaked account ${subject.email}: ${error.code} ${error.message}`);
+    }
+  }
 });
 
 describe("a failed impact read is never reported as an empty one — /api/workouts/[id]/impact", () => {
@@ -276,5 +395,153 @@ describe("a failed impact read is never reported as an empty one — /api/exerci
     expect(response.status).toBe(404);
     expect(body.code).toBe("entry_not_found");
     expect(body.code).not.toBe("impact_unavailable");
+  });
+});
+
+// THE TWO DELIBERATE SWALLOWS — and this describe runs in the OPPOSITE direction to everything
+// above it.
+//
+// Class B of the catch inventory (`research.md` § The catch inventory): two sites where a caught
+// error correctly does **not** become a non-2xx, because the write has already committed. Both carry
+// their reasoning inline and **nothing enforced either** until now — so "do not reverse a deliberate
+// swallow" was an instruction in a comment, which is exactly the kind of rule this project has
+// learned to make executable.
+//
+// **The decision rule, stated once**: log it and carry on is defensible exactly when the caller's
+// next action cannot be improved by knowing. After a committed write it cannot — an error there
+// invites a retry that duplicates the write, or contradicts a deletion that already happened.
+
+describe("a failure AFTER a committed write must not turn the write into an error — POST /api/sets", () => {
+  it("7. still answers 201 with the set persisted when the record verdict cannot be computed", async () => {
+    // `sets/index.ts:74-90` gives the verdict its OWN try/catch, inside the handler's. The set is
+    // already in the database when it runs, so a failed verdict costs the badge and nothing else.
+    // Reversing it into a 500 would invite the retry `AddSetForm` deliberately makes easy — and a
+    // retry after a successful write logs the same set twice, inflating tonnage and inventing a
+    // record nobody performed. A missing badge is recoverable by reloading; a duplicated set is not.
+    const a = await logExercise(ownerA, "verdict-fails", [{ reps: 5, weight: 100 }]);
+
+    const response = await addSetRoute(
+      jsonContext(ownerA, { exerciseEntryId: a.entryId, reps: 5, weight: 130, rpe: null }, withBrokenRankings(ownerA)),
+    );
+    const body = (await response.clone().json()) as { set?: { id: string }; record?: unknown };
+    console.info(
+      `  set logged with the verdict read broken\n           -> HTTP ${response.status} record=${JSON.stringify(body.record)}`,
+    );
+
+    expect(response.status).toBe(201);
+    expect(body.record).toBeNull();
+
+    // **THE CLAIM: the write landed.** A 201 is a statement about a response, not about stored
+    // state, and the failure worth catching here is the reverse of the usual one — a caller told
+    // "saved" while nothing was saved. Read back as the owner.
+    const { data: stored } = await ownerA.client
+      .from("sets")
+      .select("id, reps, weight")
+      .eq("user_id", ownerA.userId)
+      .eq("id", body.set?.id ?? "")
+      .maybeSingle();
+    expect(stored).not.toBeNull();
+    expect(stored?.reps).toBe(5);
+    expect(Number(stored?.weight)).toBe(130);
+  });
+
+  it("8. and still announces a record when the verdict CAN be computed", async () => {
+    // **The positive control.** `record: null` in assertion 7 is satisfied perfectly by an endpoint
+    // that has stopped announcing records at all — and such an endpoint would pass assertion 7 while
+    // having lost the feature FR-020 exists for. Only a non-null announcement separates "the
+    // swallow worked" from "the badge is gone everywhere".
+    //
+    // Both sets sit at 5 repetitions — inside the 1–12 range at positive load — so the verdict is
+    // decided by weight rather than by falling outside the range, which would make this vacuous for
+    // a domain reason rather than a failure reason.
+    const a = await logExercise(ownerA, "verdict-works", [{ reps: 5, weight: 100 }]);
+
+    const response = await addSetRoute(
+      jsonContext(ownerA, { exerciseEntryId: a.entryId, reps: 5, weight: 130, rpe: null }),
+    );
+    const body = (await response.clone().json()) as { record?: { previousBest?: unknown } | null };
+    console.info(
+      `  set logged with everything healthy\n           -> HTTP ${response.status} record=${JSON.stringify(body.record)}`,
+    );
+
+    expect(response.status).toBe(201);
+    expect(body.record).not.toBeNull();
+    expect(body.record?.previousBest).toBeDefined();
+  });
+});
+
+describe("a failure AFTER a committed write must not turn the write into an error — DELETE /api/account", () => {
+  it("9. still answers { deleted: true } when signOut RESOLVES an error, and the account is gone", async () => {
+    const subject = await throwawayAccount("delete-signout-error");
+
+    // **POSITIVE CONTROL FIRST, because the claim below is an ABSENCE.** "Signing in fails
+    // afterwards" is satisfied perfectly by an account that never existed — a typo in the address
+    // produces exactly that observation. This is the proof it was there to be removed.
+    const before = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const live = await before.auth.signInWithPassword({ email: subject.email, password });
+    expect(live.data.session).not.toBeNull();
+
+    const response = await deleteAccountRoute(
+      accountContext(
+        subject.userId,
+        withFailingSignOut(subject.client, { error: { message: "simulated GoTrue 500" } }),
+      ),
+    );
+    const body = (await response.clone().json()) as { deleted?: boolean; code?: string };
+    console.info(
+      `  account deleted, signOut resolved an error\n           -> HTTP ${response.status} ${JSON.stringify(body)}`,
+    );
+
+    // The deletion genuinely happened, so saying so is the truth. `account/index.ts:65-70` logs the
+    // orphaned cookie and reports success deliberately: telling the caller the deletion failed —
+    // about an account that no longer exists — is "the one lie this endpoint must never tell".
+    //
+    // **WHAT THIS ASSERTION DOES AND DOES NOT PIN, measured 2026-08-20 rather than assumed.**
+    // Turning the guard into `return fail(500, "unexpected")` — the reversal this test exists to
+    // forbid — reddens the line below with `expected 500 to be 200`. But **deleting the guard
+    // outright breaks nothing**: all ten assertions still pass, because
+    // `if (signOut.error) { console.error(...) }` is diagnostic-only and changes no response. So
+    // this assertion pins the SWALLOW, not the log. Said plainly rather than left implied, in the
+    // words this project uses to refuse an assertion (`lessons.md` § "When a mutation does not break
+    // anything, fix the claim — never the test"): nothing writable from this suite would notice the
+    // `console.error` being removed, and the edit that would make it load-bearing is a caller
+    // learning to act on that log — an alert, a metric, a retry — at which point its absence becomes
+    // observable somewhere other than a response body. Keep the log; do not write an assertion that
+    // merely appears to cover it.
+    expect(response.status).toBe(200);
+    expect(body.deleted).toBe(true);
+
+    // **THE CLAIM, proven from outside.** Nothing here can read `auth.users`; a fresh client
+    // attempting the same credentials is the only evidence available.
+    const after = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const gone = await after.auth.signInWithPassword({ email: subject.email, password });
+    expect(gone.data.session).toBeNull();
+  });
+
+  it("10. and the same when signOut THROWS, which is a different branch of the same handler", async () => {
+    // **Two shapes, two branches, and only one is reachable per test.** `signOut()` resolves
+    // `{ error }` for an ordinary auth failure and re-throws anything that is not an `AuthError`;
+    // `account/index.ts` handles the first at `:65` and the second at `:71`. Removing the `try`
+    // lets the throw escape after the deletion has committed — Astro answers a generic HTML 500,
+    // `DeleteAccountPanel`'s `response.json()` fails, and the user is told the deletion did not
+    // happen. Assertion 9 cannot see that; this one can.
+    const subject = await throwawayAccount("delete-signout-throws");
+
+    const before = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const live = await before.auth.signInWithPassword({ email: subject.email, password });
+    expect(live.data.session).not.toBeNull();
+
+    const response = await deleteAccountRoute(
+      accountContext(subject.userId, withFailingSignOut(subject.client, "throw")),
+    );
+    const body = (await response.clone().json()) as { deleted?: boolean; code?: string };
+    console.info(`  account deleted, signOut threw\n           -> HTTP ${response.status} ${JSON.stringify(body)}`);
+
+    expect(response.status).toBe(200);
+    expect(body.deleted).toBe(true);
+
+    const after = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const gone = await after.auth.signInWithPassword({ email: subject.email, password });
+    expect(gone.data.session).toBeNull();
   });
 });

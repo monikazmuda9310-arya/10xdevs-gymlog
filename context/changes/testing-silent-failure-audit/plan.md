@@ -829,30 +829,30 @@ No migration. No schema change, no new column, no new policy. `npm run db:push` 
 
 #### Automated
 
-- [x] 2.1 `npm run test:integration` passes, including the new suite
-- [x] 2.2 Each failure assertion is red when its route's catch is mutated to `ok({ impact: [] })`
-- [x] 2.3 Each positive control is red when its route is mutated to always throw
-- [x] 2.4 The suite passes twice in a row
-- [x] 2.5 `npm run lint` and `npm run typecheck` pass
+- [x] 2.1 `npm run test:integration` passes, including the new suite — d767cf5
+- [x] 2.2 Each failure assertion is red when its route's catch is mutated to `ok({ impact: [] })` — d767cf5
+- [x] 2.3 Each positive control is red when its route is mutated to always throw — d767cf5
+- [x] 2.4 The suite passes twice in a row — d767cf5
+- [x] 2.5 `npm run lint` and `npm run typecheck` pass — d767cf5
 
 #### Manual
 
-- [x] 2.6 Console output names each attempted failure and the raw response
+- [x] 2.6 Console output names each attempted failure and the raw response — d767cf5
 
 ### Phase 3: Pinning the two deliberate swallows
 
 #### Automated
 
-- [ ] 3.1 `npm run test:integration` passes
-- [ ] 3.2 The `/api/sets` assertion is red when the verdict catch is mutated to a 500
-- [ ] 3.3 Its positive control is red when the verdict is mutated to always return null
-- [ ] 3.4 The `/api/account` assertions are red with the `try`/`catch` and the `if` guard removed in turn
-- [ ] 3.5 The suite passes twice in a row and leaves no `t3s-` account behind
-- [ ] 3.6 `npm run lint` and `npm run typecheck` pass
+- [x] 3.1 `npm run test:integration` passes
+- [x] 3.2 The `/api/sets` assertion is red when the verdict catch is mutated to a 500
+- [x] 3.3 Its positive control is red when the verdict is mutated to always return null
+- [x] 3.4 The `/api/account` assertions are red with the `try`/`catch` and the `if` guard removed in turn
+- [x] 3.5 The suite passes twice in a row and leaves no `t3s-` account behind
+- [x] 3.6 `npm run lint` and `npm run typecheck` pass
 
 #### Manual
 
-- [ ] 3.7 The auth user list holds no `t3s-` address after a full run
+- [x] 3.7 The auth user list holds no `t3s-` address after a full run
 
 ### Phase 4: The four `loadFailed` branches
 
