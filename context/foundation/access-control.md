@@ -208,8 +208,8 @@ create trigger <t>_<parent>_must_be_visible
 - **Prefer a declarative shape when one exists.** The alternative that would work here — a generated
   sentinel owner key on both tables plus a check constraint — was weighed and rejected on cost (two
   new columns, a backfill, a value every caller must supply, and a sentinel uuid meaning "shared"
-  that somebody will read as a real account). `context/changes/cross-account-isolation/plan.md`
-  § Mechanism records it, so "lost on cost after being weighed" is not confused with "never
+  that somebody will read as a real account). The **`cross-account-isolation`** change folder's
+  `plan.md` § Mechanism records it, so "lost on cost after being weighed" is not confused with "never
   considered".
 
 ### The derived-view variant — when the read is a view rather than a table

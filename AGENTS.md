@@ -588,8 +588,8 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
     than an inlined value, so a launcher that strips the environment and sets the test pair controls
     what the worker sees. The failure mode when the launcher is bypassed is **absent** credentials,
     not production ones — `src/lib/supabase.ts` returns `null`, every protected route redirects, and a
-    browser suite goes red on its first step. Measured 2026-08-16;
-    `context/changes/testing-browser-layer/research.md` carries the file:line evidence.
+    browser suite goes red on its first step. Measured 2026-08-16; the **`testing-browser-layer`**
+    change folder carries the file:line evidence, in `research.md`.
 - Adapter v13 also removed `Astro.locals.runtime` and `cloudflareModules`, and flipped `imageService`
   to default `cloudflare-binding`. Guidance written for v12 or earlier is wrong.
 - **The Workers Free plan caps CPU at 10 ms per invocation** — a hard kill (Error 1102), not a
@@ -604,8 +604,8 @@ reader could not infer from there.
 
 - **Astro is held at 6.x.** Astro 7 resolves the four outstanding `npm audit` advisories but its
   build fails against the Cloudflare adapter (`Could not find the prerender entry point`), reproduced
-  on 7.1.6 and 7.2.0. Do not "helpfully" bump it; full record in
-  `context/changes/bootstrap-verification/verification.md`.
+  on 7.1.6 and 7.2.0. Do not "helpfully" bump it; full record in the **`bootstrap-verification`**
+  change folder, in `verification.md`.
 - CI (`.github/workflows/ci.yml`) runs the **eight** gate steps in order on every push and PR to
   `main`, with a `concurrency` group so two runs cannot race the shared fixture rows.
   `test:middleware` and `test:e2e` are steps of the **existing `ci` job** rather than a new workflow,

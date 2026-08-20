@@ -78,7 +78,7 @@ disk.
 | #   | Phase name           | Goal (one line)                                                                  | Risks covered | Test types               | Status        | Change folder                            |
 | --- | -------------------- | -------------------------------------------------------------------------------- | ------------- | ------------------------ | ------------- | ---------------------------------------- |
 | 1   | Edit-time gates      | Lock the floor: lint and typecheck fire at edit time, not at commit time         | cross-cutting | gates                    | complete      | — (no change folder — see §6.6)          |
-| 2   | Browser layer        | Prove the boundary and the flow through a real session, against the test project | #2, #3, #4    | integration + e2e        | complete      | `context/changes/testing-browser-layer/` |
+| 2   | Browser layer        | Prove the boundary and the flow through a real session, against the test project | #2, #3, #4    | integration + e2e        | complete      | `testing-browser-layer`                  |
 | 3   | Silent-failure audit | A failure that is caught must still be told to the caller                        | #5            | integration + regression | not started   | —                                        |
 | 4   | Week-boundary seam   | The week the screen shows is bounded by the zone the profile holds               | #1            | integration + render     | not started   | —                                        |
 | 5   | Environment parity   | Prove the two projects agree, and that a deploy can still sign somebody in       | #6, #7        | script + CI + smoke      | not started   | —                                        |
@@ -89,7 +89,7 @@ it is well defended already at the pure-function layer, and it blocks nothing. P
 post-badge.
 
 **Phase 2 opened with a sub-phase that is not a test, and it has been answered** (research, 2026-08-16
-— `context/changes/testing-browser-layer/research.md`). Nothing in this repository pointed a running
+— the **`testing-browser-layer`** change folder's `research.md`). Nothing in this repository pointed a running
 HTTP server at `gymlog-test`, and the reason is now mechanical rather than folklore: `@astrojs/cloudflare`
 does `Object.assign(process.env, parseEnv(".dev.vars"))` in `astro:config:done`, and Vite's `loadEnv`
 applies `process.env` **last**, so `.dev.vars` beats a shell variable, `.env` and `.env.<mode>` alike.

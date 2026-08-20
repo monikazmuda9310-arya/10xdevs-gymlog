@@ -12,7 +12,8 @@
 
 ## A slice that ends in a screen needs a deployment phase
 
-- **Context**: `context/changes/exercise-catalogue/plan.md` — five phases ending at documentation.
+- **Context**: the **`exercise-catalogue`** change folder's `plan.md` — five phases ending at
+  documentation.
   Found during /10x-impl-review on 2026-08-10 (finding F4).
 - **Problem**: S-01 deployed in its Phase 4; S-02 had no deployment step at all. Because
   `npm run db:push` writes to **both** databases while application code reaches production only
@@ -419,7 +420,7 @@ restrict` above then **blocks that cascade**. One account could permanently prev
 ## The ORDER database-internal actions fire in is a fact about the catalogue — and reading the catalogue is still not measuring
 
 - **Context**: `public.delete_own_account()` and step 1.2 of
-  `context/changes/account-deletion/plan.md`, 2026-08-15.
+  the **`account-deletion`** change folder's `plan.md`, 2026-08-15.
 - **Problem**: planning needed to know whether `delete from auth.users` would abort for an account
   owning a custom exercise referenced by its own entry — `exercise_entries.exercise_id` carries the
   schema's only `on delete restrict`. The migration files cannot answer that: they declare the
@@ -470,7 +471,7 @@ restrict` above then **blocks that cascade**. One account could permanently prev
 
 - **Context**: any test whose assertions could all fail from the same defect, and every
   mutation-testing step that checks one. Found in `tests/middleware/session-lifecycle.test.ts`
-  assertion 2 on 2026-08-16; measured in `context/changes/testing-browser-layer/plan.md`
+  assertion 2 on 2026-08-16; measured in the **`testing-browser-layer`** change folder's `plan.md`
   § Measurement record P3.b.
 - **Problem**: assertion 2 claims "signing out ends access AND the training is no longer readable".
   Written in narrative order — the cookie write, then the redirect, then the data read — the mutation
@@ -513,6 +514,31 @@ restrict` above then **blocks that cascade**. One account could permanently prev
 - **Applies to**: implement, impl-review, plan — for any browser-level phase. More generally: **an
   assertion that something is absent is only as strong as the proof it was ever present**, and that
   proof belongs in the same test, not in the author's head.
+
+## A pointer INTO `context/changes/` dies the day that change is archived — cite the folder by NAME
+
+- **Context**: every foundation document that cites evidence living in a change folder —
+  `AGENTS.md`, `lessons.md`, `roadmap.md`, `access-control.md`, `test-plan.md`. Found 2026-08-20
+  while checking `testing-browser-layer`'s own documentation criterion.
+- **Problem**: `/10x-archive` moves `context/changes/<id>/` to
+  `context/archive/<archive-date>-<id>/`. Every path-shaped pointer at the old location breaks, and
+  **the new name carries the archive DATE, so the eventual path cannot be written in advance** — this
+  is not carelessness that a more careful author would avoid. **Three were already dead when this was
+  written** (`lessons.md`'s own first entry, and two in `roadmap.md`), and one `roadmap.md` sentence
+  cited two records side by side with one path corrected and the other not, which reads as an
+  oversight rather than as the systematic failure it is. The rot is silent in the worst way: nothing
+  checks markdown paths, so the pointer looks authoritative until somebody follows it, and what they
+  conclude is that the evidence never existed — exactly when they are deciding whether to trust the
+  claim it was supporting.
+- **Rule**: **cite a change folder by its NAME, never by its path** — "the `owned-persistence-baseline`
+  change folder's `plan.md`", not `context/changes/owned-persistence-baseline/plan.md`. A name is
+  findable by grep in either location and survives the move; a path is only correct until the work it
+  describes is finished, which is precisely when it starts being cited. The same applies to an
+  `context/archive/` path: correct today, and still a path.
+- **Applies to**: implement, impl-review, plan, research — anything that writes a durable document
+  citing in-flight work. More generally: **a reference whose target is scheduled to move is a
+  reference that will be wrong, and the fix belongs at the moment of writing, not at the moment of
+  moving** — nobody is watching at the moment of moving.
 
 ## Measurement record — the evidence behind the rules in `AGENTS.md`
 
