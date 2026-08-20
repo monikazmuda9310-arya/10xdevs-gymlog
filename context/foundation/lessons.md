@@ -489,6 +489,31 @@ restrict` above then **blocks that cascade**. One account could permanently prev
   share a cause, and every `#### Manual Verification` mutation step whose wording names WHICH
   assertion must go red — that wording is unenforceable unless the ordering puts it first.
 
+## A `fill()` before hydration is lost SILENTLY — and what it breaks is the assertion that proves ABSENCE
+
+- **Context**: `tests/e2e/`, and any browser interaction with a **controlled** React input inside a
+  `client:load` island — which in this product is every input there is. Found in
+  `tests/e2e/critical-flow.spec.ts` during `testing-browser-layer` Phase 6, 2026-08-20; measured in
+  that plan's § Measurement record, P6.b.
+- **Problem**: Playwright's `fill()` sets the DOM value and dispatches an `input` event. If the
+  island has not hydrated yet, no handler is attached, the event is lost, and hydration then restores
+  React's own (empty) state. **Measured at one run in three.** The flake is the visible half and the
+  cheap one. The dangerous half is silent: the spec filled a run-unique NOTE into a workout, and
+  assertion 3 proved signing out by looking for that note and finding **nothing** — which a note that
+  was never saved satisfies perfectly. A lost fill there does not go red. It turns the load-bearing
+  assertion of the suite into one that passes for the wrong reason and reports green, and no run,
+  green or red, looks any different.
+- **Rule**: **Retry the fill until the target's own state reflects it** — wrap `fill` plus a
+  state-reflecting check in `expect(async () => {…}).toPass()`, which is waiting on state rather than
+  sleeping and is therefore not a `waitForTimeout` in disguise. **And give every assertion that
+  proves something by ABSENCE a positive control** establishing that the thing was present first.
+  Prefer a check that reflects FRAMEWORK state (a client-side filter having narrowed the list) over
+  one that only reads the DOM (an input's `value`), because the DOM is exactly what lies in this
+  failure.
+- **Applies to**: implement, impl-review, plan — for any browser-level phase. More generally: **an
+  assertion that something is absent is only as strong as the proof it was ever present**, and that
+  proof belongs in the same test, not in the author's head.
+
 ## Measurement record — the evidence behind the rules in `AGENTS.md`
 
 > **These entries are not rules and must not be read as ones.** They are the measurements and
