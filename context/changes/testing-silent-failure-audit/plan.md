@@ -813,31 +813,31 @@ No migration. No schema change, no new column, no new policy. `npm run db:push` 
 
 #### Automated
 
-- [x] 1.1 Assertions 6 and 7 are red against the unfixed `signout.ts`, failing on the data read
-- [x] 1.2 The `{ error: null }` positive control is red when `?error=` is appended unconditionally
-- [x] 1.3 Assertion 2 still passes unchanged: `npm run test:middleware`
-- [x] 1.4 `npm test` passes — `messageForCode("sign_out_failed")` resolves to the new sentence
-- [x] 1.5 `npm run lint` and `npm run typecheck` pass
-- [x] 1.6 `npm run test:e2e` passes — the critical flow's sign-out step crosses this route
+- [x] 1.1 Assertions 6 and 7 are red against the unfixed `signout.ts`, failing on the data read — d9ba619
+- [x] 1.2 The `{ error: null }` positive control is red when `?error=` is appended unconditionally — d9ba619
+- [x] 1.3 Assertion 2 still passes unchanged: `npm run test:middleware` — d9ba619
+- [x] 1.4 `npm test` passes — `messageForCode("sign_out_failed")` resolves to the new sentence — d9ba619
+- [x] 1.5 `npm run lint` and `npm run typecheck` pass — d9ba619
+- [x] 1.6 `npm run test:e2e` passes — the critical flow's sign-out step crosses this route — d9ba619
 
 #### Manual
 
-- [x] 1.7 Signing out through the deployed app lands on the sign-in page with no message
-- [x] 1.8 With the failure branch forced, the sentence shows and the dashboard needs a fresh sign-in
+- [x] 1.7 Signing out through the deployed app lands on the sign-in page with no message — d9ba619
+- [x] 1.8 With the failure branch forced, the sentence shows and the dashboard needs a fresh sign-in — d9ba619
 
 ### Phase 2: `impact_unavailable` on the two untested routes
 
 #### Automated
 
-- [ ] 2.1 `npm run test:integration` passes, including the new suite
-- [ ] 2.2 Each failure assertion is red when its route's catch is mutated to `ok({ impact: [] })`
-- [ ] 2.3 Each positive control is red when its route is mutated to always throw
-- [ ] 2.4 The suite passes twice in a row
-- [ ] 2.5 `npm run lint` and `npm run typecheck` pass
+- [x] 2.1 `npm run test:integration` passes, including the new suite
+- [x] 2.2 Each failure assertion is red when its route's catch is mutated to `ok({ impact: [] })`
+- [x] 2.3 Each positive control is red when its route is mutated to always throw
+- [x] 2.4 The suite passes twice in a row
+- [x] 2.5 `npm run lint` and `npm run typecheck` pass
 
 #### Manual
 
-- [ ] 2.6 Console output names each attempted failure and the raw response
+- [x] 2.6 Console output names each attempted failure and the raw response
 
 ### Phase 3: Pinning the two deliberate swallows
 
