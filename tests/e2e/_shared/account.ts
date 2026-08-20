@@ -33,6 +33,15 @@ function required(name: string): string {
 export const RUN_ACCOUNT_EMAIL = required("E2E_ACCOUNT_EMAIL");
 export const RUN_ACCOUNT_PASSWORD = required("GYMLOG_TEST_PASSWORD");
 
+/**
+ * The same run id the address is built from, for marking rows a spec writes INSIDE the account.
+ *
+ * They need no cleanup of their own — deleting the account takes its workouts, entries and sets with
+ * it — but an interrupted run leaks the account, and then the mark is what identifies the training
+ * inside it as this suite's rather than a person's.
+ */
+export const RUN_ID = required("E2E_RUN_ID");
+
 function testProjectClient() {
   // `SUPABASE_TEST_URL`, never `SUPABASE_URL`. The two are equal here by construction — the config
   // seeds one from the other — and reading the test-project name directly is what keeps this module

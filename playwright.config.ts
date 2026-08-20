@@ -51,6 +51,7 @@ process.env.SUPABASE_KEY = testKey;
 // account identifiable, and the suite keeps to ONE account per run: an interruption leaks one, not
 // seven. See `tests/e2e/_shared/account.ts`.
 const RUN_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+process.env.E2E_RUN_ID ??= RUN_ID;
 process.env.E2E_ACCOUNT_EMAIL ??= `t2e-${RUN_ID}@gymlog-test.dev`;
 
 // `localhost`, NOT `127.0.0.1`: Chrome treats `localhost` as a secure context, so the `Secure`
@@ -75,6 +76,10 @@ export default defineConfig({
     baseURL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    // Default 0, so this is inert in the gate. It exists for the one manual step in the plan that
+    // asks a human to WATCH the flow: headed alone runs the whole thing in ~6 s, which is not
+    // watchable. `E2E_SLOWMO=400 npm run test:e2e -- --headed` makes it followable.
+    launchOptions: { slowMo: Number(process.env.E2E_SLOWMO ?? 0) },
   },
   webServer: {
     command: "node scripts/e2e-serve.mjs",

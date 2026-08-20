@@ -998,6 +998,48 @@ No schema change. No migration. `delete_own_account()` already exists
     real flow. Recorded rather than left implicit: 5.6 is checked on the measurement above, not on a
     human having watched it, and Phase 6 is where that changes.
 
+- **P6.a mutation 6.4 landed on a LOCATOR, and the plan's own criterion said what to do about it** —
+  2026-08-16. Removing `client:load` from `WorkoutDetail` (`[id].astro:98`) made the spec red at
+  `locator.fill: waiting for getByLabel('Reps')`, not at the "Add set" step. The chain is honest — an
+  unhydrated picker adds no entry, so the set form never renders — but the MESSAGE is
+  indistinguishable from somebody renaming the label, and those are very different defects. Re-aimed
+  per criterion 6.4: a **hydration tripwire** was added immediately after the picker's search box,
+  asserting the catalogue NARROWED — client-side filtering is something no amount of correct
+  server-rendered HTML can fake. Re-measured under the same mutation: `Expected: 0, Received: 3`, the
+  three seeded names containing "Bench Press", i.e. the unfiltered catalogue still on screen. A
+  renamed field now fails at its own locator instead.
+- **P6.b `fill()` before hydration is SILENTLY LOST — one run in three — and it nearly made the
+  strongest assertion in the spec vacuous** — measured 2026-08-20 and the most valuable finding of
+  this phase. Every input in this product is a **controlled** React input inside a `client:load`
+  island. A `fill()` landing before the island hydrates puts the text in the DOM, never in React's
+  state, and hydration then restores the empty value. Three consecutive runs of the finished spec:
+  **green, RED, green** — and the red was on the hydration tripwire, which had briefly been read as
+  mutation 6.5 failing. It was not; it was a flake.
+  - **The dangerous half was not the flake.** The workout NOTE is filled the same way, and assertion 3
+    proves signing out by looking for that note and finding **nothing** — which a note that was never
+    saved satisfies perfectly. A lost `fill()` there does not go red; it turns the load-bearing
+    assertion into one that passes for the wrong reason and reports green
+    (`lessons.md` § "A guard you have not mutated may not guard").
+  - **Two fixes, both required.** Each fill is retried until the island's own state reflects it
+    (`expect(...).toPass()` — waiting on state, not sleeping), which removed the flake: **5/5 then
+    2/2 green**. And a **positive control** now asserts the note is visible on the workout page while
+    signed in, so the absence in assertion 3 cannot be vacuous. Proven by removing the fill: `expect
+    (getByText('t2e-flow-…')).toBeVisible() — element(s) not found`.
+- **P6.c mutation 6.5 failed correctly, on the number** — 2026-08-16. `MAX_ESTIMABLE_REPS` widened
+  from 12 to 20 made the 15-rep row read `#2 15 × 60 kg ≈ 98.2 kg 1RM` where the suite wanted
+  `outside 1–12 reps — no estimate`. Red for its own reason: a fabricated estimate in the slot the
+  refusal occupies, which is exactly what criterion 6.5 describes.
+- **P6.e the dashboards were read by the owner, 2026-08-20, and agreed** — `gymlog-test` holds **no**
+  `t2e-` and **no** `t2c-` account (every per-run account of this whole change is cleaned up), while
+  `rls-owner-a/b` and the `s09i-` fixtures are present with their original creation dates. In
+  **production**, a search for `gymlog-test.dev` returns **zero** rows and the account list is the
+  owner's single account. The last of those is the decisive one: a harness that had ever been aimed
+  at production could only have created such an address THERE. The fixture checks are the positive
+  control — an empty result and a list with nothing matching look identical otherwise.
+- **P6.d what the spec does NOT cover, restated so it is not inferred away**: viewport, layout and
+  reachability at a phone width. That half of risk #4 has no assigned layer in `test-plan.md` §2 and
+  this spec adds none. Stated in the file's own header as well as here.
+
 ## References
 
 - Research: `context/changes/testing-browser-layer/research.md` (ground truth for this phase)
@@ -1081,30 +1123,30 @@ No schema change. No migration. `delete_own_account()` already exists
 
 #### Automated
 
-- [x] 5.1 `npm run test:e2e` starts the server and the smoke spec finds the `Sign in` heading
-- [x] 5.2 `npm run lint` and `npm run typecheck` pass over the new files
-- [x] 5.3 `npm run build` still passes
+- [x] 5.1 `npm run test:e2e` starts the server and the smoke spec finds the `Sign in` heading — 27c5f47
+- [x] 5.2 `npm run lint` and `npm run typecheck` pass over the new files — 27c5f47
+- [x] 5.3 `npm run build` still passes — 27c5f47
 
 #### Manual
 
-- [x] 5.4 The absence-assert proven by planting `dist/server/.dev.vars` — the launcher refuses
-- [x] 5.5 The strip proven by unsetting `SUPABASE_TEST_URL` — the launcher refuses
-- [x] 5.6 The aim proven — a browser-created account is found in `gymlog-test`
+- [x] 5.4 The absence-assert proven by planting `dist/server/.dev.vars` — the launcher refuses — 27c5f47
+- [x] 5.5 The strip proven by unsetting `SUPABASE_TEST_URL` — the launcher refuses — 27c5f47
+- [x] 5.6 The aim proven — a browser-created account is found in `gymlog-test` — 27c5f47
 
 ### Phase 6: The critical flow in a real browser (risk #4)
 
 #### Automated
 
-- [ ] 6.1 `npm run test:e2e` passes from a clean `dist/`, and again immediately
-- [ ] 6.2 No `t2e-` account survives a green run
-- [ ] 6.3 `npm run lint` and `npm run typecheck` pass
+- [x] 6.1 `npm run test:e2e` passes from a clean `dist/`, and again immediately
+- [x] 6.2 No `t2e-` account survives a green run
+- [x] 6.3 `npm run lint` and `npm run typecheck` pass
 
 #### Manual
 
-- [ ] 6.4 Assertion 1 proven by removing `client:load` from `WorkoutDetail` — red at "Add set", then reverted
-- [ ] 6.5 Assertion 2 proven by widening the estimator's rep range — red, then reverted
-- [ ] 6.6 The flow watched once with `--headed`
-- [ ] 6.7 No shared fixture and no production row touched
+- [x] 6.4 Assertion 1 proven by removing `client:load` from `WorkoutDetail` — red at "Add set", then reverted
+- [x] 6.5 Assertion 2 proven by widening the estimator's rep range — red, then reverted
+- [x] 6.6 The flow watched once with `--headed`
+- [x] 6.7 No shared fixture and no production row touched
 
 ### Phase 7: The gate, the documentation, and the cookbook
 
