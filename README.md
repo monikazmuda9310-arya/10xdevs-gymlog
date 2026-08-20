@@ -309,6 +309,8 @@ GitHub Actions runs **eight** steps in order on every push and PR to `main`: lin
 
 `npm run test:render` needs no secrets and no network — it renders pages through Astro's container and asserts on the HTML. It is in the gate because it holds the only check that would notice the 418-entry timezone list being passed as an island prop, and a check outside the gate rots.
 
+**`main` is protected and the `ci` check is required, including for admins.** A pull request cannot be merged while its run is red or still in flight, and a direct push to `main` is refused (`GH006 … Required status check "ci" is expected`). This is a repository setting rather than a file here, so no test can see it — inspect it with `gh api repos/<owner>/<repo>/branches/main/protection`. Before 2026-08-20 every gate below said "required" and none of them was enforced.
+
 `npm run test:middleware` and `npm run test:e2e` write to `gymlog-test` and **carry no production credential**. The browser check builds the worker itself, deletes the credentials that build writes to disk, and serves it through a launcher that refuses to start if they are still there. If that launcher is ever bypassed the worker's credentials are **absent**, not production's, so the failure is a red test rather than a write into real training data.
 
 Five repository secrets:
