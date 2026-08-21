@@ -91,7 +91,7 @@ disk.
 | 1   | Edit-time gates      | Lock the floor: lint and typecheck fire at edit time, not at commit time         | cross-cutting | gates                    | complete    | — (no change folder — see §6.6) |
 | 2   | Browser layer        | Prove the boundary and the flow through a real session, against the test project | #2, #3, #4    | integration + e2e        | complete    | `testing-browser-layer`         |
 | 3   | Silent-failure audit | A failure that is caught must still be told to the caller                        | #5            | integration + regression | complete    | `testing-silent-failure-audit`  |
-| 4   | Week-boundary seam   | The week the screen shows is bounded by the zone the profile holds               | #1            | integration + render     | not started | —                               |
+| 4   | Week-boundary seam   | The week the screen shows is bounded by the zone the profile holds               | #1            | integration + render     | complete    | `testing-week-boundary-seam`    |
 | 5   | Environment parity   | Prove the two projects agree, and that a deploy can still sign somebody in       | #6, #7        | script + CI + smoke      | not started | —                               |
 
 Phases 1–3 are course deliverables (module 3, items 3, 4 and 5) and come first for that reason.
@@ -382,6 +382,64 @@ denied for table workouts`). Both outcomes are "no data" and they are different 
   `tests/middleware/session-lifecycle.test.ts` (assertions 6 and 7 for the injected auth failure).
 - **Run locally**: `npm run test:middleware`.
 
+### 6.8 Adding a week-boundary or timezone check
+
+- **Location**: `tests/render/` for "does a SCREEN use the stored zone", `tests/integration/` for
+  "does a stored zone change which week a real set counts in", `src/**/*.test.ts` for the arithmetic
+  itself. The unit layer is already strong — `calendar.test.ts` pins both Warsaw DST transitions, the
+  Sunday rollover, month/year/leap boundaries and a 365-instant sweep — so a new week test almost
+  never belongs there. **What nothing checked until Phase 4 is that anything CALLS it with the zone
+  the account stored.**
+- **NEVER derive an expected week from `trainingWeeksFor`.** This is the rule, and it is what made
+  three suites inert before anybody noticed. `dashboard-tonnage.test.ts:30`,
+  `weekly-tonnage.test.ts:63-74` and `tonnage-breakdown.test.ts:130-134` all compute their fixture
+  dates with the function under test, so an off-by-one in `mondayOf` moves the fixture and the
+  expectation together and every assertion still passes — including the ones titled after the Sunday
+  boundary. **Type the dates out.** Where the right answer is awkward to write by hand, that
+  awkwardness is the point; see `lessons.md` § "An expectation derived from the subject is not an
+  assertion".
+- **On `/dashboard` the window is observable only at the QUERY boundary.** The page renders no dates
+  at all: it prints the zone name and two figures, and `week.start` / `week.end` reach the markup and
+  are ignored. So the stub records the range instead of discarding it — `gte: (column, value) => …`,
+  where `dashboard-tonnage.test.ts:92` takes no parameters and throws the real arguments away.
+  Record at the link that RESOLVES the chain (`.lte` for `daily_tonnage`, `.limit` for
+  `daily_exercise_tonnage`), so a recorded range proves the whole chain executed.
+- **Pin the clock with `vi.setSystemTime`, and fake only `Date`.** Neither page has an injectable
+  `now` — `dashboard.astro:43` passes three arguments and `workouts/index.astro:23` passes one — so
+  the instant cannot be supplied any other way. It also removes the once-a-week Sunday-midnight flake
+  S-07's implementation review named and left open. `vi.useFakeTimers({ toFake: ["Date"] })`: Astro's
+  container renderer is async, and a faked `setTimeout` is a hazard unrelated to anything asserted.
+- **Choose the instant and the zone TOGETHER, and use two pairs.** The property being tested is
+  "currently on a different calendar date", not "far away" — only 9 of 418 zones satisfied it at the
+  hour S-06's manual step ran (`lessons.md`). The measured pairs:
+
+  | instant                | `Europe/Warsaw` | `UTC`      | `America/New_York` | catches                                   |
+  | ---------------------- | --------------- | ---------- | ------------------ | ----------------------------------------- |
+  | `2026-08-09T22:30:00Z` | week 08-10      | week 08-03 | week 08-03         | UTC substituted for a **positive** offset |
+  | `2026-08-10T02:00:00Z` | week 08-10      | week 08-10 | week 08-03         | UTC substituted for a **negative** offset |
+
+  **Neither row is sufficient alone**, and half the zone/instant pairs prove nothing: asserting that
+  `Europe/Warsaw` reads `2026-08-10` at the second instant is silent about a UTC substitution,
+  because UTC reads it too. Together the two rows also catch a hardcoded `"Europe/Warsaw"`, since the
+  second instant under that literal yields the first's window. Read the table before adding a case.
+
+- **In an integration suite the stored COLUMN is the input, not a literal.** Write the zone through
+  `PATCH /api/profile` (the `setPreferences` shape at `preferences-derive.test.ts:84-90`, which
+  throws on a non-200) and read it back off the row before each read. Passing the same literal to the
+  write and to the service asserts only that the service honours its own argument. **Own a year no
+  other suite writes to** — this read aggregates by DATE RANGE, so a name prefix protects nothing —
+  and keep two tests' windows weeks apart. **Restore the zone in a `finally` AND establish it in
+  `beforeAll`**: measured, an interrupted run does leak the flipped value, and only setup recovers it.
+- **No `TZ` pin belongs in `vitest.render.config.ts`, and this is deliberate.** Measured: the probe
+  ran under an ambient `Europe/Warsaw` and correctly produced `America/New_York`'s window, because
+  the subject names its own zone on every call and every expectation is a literal. A pin here would
+  be a guard nobody had mutated. `vitest.config.ts:12-32`'s pin is a different case and both of its
+  properties are load-bearing — the unit suite's subject is `Date` arithmetic, which the ambient zone
+  genuinely changes.
+- **Reference tests**: `tests/render/week-boundary.test.ts`,
+  `tests/integration/week-boundary-seam.test.ts`.
+- **Run locally**: `npm run test:render`, then `npm run test:integration`.
+
 ### 6.6 Per-rollout-phase notes
 
 **Phase 1 — Edit-time gates (complete, 2026-08-16).** Shipped directly rather than through a change
@@ -430,7 +488,7 @@ two were wrong in this document before they were measured.
 
 - **The two class-E fallbacks**, which degrade silently by design and are compensated on `/settings`
   only: `todayIn` answering in UTC for an unknown zone (`calendar.ts:26-35`), and
-  `Intl.supportedValuesOf("timeZone")` degrading from 418 entries to a 12-entry hardcoded list
+  `Intl.supportedValuesOf("timeZone")` degrading from 418 entries to a seven-entry hardcoded list
   (`timezones.ts:50-63`). Both are week-boundary-shaped and are **assigned to Phase 4**. Note the
   **category** rather than a count: this document said "three swallows are deliberate" and there are
   five, which is the same failure mode as `lessons.md` § "The conversion constant has been miscounted
@@ -449,6 +507,82 @@ two were wrong in this document before they were measured.
   nothing.** Measured 2026-08-20: all ten assertions stayed green. The assertion beside it pins the
   **swallow**, not the log. Named rather than covered by an assertion that would only look like
   coverage; the edit that would make it load-bearing is a caller learning to act on that log.
+
+**Phase 4 — Week-boundary seam (complete, 2026-08-21).** Risk #1, the only High × High row on the
+map. **No production code changed**: the defect was that nothing would have noticed if it had.
+Replacing `profile.timezone` with the literal `"Europe/Warsaw"` at `dashboard.astro:43` left all five
+runners green, and the same held for `workouts/index.astro:23`. Three things were wrong in this
+document before they were measured.
+
+- **The hot-spot citation was adjacent rather than the anchor.** Risk #1's evidence cited
+  `src/lib/services/` at 53 changes/30d, which is a directory-level figure; per file `calendar.ts`
+  had 3 and `timezones.ts` had 1. The seam is one expression in `src/pages/`, and `tonnage.ts` is its
+  consumer rather than its site — so the citation points at the right neighbourhood and not at the
+  door. The sharper evidence was never churn at all: **the column became user-settable on
+  2026-08-13**, which is the event that made a wrong zone reachable.
+- **"Assert which days made the figure" is structurally impossible from `/dashboard`'s HTML.** The
+  guidance stated it as a discipline. The page prints the zone name and two figures and renders no
+  dates: `week.start` / `week.end` reach the markup — `WeekTonnage extends DateRange` — and are
+  ignored, and no `Intl.DateTimeFormat` appears anywhere in the UI. The window is observable only at
+  the query boundary, which is why the assertions read the query and the stub had to start recording
+  what `dashboard-tonnage.test.ts:92` throws away. `/workouts` is the one screen where the arithmetic
+  reaches the HTML, and it was not in the brief.
+- **The inertness mechanism was CIRCULARITY, not the ambient zone the anti-pattern column named.**
+  `mondayOf` and `addDays` work on the `getUTC*` accessors of a zoneless date and every call names
+  its own zone, so the subject is ambient-independent by construction and a `TZ` pin in the render
+  config would have been a guard nobody had mutated. What actually made three suites unable to fail
+  is that each computes its expected week with `trainingWeeksFor` — the function under test. The
+  ambient hazard that WAS real is the one S-07's review left open: the clock, closed here by pinning
+  the instant. Both corrections are now §6.8's first two rules and a new `lessons.md` entry.
+
+**A fourth correction, to this section rather than to §2**: `Intl.supportedValuesOf`'s fallback list
+has **seven** entries (`timezones.ts:34-42`, and the module's own comment says seven), not twelve.
+Fixed above. Note the **category** rather than the number, for the reason `lessons.md` § "The
+conversion constant has been miscounted twice, in the same direction" gives — and which this phase's
+own brief then violated by repeating the wrong figure.
+
+**§6.8's one untested claim, and who settles it.** Criterion 4.4 asked whether §6.8 is sufficient to
+write a correct week assertion without reading `research.md` — and it was checked by the person who
+wrote §6.8, which is the same shape as `lessons.md` § "Verify with a script that attacks, not by
+asking the owner to read code". The owner confirmed it, which is the strongest signal available
+today, and it is not evidence. **The next author who writes a week- or timezone-related test against
+§6.8 settles it**: record here whether they needed `research.md`, and if they did, what §6.8 was
+missing. Found by this change's own implementation review, 2026-08-21.
+
+**What Phase 4 deliberately did NOT close**, stated so a green gate is not read as covering it:
+
+- **`timezones.ts`'s fallback is closed by this paragraph, not by a test**, and that is a decision
+  rather than an omission. It **cannot produce a wrong week at all**: `todayIn` formats through
+  `Intl.DateTimeFormat` and never consults the list, so the two are independent code paths over
+  different APIs — a collapsed list shortens a `<select>` and moves no boundary. It is also
+  unreachable, measured in workerd (418 zones) and in Node, and forcing it would mean stubbing `Intl`
+  — runtime-specific, which `vitest.render.config.ts:17-23` forbids in the only suite that could host
+  it. **The edits that would make it bite** are a runtime without `supportedValuesOf`, or somebody
+  growing the list by hand towards completeness, which turns a tripwire into a second source of truth.
+- **`todayIn`'s UTC fallback IS closed by a test**, and the reachability is worth stating because the
+  brief assumed the wrong route. Not through the form: `isSupportedTimeZone` checks membership in
+  `Intl.supportedValuesOf("timeZone")`, which is a strict SUBSET of what `Intl.DateTimeFormat`
+  accepts — measured, `US/Eastern`, `Australia/Canberra`, `GMT` and `Etc/GMT+5` all format and are
+  all refused, and no counter-example runs the other way. It is reachable by a **direct PostgREST
+  write from the row's own owner**: the column carries no membership constraint and
+  `profiles-rls.test.ts:179-194` writes `Test/Run-<id>` into it today. `week-boundary.test.ts` pins
+  both halves of the resulting failure — the window falls back to UTC while the sentence on screen
+  still names the stored zone — and says plainly that this is pinned, not endorsed. **The edit that
+  would change it** is `/dashboard` learning to name the zone it actually computed in.
+- **`src/lib/services/tonnage.ts` still has no unit test**, and its five throws have no coverage.
+  That is a real gap and a **different** one: research proved the two span guards check the window's
+  WIDTH and can say nothing about whether it starts on the right Monday, so covering them would read
+  as a defence of this seam without being one. Whoever writes it should not record Risk #1 as
+  better covered afterwards.
+- **`/workouts`' null-profile asymmetry is pinned, not endorsed.** `dashboard.astro:31-37` treats an
+  absent profile as a FAILED load specifically so it does not compute a week in UTC for somebody who
+  is not in it; `settings.astro:37-47` does the same; `workouts/index.astro` puts a UTC date on the
+  form for the identical input with nothing on screen saying so, by three paths. That is the
+  `records.astro` class Phase 3 named, applied to the timezone, and it is week-shaped rather than
+  merely date-shaped: a workout filed on the wrong day at 01:00 Warsaw lands in the wrong week's
+  tonnage. Two assertions pin today's behaviour and say it is not an endorsement. **The edit that
+  makes it a product decision** is Open Question 2 in the `testing-week-boundary-seam` change
+  folder's `research.md` — an owner call, not a test's.
 
 ## 7. What We Deliberately Don't Test
 
