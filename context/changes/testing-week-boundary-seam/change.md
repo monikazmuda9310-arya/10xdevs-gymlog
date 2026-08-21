@@ -66,3 +66,26 @@ fails for the WRONG REASON has not confirmed the guard").
   tests with `{ gte: undefined, lte: undefined }`. `dashboard-tonnage.test.ts` stayed green at its
   full 14 tests, which is the sharpest available statement of what this file adds: the bounds S-07's
   implementation review found were guarded by nothing now have a reader.
+
+## Mutation record — Phase 2 (2026-08-21)
+
+- **Mutation 4 — `workouts/index.astro:23` → `todayIn("UTC")`.** Red on **both** stored-zone rows:
+  the negative-offset one wanted `2026-08-09` and got `2026-08-10`, the positive-offset one wanted
+  `2026-08-10` and got `2026-08-09`. **Both fallback rows stayed green**, which is the point of the
+  mutation: it is what proves they pin the fallback rather than the happy path.
+- **Mutation 5 — `dashboard.astro:143` printing a literal instead of `profile.timezone`.** Red on the
+  unformattable-zone test alone, and on its **sentence** half (`toContain("… in Europe/Warsawa.")`),
+  not on its window half — which is what the criterion asks for. Every other test stayed green.
+
+### The plan/reality mismatch this phase found, and how it was settled
+
+The plan put all four `/workouts` assertions at **I2** and expected Mutation 4 to redden "the two
+stored-zone rows". At I2 `Europe/Warsaw` reads `2026-08-10` and **so does UTC** — the plan's own
+instant table says so — so the Warsaw row there is a varied-zone control and is structurally blind to
+a UTC substitution. Owner ruling, 2026-08-21: **add a fifth assertion at I1**, where Warsaw reads
+`2026-08-10` against UTC's `2026-08-09`. The four I2 assertions from the contract are untouched, and
+criterion 2.3 is now literally satisfiable — confirmed by the mutation above.
+
+The instant/zone table was moved into the test file's own header for the same reason, with the
+sentence a future author needs: half the zone/instant pairs prove nothing, so read the table before
+adding a case.

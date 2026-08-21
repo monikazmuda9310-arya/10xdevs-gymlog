@@ -546,30 +546,30 @@ Frankfurt, in line with the existing tonnage suites.
 
 #### Automated
 
-- [x] 1.1 `npm run test:render` passes with the new file
-- [x] 1.2 `npm run lint` passes
-- [x] 1.3 `npm run typecheck` passes
-- [x] 1.4 `npm test` still passes
-- [x] 1.5 `dashboard-tonnage.test.ts` reports its existing count unchanged
+- [x] 1.1 `npm run test:render` passes with the new file — 4c7ea4b
+- [x] 1.2 `npm run lint` passes — 4c7ea4b
+- [x] 1.3 `npm run typecheck` passes — 4c7ea4b
+- [x] 1.4 `npm test` still passes — 4c7ea4b
+- [x] 1.5 `dashboard-tonnage.test.ts` reports its existing count unchanged — 4c7ea4b
 
 #### Manual
 
-- [x] 1.6 Mutation 1 — hardcoded `"Europe/Warsaw"` at `dashboard.astro:43` reddens the I2 case
-- [x] 1.7 Mutation 2 — hardcoded `"UTC"` reddens both instant rows
-- [x] 1.8 Mutation 3 — deleting `.gte`/`.lte` from `tonnage.ts:99-100` reddens the suite
+- [x] 1.6 Mutation 1 — hardcoded `"Europe/Warsaw"` at `dashboard.astro:43` reddens the I2 case — 4c7ea4b
+- [x] 1.7 Mutation 2 — hardcoded `"UTC"` reddens both instant rows — 4c7ea4b
+- [x] 1.8 Mutation 3 — deleting `.gte`/`.lte` from `tonnage.ts:99-100` reddens the suite — 4c7ea4b
 
 ### Phase 2: The unformattable zone, and the date `/workouts` shows
 
 #### Automated
 
-- [ ] 2.1 `npm run test:render` passes
-- [ ] 2.2 `npm run lint` and `npm run typecheck` pass
+- [x] 2.1 `npm run test:render` passes
+- [x] 2.2 `npm run lint` and `npm run typecheck` pass
 
 #### Manual
 
-- [ ] 2.3 Mutation 4 — `todayIn("UTC")` at `workouts/index.astro:23` reddens only the stored-zone rows
-- [ ] 2.4 Mutation 5 — a literal at `dashboard.astro:143` reddens the sentence half
-- [ ] 2.5 Both "pinned not endorsed" paragraphs name the guarantee and the edit that would break it
+- [x] 2.3 Mutation 4 — `todayIn("UTC")` at `workouts/index.astro:23` reddens only the stored-zone rows
+- [x] 2.4 Mutation 5 — a literal at `dashboard.astro:143` reddens the sentence half
+- [x] 2.5 Both "pinned not endorsed" paragraphs name the guarantee and the edit that would break it
 
 ### Phase 3: The stored column decides the bucket, against real rows
 
