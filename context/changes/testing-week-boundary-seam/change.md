@@ -89,3 +89,29 @@ criterion 2.3 is now literally satisfiable — confirmed by the mutation above.
 The instant/zone table was moved into the test file's own header for the same reason, with the
 sentence a future author needs: half the zone/instant pairs prove nothing, so read the table before
 adding a case.
+
+## Mutation record — Phase 3 (2026-08-21)
+
+- **Mutation 6 — `updateProfile` (`profiles.ts:77`) dropping `timezone` from its `update`.** Red on
+  assertion 2 alone: `expected { start: '2023-08-14', … } to deeply equal { start: '2023-08-07', … }`.
+  That is the read-back doing its job — the endpoint answered `200`, the column never moved, so the
+  zone `weeklyTonnage` was driven by was still `Europe/Warsaw` and the set stayed in the previous
+  week. Assertions 1 and 3 stayed green, correctly: neither leaves the default zone.
+
+### The date window, re-checked rather than trusted
+
+`grep -rn "2023-" tests/ src/ supabase/` outside this file returns **0 hits**. The suite's two windows
+are `2023-06-12..2023-06-25` and `2023-07-31..2023-08-20` — seven weeks clear of each other, which
+matters because this suite aggregates by date range and a name prefix protects nothing there.
+
+### What an interrupted run actually costs, measured rather than reasoned
+
+Criterion 3.7 asked for this to be confirmed or recorded. It was **simulated** rather than argued:
+`profiles.timezone` on `rls-owner-a` was written to `America/New_York` directly, the way a Ctrl-C
+between a flip and its `finally` would leave it, and read back to confirm the poisoned state. The
+suite was then re-run from there — **green, 3 of 3**, and the column read `Europe/Warsaw` afterwards.
+
+So the answer is both halves of the plan's question: an interrupted run **does** leave the column
+flipped (a `finally` is application-level and a kill skips it), and `beforeAll`'s `resetPreferences`
+**does** recover it on the next run. That is the split `fixture-preferences.ts` states — teardown
+protects the happy path, only setup protects the next run — demonstrated instead of quoted.

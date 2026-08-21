@@ -562,29 +562,29 @@ Frankfurt, in line with the existing tonnage suites.
 
 #### Automated
 
-- [x] 2.1 `npm run test:render` passes
-- [x] 2.2 `npm run lint` and `npm run typecheck` pass
+- [x] 2.1 `npm run test:render` passes — 10ae935
+- [x] 2.2 `npm run lint` and `npm run typecheck` pass — 10ae935
 
 #### Manual
 
-- [x] 2.3 Mutation 4 — `todayIn("UTC")` at `workouts/index.astro:23` reddens only the stored-zone rows
-- [x] 2.4 Mutation 5 — a literal at `dashboard.astro:143` reddens the sentence half
-- [x] 2.5 Both "pinned not endorsed" paragraphs name the guarantee and the edit that would break it
+- [x] 2.3 Mutation 4 — `todayIn("UTC")` at `workouts/index.astro:23` reddens only the stored-zone rows — 10ae935
+- [x] 2.4 Mutation 5 — a literal at `dashboard.astro:143` reddens the sentence half — 10ae935
+- [x] 2.5 Both "pinned not endorsed" paragraphs name the guarantee and the edit that would break it — 10ae935
 
 ### Phase 3: The stored column decides the bucket, against real rows
 
 #### Automated
 
-- [ ] 3.1 `npm run test:integration` passes with the new file
-- [ ] 3.2 Running the new suite twice in a row passes both times
-- [ ] 3.3 The whole integration directory passes, including `preferences-derive` assertion 4
-- [ ] 3.4 `npm run lint` and `npm run typecheck` pass
+- [x] 3.1 `npm run test:integration` passes with the new file
+- [x] 3.2 Running the new suite twice in a row passes both times
+- [x] 3.3 The whole integration directory passes, including `preferences-derive` assertion 4
+- [x] 3.4 `npm run lint` and `npm run typecheck` pass
 
 #### Manual
 
-- [ ] 3.5 Mutation 6 — `updateProfile` ignoring `timezone` reddens assertion 2
-- [ ] 3.6 The suite's date window overlaps no other suite's, re-checked by grep
-- [ ] 3.7 An interrupted run's effect on `profiles.timezone` is recorded
+- [x] 3.5 Mutation 6 — `updateProfile` ignoring `timezone` reddens assertion 2
+- [x] 3.6 The suite's date window overlaps no other suite's, re-checked by grep
+- [x] 3.7 An interrupted run's effect on `profiles.timezone` is recorded
 
 ### Phase 4: Cookbook, corrections, and the gaps this phase did not close
 
