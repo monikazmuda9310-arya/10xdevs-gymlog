@@ -31,7 +31,7 @@ Inherited from Phase 3 (named in test-plan.md section 6.6 with this phase as own
 
 - Two class-E fallbacks that degrade silently and are compensated on /settings only:
   `todayIn` answering in UTC for an unknown zone (`calendar.ts:26-35`), and
-  `Intl.supportedValuesOf("timeZone")` degrading from 418 entries to a 12-entry hardcoded list
+  `Intl.supportedValuesOf("timeZone")` degrading from 418 entries to a seven-entry hardcoded list
   (`timezones.ts:50-63`). Both are week-boundary-shaped, which is why they were assigned here.
 - Note the CATEGORY rather than a count: test-plan.md said "three swallows are deliberate" and there
   are five (lessons.md section "The conversion constant has been miscounted twice").
@@ -115,3 +115,30 @@ So the answer is both halves of the plan's question: an interrupted run **does**
 flipped (a `finally` is application-level and a kill skips it), and `beforeAll`'s `resetPreferences`
 **does** recover it on the next run. That is the split `fixture-preferences.ts` states — teardown
 protects the happy path, only setup protects the next run — demonstrated instead of quoted.
+
+## Phase 4 notes (2026-08-21)
+
+### Criterion 4.3, and why "no occurrence survives in `context/`" is the wrong literal reading
+
+The two **live claims** are fixed — `test-plan.md:433` and `change.md:34` now say `seven-entry`, and
+§6.6 restates it by **category** rather than leaning on the number, which is the instruction
+`lessons.md` § "The conversion constant has been miscounted twice" gives and which this change's own
+brief had violated.
+
+Six occurrences remain, deliberately, in three classes that a grep cannot tell apart:
+
+- **`context/archive/2026-08-20-testing-silent-failure-audit/{plan,research}.md`** — a closed record
+  of what Phase 3 believed when it wrote it. Editing an archived document to correct a fact it
+  recorded rewrites history rather than fixing a claim, and the reader who needs the right number is
+  served by §6.6 naming the category instead.
+- **`plan.md:438`, `plan.md:486`, `research.md:341`** — the sentences that STATE the correction
+  (`` `12-entry hardcoded list` → `7-entry` ``, "both say a 12-entry hardcoded list"). Editing them
+  would delete the instruction and the finding.
+- **`plan.md:598`** — the Progress row's own title, which `/10x-implement` forbids renaming.
+
+Owner ruling, 2026-08-21: read 4.3 as "no live claim still says twelve", checked off on that basis.
+
+### The full gate, run in CI order
+
+`lint` → `typecheck` (0 errors) → `test` (249) → `test:render` (52) → `test:integration` (142) →
+`test:middleware` (11) → `build` → `test:e2e` (2). All green.

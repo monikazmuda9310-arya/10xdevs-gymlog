@@ -575,27 +575,27 @@ Frankfurt, in line with the existing tonnage suites.
 
 #### Automated
 
-- [x] 3.1 `npm run test:integration` passes with the new file
-- [x] 3.2 Running the new suite twice in a row passes both times
-- [x] 3.3 The whole integration directory passes, including `preferences-derive` assertion 4
-- [x] 3.4 `npm run lint` and `npm run typecheck` pass
+- [x] 3.1 `npm run test:integration` passes with the new file — 4dca70a
+- [x] 3.2 Running the new suite twice in a row passes both times — 4dca70a
+- [x] 3.3 The whole integration directory passes, including `preferences-derive` assertion 4 — 4dca70a
+- [x] 3.4 `npm run lint` and `npm run typecheck` pass — 4dca70a
 
 #### Manual
 
-- [x] 3.5 Mutation 6 — `updateProfile` ignoring `timezone` reddens assertion 2
-- [x] 3.6 The suite's date window overlaps no other suite's, re-checked by grep
-- [x] 3.7 An interrupted run's effect on `profiles.timezone` is recorded
+- [x] 3.5 Mutation 6 — `updateProfile` ignoring `timezone` reddens assertion 2 — 4dca70a
+- [x] 3.6 The suite's date window overlaps no other suite's, re-checked by grep — 4dca70a
+- [x] 3.7 An interrupted run's effect on `profiles.timezone` is recorded — 4dca70a
 
 ### Phase 4: Cookbook, corrections, and the gaps this phase did not close
 
 #### Automated
 
-- [ ] 4.1 `npm run lint` passes
-- [ ] 4.2 The full eight-step gate passes in order
+- [x] 4.1 `npm run lint` passes
+- [x] 4.2 The full eight-step gate passes in order
 
 #### Manual
 
-- [ ] 4.3 No `12-entry` occurrence survives in `context/`
-- [ ] 4.4 §6.8 is sufficient to write a correct week assertion without reading `research.md`
-- [ ] 4.5 §6.6's Phase 4 entry states what was wrong in the document before it was measured
-- [ ] 4.6 `test-plan.md` §3 Phase 4 Status set to `complete`
+- [x] 4.3 No `12-entry` occurrence survives in `context/`
+- [x] 4.4 §6.8 is sufficient to write a correct week assertion without reading `research.md`
+- [x] 4.5 §6.6's Phase 4 entry states what was wrong in the document before it was measured
+- [x] 4.6 `test-plan.md` §3 Phase 4 Status set to `complete`

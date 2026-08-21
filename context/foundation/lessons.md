@@ -549,6 +549,35 @@ restrict` above then **blocks that cascade**. One account could permanently prev
   reference that will be wrong, and the fix belongs at the moment of writing, not at the moment of
   moving** — nobody is watching at the moment of moving.
 
+## An expectation derived from the subject is not an assertion
+
+- **Context**: `tests/render/dashboard-tonnage.test.ts:30`, `tests/integration/weekly-tonnage.test.ts:63-74`
+  and `tests/integration/tonnage-breakdown.test.ts:130-134` — every non-unit statement about a
+  training week in the repository, written by S-07 and S-08 and found during the
+  **`testing-week-boundary-seam`** research on 2026-08-20.
+- **Problem**: each suite computes the dates its fixture is written to, and the dates it then
+  expects, by calling `trainingWeeksFor` — **the function under test**. So a `mondayOf` returning the
+  wrong Monday moves the fixture and the expectation by the same seven days, every assertion still
+  passes, and the suite reports green against precisely the defect the PRD names by name. Assertion 6
+  of `weekly-tonnage.test.ts` reduces to `expect(current.start).toBe(weeks.thisMonday)` — literally
+  `f(x) === f(x)`. The stub one layer down made it worse rather than catching it: `gte: () => …`
+  accepts no parameters, so the window the page asked for was discarded before anything could look at
+  it. Three suites, thirteen week-related assertions, and **not one of them names a date**. What
+  makes this dangerous rather than merely weak is that it is invisible in review: the test reads as
+  thorough, the boundary is clearly on the author's mind, and the titles say so — after which the
+  titles get cited (see "A test whose title claims more than its body asserts becomes the citation").
+- **Rule**: **derive every expectation from a literal, or from an independent implementation — never
+  from the subject.** Type the date out. Where the right answer is awkward to know by hand, that
+  awkwardness is the whole point: it is the cost of having an oracle, and paying it is what turns the
+  test into one. Then check the shape of the assertion before trusting it: if you can substitute the
+  subject's own call for both sides and the line still reads sensibly, it asserts nothing. And where
+  a value is only observable at a boundary the test controls — a query, a request, a written file —
+  **record what was passed instead of discarding it**; a stub that ignores its arguments cannot fail.
+- **Applies to**: dates, weeks and any calendar arithmetic; ids, hashes and checksums; formatted or
+  serialised output; anything sorted or ranked — in short, anywhere the natural way to know the right
+  answer is to ask the code. It is the peer of "A guard you have not mutated may not guard": there
+  the assertion was empty, here it is fully written and mathematically incapable of failing.
+
 ## Measurement record — the evidence behind the rules in `AGENTS.md`
 
 > **These entries are not rules and must not be read as ones.** They are the measurements and
