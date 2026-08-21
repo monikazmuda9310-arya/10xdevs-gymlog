@@ -86,13 +86,13 @@ Each row is a discrete rollout phase that will open its own change folder via `/
 moves left-to-right through the values below; the orchestrator updates Status as artifacts appear on
 disk.
 
-| #   | Phase name           | Goal (one line)                                                                  | Risks covered | Test types               | Status      | Change folder                   |
-| --- | -------------------- | -------------------------------------------------------------------------------- | ------------- | ------------------------ | ----------- | ------------------------------- |
-| 1   | Edit-time gates      | Lock the floor: lint and typecheck fire at edit time, not at commit time         | cross-cutting | gates                    | complete    | — (no change folder — see §6.6) |
-| 2   | Browser layer        | Prove the boundary and the flow through a real session, against the test project | #2, #3, #4    | integration + e2e        | complete    | `testing-browser-layer`         |
-| 3   | Silent-failure audit | A failure that is caught must still be told to the caller                        | #5            | integration + regression | complete    | `testing-silent-failure-audit`  |
-| 4   | Week-boundary seam   | The week the screen shows is bounded by the zone the profile holds               | #1            | integration + render     | complete    | `testing-week-boundary-seam`    |
-| 5   | Environment parity   | Prove the two projects agree, and that a deploy can still sign somebody in       | #6, #7        | script + CI + smoke      | not started | —                               |
+| #   | Phase name           | Goal (one line)                                                                  | Risks covered | Test types               | Status        | Change folder                   |
+| --- | -------------------- | -------------------------------------------------------------------------------- | ------------- | ------------------------ | ------------- | ------------------------------- |
+| 1   | Edit-time gates      | Lock the floor: lint and typecheck fire at edit time, not at commit time         | cross-cutting | gates                    | complete      | — (no change folder — see §6.6) |
+| 2   | Browser layer        | Prove the boundary and the flow through a real session, against the test project | #2, #3, #4    | integration + e2e        | complete      | `testing-browser-layer`         |
+| 3   | Silent-failure audit | A failure that is caught must still be told to the caller                        | #5            | integration + regression | complete      | `testing-silent-failure-audit`  |
+| 4   | Week-boundary seam   | The week the screen shows is bounded by the zone the profile holds               | #1            | integration + render     | complete      | `testing-week-boundary-seam`    |
+| 5   | Environment parity   | Prove the two projects agree, and that a deploy can still sign somebody in       | #6, #7        | script + CI + smoke      | change opened | `testing-environment-parity`    |
 
 Phases 1–3 are course deliverables (module 3, items 3, 4 and 5) and come first for that reason.
 Phase 4 covers the highest-scoring risk on the map and is deliberately **not** first: it is cheap,
