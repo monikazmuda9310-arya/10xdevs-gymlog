@@ -611,9 +611,30 @@ this plan's § Measurement record carries the exact statements.
   `SUPABASE_TEST_URL=` → exit 2 naming the variable; a forced HTTP 400 answered
   `Invalid project ref: <gymlog-test>` — the provider's own error text masked, and
   `Nothing was compared` printed beside it.
-- **P2.0** — (Phase 2) structural mutation: SQL applied, aspect that reported it, rows printed, exit code.
-- **P2.1** — (Phase 2) access-control mutation: same fields.
-- **P2.2** — (Phase 2) revert confirmed: `db:parity` exit `0`, `db:status` histories unchanged.
+- **P2.0** — (Phase 2, 2026-08-21) STRUCTURAL mutation on gymlog-test:
+  `alter table public.exercises add column parity_probe_marker text`. `db:parity` → **exit 1**,
+  `DIFF columns prod=77 test=78`, printed row
+  `gymlog-test only: exercises.parity_probe_marker :: text null=YES default=- generated=-`.
+  **Only that aspect went red**, so the failure is for its own reason rather than a blanket one.
+- **P2.1** — (Phase 2, 2026-08-21) ACCESS-CONTROL mutation on gymlog-test:
+  `create policy parity_probe_noop on public.exercises for select to authenticated using (false)`
+  — permissive, so it is OR-ed with the existing select policy and widens nothing. `db:parity` →
+  **exit 1**, `DIFF policies prod=19 test=20`, printed row
+  `exercises | parity_probe_noop | SELECT | authenticated | using=false | check=-`.
+  The predicate is in the compared string, so the aspect sees policy BODIES, not just names.
+- **P2.2** — (Phase 2, 2026-08-21) revert confirmed three independent ways.
+  (a) `db:parity` → exit 0, all 12 aspects back at their P1.0 counts, exactly.
+  (b) A direct catalogue read on BOTH projects: `parity_probe_marker` column 0, `parity_probe_noop`
+  policy 0, seeded exercises 38 — which also rules out the green-because-both-sides-were-mutated
+  case, since production never held either object.
+  (c) `db:status`: ten migration versions on each project, identical, and **no new version row**
+  from the DDL — the mutation left no history behind, which is the hazard AGENTS.md names for the
+  dashboard SQL editor.
+  `npm run test:integration` afterwards: 17 files, 142 tests passed. No CI run was in flight at
+  any point (`gh run list`: latest 32464522837, completed 08:43Z; mutations ran ~12:2xZ).
+  The mutation tool refuses any target but the literal `gymlog-test` and refuses when
+  SUPABASE_TEST_URL resolves to production — both refusals fired before first use. It lives in the
+  scratchpad and is deliberately not committed: env-parity.mjs must stay incapable of writing.
 - **P3.0** — (Phase 3) `gymlog-test` auth config before and after the correction, read back.
 - **P4.0** — (Phase 4) `db:push` with drift planted: before-warning text, after-failure text.
 - **P5.0** — (Phase 5) smoke against the deployed URL: code and exit.
@@ -628,33 +649,33 @@ this plan's § Measurement record carries the exact statements.
 
 #### Automated
 
-- [x] 1.1 `npm run db:parity` exits 0 and reports every aspect as agreeing
-- [x] 1.2 Every aspect reports a row count at or above its floor; no aspect reports 0
-- [x] 1.3 `grants` reports 9 relations on both projects, not 0
-- [x] 1.4 `seeded_catalogue` reports 38 on both; the 75 custom rows appear nowhere
-- [x] 1.5 With `SUPABASE_ACCESS_TOKEN` withheld, the script exits 2 and names the variable
-- [x] 1.6 `npm run lint` passes
-- [x] 1.7 `npx prettier --check scripts/env-parity.mjs package.json` passes
+- [x] 1.1 `npm run db:parity` exits 0 and reports every aspect as agreeing — 13aab56
+- [x] 1.2 Every aspect reports a row count at or above its floor; no aspect reports 0 — 13aab56
+- [x] 1.3 `grants` reports 9 relations on both projects, not 0 — 13aab56
+- [x] 1.4 `seeded_catalogue` reports 38 on both; the 75 custom rows appear nowhere — 13aab56
+- [x] 1.5 With `SUPABASE_ACCESS_TOKEN` withheld, the script exits 2 and names the variable — 13aab56
+- [x] 1.6 `npm run lint` passes — 13aab56
+- [x] 1.7 `npx prettier --check scripts/env-parity.mjs package.json` passes — 13aab56
 
 #### Manual
 
-- [x] 1.8 Full-run output names each aspect and its row counts, readable without the source
-- [x] 1.9 No token, project ref or connection string appears in success or forced-failure output
+- [x] 1.8 Full-run output names each aspect and its row counts, readable without the source — 13aab56
+- [x] 1.9 No token, project ref or connection string appears in success or forced-failure output — 13aab56
 
 ### Phase 2: Prove the check bites
 
 #### Automated
 
-- [ ] 2.1 Before mutating, `npm run db:parity` exits 0
-- [ ] 2.2 Column added to `gymlog-test`: exits 1, `columns` aspect names that column
-- [ ] 2.3 RLS policy altered on `gymlog-test`: exits 1, `policies` aspect names it
-- [ ] 2.4 After reverting both: exits 0, every aspect back at its Phase 1 row count
+- [x] 2.1 Before mutating, `npm run db:parity` exits 0
+- [x] 2.2 Column added to `gymlog-test`: exits 1, `columns` aspect names that column
+- [x] 2.3 RLS policy altered on `gymlog-test`: exits 1, `policies` aspect names it
+- [x] 2.4 After reverting both: exits 0, every aspect back at its Phase 1 row count
 
 #### Manual
 
-- [ ] 2.5 No CI run was in flight against `gymlog-test`, checked before and after
-- [ ] 2.6 Revert confirmed by re-reading the catalogue, not only by the check going green
-- [ ] 2.7 `npm run db:status` reports identical histories — no history row was written
+- [x] 2.5 No CI run was in flight against `gymlog-test`, checked before and after
+- [x] 2.6 Revert confirmed by re-reading the catalogue, not only by the check going green
+- [x] 2.7 `npm run db:status` reports identical histories — no history row was written
 
 ### Phase 3: The auth-config contract
 
