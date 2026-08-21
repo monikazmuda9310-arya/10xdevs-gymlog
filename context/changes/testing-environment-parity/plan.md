@@ -664,9 +664,39 @@ this plan's § Measurement record carries the exact statements.
 - **P4.2** — (Phase 4) `npm run db:status` unchanged: twenty version rows, ten per project. The
   dispatcher now awaits its verb, and `status` still returns a plain number — awaiting one is a
   no-op, which `db:status` returning 0 through the new path confirms.
-- **P5.0** — (Phase 5) smoke against the deployed URL: code and exit.
-- **P5.1** — (Phase 5) negative control: credentials withheld, code and exit.
-- **P5.2** — (Phase 5) `Origin` control: header dropped, code and exit.
+- **P5.0** — (Phase 5, 2026-08-21) smoke against the deployed URL: **PASS**, exit 0,
+  `https://gymlog.10x-astro-starter.workers.dev` answered `?error=sign_in_failed`. The Worker
+  reached Supabase and got a genuine identity refusal, so its runtime secrets are present and
+  the provider accepted them. The two limits printed with it.
+- **P5.1** — (Phase 5, 2026-08-21) NEGATIVE CONTROL: the built worker served on :8799 with the
+  launcher bypassed and every SUPABASE*/GYMLOG*/CLOUDFLARE\_ variable stripped, so no credential
+  was reachable at all. Smoke → **FAIL, exit 1**, `?error=not_configured`. Without this the
+  passing result above would be indistinguishable from a probe incapable of failing.
+  `scripts/e2e-serve.mjs` could not be used: it REFUSES to start without the three test
+  credentials, which is its own guard and not what was under test.
+- **P5.2** — (Phase 5, 2026-08-21) `Origin` CONTROL, on the SAME server as P5.1 — which is the
+  sharp form of it. Header dropped → **exit 2**, `answered 403 with no redirect`, reported as
+  `the probe did not reach a handler, so this says NOTHING about the Worker's credentials`.
+  One server, two questions, two different answers: the smoke separates _the deployment is
+  broken_ from _I could not ask_, rather than collapsing both into a failure.
+- **P5.3** — (Phase 5, 2026-08-21) the probe ADDRESS, which the plan left open rather than
+  assumed. `deploy-smoke-<nonce>@example.com` clears this project's `isValidEmail` **and**
+  Supabase's own validation, arriving as `invalid_credentials` → `sign_in_failed`. Had the
+  provider rejected the address instead, it would have mapped to `unexpected` and the smoke
+  would have reported every healthy deployment as broken.
+- **P5.4** — (Phase 5, 2026-08-21) the secret PRE-FLIGHT proven to block, by requiring a secret
+  that does not exist. `npm run deploy` printed `— worker secrets —` then
+  `deploy REFUSING … missing runtime secret(s): SUPABASE_NONEXISTENT`, and **never reached the
+  `— deploy —` section**. Reverted. Found while doing it: the astro binary path was guessed and
+  wrong, so the first attempt refused for the wrong reason (`astro build` failed) — now resolved
+  from astro's own `bin` field, as `lessons.md` § "A mutation that fails for the WRONG REASON"
+  requires it to be read.
+
+- **P5.5** — (Phase 5, 2026-08-21) `npm run deploy` end to end against production: build →
+  `runtime secrets present by name — SUPABASE_KEY, SUPABASE_URL` → `wrangler deploy` →
+  smoke **PASS**, exit 0. Version ID `c5c41f6d-9913-463d-a65c-0f560c5d732b`, 3 new static assets.
+  The smoke ran automatically as part of the command, which is the property this phase was for:
+  deploying without checking is no longer an available mistake.
 
 ## Progress
 
@@ -722,31 +752,31 @@ this plan's § Measurement record carries the exact statements.
 
 #### Automated
 
-- [x] 4.1 `npm run db:push` with nothing pending runs the after-check and exits 0
-- [x] 4.2 With drift planted, `db:push` warns before and fails after, with different wording
-- [x] 4.3 With `SUPABASE_ACCESS_TOKEN` withheld, `db:push` fails on the after-check
-- [x] 4.4 `npm run db:status` output is unchanged
-- [x] 4.5 `npm run lint` and `npx prettier --check scripts/supabase-db.mjs` pass
+- [x] 4.1 `npm run db:push` with nothing pending runs the after-check and exits 0 — 9da8429
+- [x] 4.2 With drift planted, `db:push` warns before and fails after, with different wording — 9da8429
+- [x] 4.3 With `SUPABASE_ACCESS_TOKEN` withheld, `db:push` fails on the after-check — 9da8429
+- [x] 4.4 `npm run db:status` output is unchanged — 9da8429
+- [x] 4.5 `npm run lint` and `npx prettier --check scripts/supabase-db.mjs` pass — 9da8429
 
 #### Manual
 
-- [x] 4.6 The two messages are distinguishable at a glance in a real terminal
+- [x] 4.6 The two messages are distinguishable at a glance in a real terminal — 9da8429
 
 ### Phase 5: The post-deploy smoke
 
 #### Automated
 
-- [ ] 5.1 Against the deployed URL, the smoke exits 0 reporting `sign_in_failed`
-- [ ] 5.2 Negative control: built worker served with credentials withheld reports `not_configured`, exit 1
-- [ ] 5.3 `Origin` control: header dropped reports the 403 branch and exits 2, not 1
-- [ ] 5.4 `wrangler secret list --name gymlog` lists both names
-- [ ] 5.5 `npm run lint` and `npx prettier --check` pass
+- [x] 5.1 Against the deployed URL, the smoke exits 0 reporting `sign_in_failed`
+- [x] 5.2 Negative control: built worker served with credentials withheld reports `not_configured`, exit 1
+- [x] 5.3 `Origin` control: header dropped reports the 403 branch and exits 2, not 1
+- [x] 5.4 `wrangler secret list --name gymlog` lists both names
+- [x] 5.5 `npm run lint` and `npx prettier --check` pass
 
 #### Manual
 
-- [ ] 5.6 `npm run deploy` end to end, and the deployed URL still signs a real account in
-- [ ] 5.7 Passing output states its two limits
-- [ ] 5.8 `not_configured` failure names `wrangler secret put` and does not suggest rollback
+- [x] 5.6 `npm run deploy` end to end, and the deployed URL still signs a real account in
+- [x] 5.7 Passing output states its two limits
+- [x] 5.8 `not_configured` failure names `wrangler secret put` and does not suggest rollback
 
 ### Phase 6: Close the gates in the documents
 

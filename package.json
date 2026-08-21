@@ -20,7 +20,8 @@
     "db:status": "node scripts/supabase-db.mjs status",
     "db:parity": "node scripts/env-parity.mjs",
     "db:push": "node scripts/supabase-db.mjs push",
-    "db:types": "node scripts/supabase-db.mjs types && prettier --write src/db/database.types.ts"
+    "db:types": "node scripts/supabase-db.mjs types && prettier --write src/db/database.types.ts",
+    "deploy": "node scripts/deploy.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.8",
