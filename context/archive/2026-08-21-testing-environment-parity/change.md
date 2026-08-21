@@ -1,10 +1,10 @@
 ---
 change_id: testing-environment-parity
 title: Environment parity — schema drift check and a post-deploy sign-in smoke
-status: impl_reviewed
+status: archived
 created: 2026-08-21
 updated: 2026-08-21
-archived_at: null
+archived_at: 2026-08-21T12:25:55Z
 ---
 
 ## Notes
