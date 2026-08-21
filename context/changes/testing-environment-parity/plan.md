@@ -782,12 +782,12 @@ this plan's § Measurement record carries the exact statements.
 
 #### Automated
 
-- [x] 6.1 `npx prettier --check` passes on all five documents
-- [x] 6.2 No file in `context/foundation/` still describes either gate as pending
-- [x] 6.3 The full eight-step gate passes
-- [x] 6.4 `npm run db:parity` exits 0 and `npm run db:push` completes with both checks green
+- [x] 6.1 `npx prettier --check` passes on all five documents — 2729c44
+- [x] 6.2 No file in `context/foundation/` still describes either gate as pending — 2729c44
+- [x] 6.3 The full eight-step gate passes — 2729c44
+- [x] 6.4 `npm run db:parity` exits 0 and `npm run db:push` completes with both checks green — 2729c44
 
 #### Manual
 
-- [x] 6.5 §6.9 is sufficient to add an aspect without opening this plan, checked by writing one
-- [x] 6.6 The `lessons.md` entries name the measurement, not just the rule
+- [x] 6.5 §6.9 is sufficient to add an aspect without opening this plan, checked by writing one — 2729c44
+- [x] 6.6 The `lessons.md` entries name the measurement, not just the rule — 2729c44
