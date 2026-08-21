@@ -476,7 +476,17 @@ describe("the new-workout form's two silent UTC fallbacks", () => {
   // both branches are reached only when the profile read returns nothing or fails, neither of which
   // a user can cause. **The edit that would change them** is the product deciding this page should
   // say when its date came from UTC, or should refuse the form the way `/dashboard` refuses a
-  // figure — Open Question 2 of this change's `research.md`, and an owner call rather than a test's.
+  // figure — Open Question 2 of the `testing-week-boundary-seam` change folder's `research.md`, and
+  // an owner call rather than a test's.
+  //
+  // **`not.toContain("UTC")` below is deliberately UNBOUNDED, against this project's usual
+  // discipline.** `dashboard-tonnage.test.ts:250` bounds such a check to a region so it cannot fail
+  // for a reason unrelated to its claim, and that is right there, where the same sentence
+  // legitimately appears elsewhere on the page. Here the claim is precisely "NOWHERE on this
+  // screen", so narrowing it to the form would weaken it into something these two fallbacks could
+  // pass while a banner further down said UTC. The cost is accepted and named: unrelated copy
+  // containing those three letters would redden these two tests, and the fix for that is to read
+  // this paragraph, not to loosen the assertion.
 
   it("falls back to UTC with no signal when there is no profile row", async () => {
     // At I2 the UTC date is `2026-08-10` — the same date `Europe/Warsaw` would give, which is why

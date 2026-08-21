@@ -541,6 +541,14 @@ Fixed above. Note the **category** rather than the number, for the reason `lesso
 conversion constant has been miscounted twice, in the same direction" gives — and which this phase's
 own brief then violated by repeating the wrong figure.
 
+**§6.8's one untested claim, and who settles it.** Criterion 4.4 asked whether §6.8 is sufficient to
+write a correct week assertion without reading `research.md` — and it was checked by the person who
+wrote §6.8, which is the same shape as `lessons.md` § "Verify with a script that attacks, not by
+asking the owner to read code". The owner confirmed it, which is the strongest signal available
+today, and it is not evidence. **The next author who writes a week- or timezone-related test against
+§6.8 settles it**: record here whether they needed `research.md`, and if they did, what §6.8 was
+missing. Found by this change's own implementation review, 2026-08-21.
+
 **What Phase 4 deliberately did NOT close**, stated so a green gate is not read as covering it:
 
 - **`timezones.ts`'s fallback is closed by this paragraph, not by a test**, and that is a decision
@@ -573,8 +581,8 @@ own brief then violated by repeating the wrong figure.
   `records.astro` class Phase 3 named, applied to the timezone, and it is week-shaped rather than
   merely date-shaped: a workout filed on the wrong day at 01:00 Warsaw lands in the wrong week's
   tonnage. Two assertions pin today's behaviour and say it is not an endorsement. **The edit that
-  makes it a product decision** is Open Question 2 in this change folder's `research.md` — an owner
-  call, not a test's.
+  makes it a product decision** is Open Question 2 in the `testing-week-boundary-seam` change
+  folder's `research.md` — an owner call, not a test's.
 
 ## 7. What We Deliberately Don't Test
 
