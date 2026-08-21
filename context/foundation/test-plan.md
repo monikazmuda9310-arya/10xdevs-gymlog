@@ -282,8 +282,9 @@ named against it.
   range for the assertion to mean anything: 5 reps at 100 kg is `100 × 36 / (37 − 5)` = **112.5**
   under the default Brzycki. Outside it the slot holds a sentence instead.
 - **A known failure mode that is NEITHER the product nor the spec: `wrangler dev` can die mid-run.**
-  Seen once, on the push run for `7fbfb0d` (2026-08-20, GitHub Actions run `32411019182`). Read the
-  log before diagnosing anything else, because the symptom points at the wrong place:
+  **Seen twice** — 2026-08-20 on the push run for `7fbfb0d` (run `32411019182`), and 2026-08-21 on
+  PR #12 (run `32484858384`). Read the log before diagnosing anything else, because the symptom
+  points at the wrong place. The first occurrence:
 
   ```
   19:58:01.466  GET /auth/signin 200 OK           ← critical-flow's last step
@@ -301,19 +302,50 @@ named against it.
   check, which is the last thing at fault. **`ERR_CONNECTION_REFUSED` from any spec means the server
   is gone: grep the `[WebServer]` lines for `✘ [ERROR]` before reading a single line of product
   code.**
-  - **The trigger is unknown and is not recorded as known.** Wrangler's message was **empty**; a
-    telemetry notice printed 80 ms earlier is suggestive and unproven, and writing it down as the
-    cause would be inventing one. What IS established: the process crashed, it was not the specs, and
-    it has not recurred — the same two specs went green twice the following day.
-  - **`wrangler` is `^4.90.0` in `package.json` while `npm ci` installs whatever the lockfile pins**,
-    and wrangler's own crash output suggested 4.125.0. A lead for whoever meets this next, not a fix:
-    nobody has checked whether the newer version changes anything.
+
+  **The second occurrence, 2026-08-21, settles two things the first could not.**
+
+  ```
+  13:08:45.757  [WebServer] ✘ [ERROR]                    ← empty message again
+  13:08:45.758  Note that there is a newer version of Wrangler available (4.125.0)
+  13:08:51.183  ✘ critical-flow (13.6s)                  ← died at its LAST assertion, line 165
+  13:08:52.060  ✘ smoke (251ms) — ERR_CONNECTION_REFUSED
+  ```
+
+  - **It is not caused by anything in the diff.** That PR changed five files, all of them renames
+    under `context/` — no source, no config, no dependency. Eight gate steps passed ahead of it.
+    Whatever provokes this, it is not the change under test.
+  - **It is non-deterministic on IDENTICAL input, which the first occurrence could not show.**
+    `gh run rerun --failed` on the same commit went green in 4m56s. The 2026-08-20 note reasoned
+    from two green runs _the following day_ — a different commit, so it could not separate
+    "flaky" from "fixed by whatever landed in between". A rerun of the same SHA can.
+  - **A DIFFERENT spec took the blame this time, which is the rule behaving as stated.** The crash
+    landed earlier in the run, so `critical-flow` failed too — at line 165,
+    `expect(page).toHaveURL(/\/auth\/signin/)` after sign-out, having stayed on `/workouts/<id>`
+    because the sign-out POST met a dead server. Read on its own that assertion looks like a
+    routing defect. It is not. **Two occurrences, two different accused specs, one cause.**
+  - **The trigger is still unknown and is still not recorded as known.** Wrangler's message was
+    empty both times. What IS established after two: the process crashes, it is not the specs, it
+    does not depend on the diff, and it does not reproduce on a rerun.
+  - **`wrangler` is `^4.90.0` in `package.json` while `npm ci` installs whatever the lockfile pins**
+    — 4.120.0 on both occurrences — and wrangler's own crash output named 4.125.0 both times. After
+    two crashes on the same version pair this is the strongest lead available and still nobody has
+    tried the newer version. It is a lead, not a diagnosis: nothing connects the version to the
+    crash except that wrangler mentions it while dying.
+  - **When you watch a run for this, do not pipe `gh run watch --exit-status` through anything.** A
+    shell pipeline exits with the LAST command's status, so `… | tail` reports 0 over a failed run —
+    which is how the second occurrence was first reported as a pass. Redirect to a file and read
+    `gh`'s own code, or read `conclusion` back from the API.
   - **`retries: 0` is deliberate and it settles two different questions with one rule.**
     `playwright.config.ts:70` argues it for the FLOW — "a flow that only passes on the second attempt
     is a finding, not a flake to absorb" — which is right. A crashed harness server is not the flow
     behaving inconsistently, and the gate cannot currently tell the two apart. Do not "fix" this by
-    turning retries on: that would absorb the product flakiness the rule exists to surface. If it
-    recurs, the shape worth building is one that distinguishes a dead port from a failed assertion.
+    turning retries on: that would absorb the product flakiness the rule exists to surface.
+    **It has now recurred, so the conditional is spent**: the shape worth building distinguishes a
+    dead port from a failed assertion — a spec-level check that the server still answers before a
+    failure is reported as the flow's, so the gate can say "the harness died" in its own words
+    instead of leaving a human to grep for it. Not built; named here so the next occurrence does
+    not have to re-derive it.
 
 - **Reference test**: `tests/e2e/critical-flow.spec.ts`; `tests/e2e/smoke.spec.ts` for the harness.
 - **Run locally**: `npm run test:e2e`. To watch it: `E2E_SLOWMO=500 npm run test:e2e -- --headed`.
