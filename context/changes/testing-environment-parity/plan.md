@@ -650,7 +650,20 @@ this plan's § Measurement record carries the exact statements.
   the "the deployed URL moved and the project config did not" scenario AGENTS.md § Environment
   names as invisible to every test in the repository.
   Both mutations reverted; `db:parity` green afterwards.
-- **P4.0** — (Phase 4) `db:push` with drift planted: before-warning text, after-failure text.
+- **P4.0** — (Phase 4, 2026-08-21) `db:push` with drift planted on gymlog-test
+  (`add column exercises.parity_probe_marker`). The two sides said different things, which is the
+  whole point of running the check twice:
+  BEFORE → `WARNING — the two projects ALREADY differ, before this push touched anything.`
+  and the push **proceeded**;
+  AFTER → `BOTH PUSHES SUCCEEDED AND THE SCHEMAS DO NOT AGREE.` and the command **failed, exit 1**.
+  Reverted; `db:parity` green afterwards.
+- **P4.1** — (Phase 4, 2026-08-21) `SUPABASE_ACCESS_TOKEN=` through `db:push`: the before-check
+  warned and continued, the after-check **failed with exit 2** saying
+  `That is not the same as "the projects agree", so this command is not reporting success.`
+  An unverifiable after-state does not read as a successful push.
+- **P4.2** — (Phase 4) `npm run db:status` unchanged: twenty version rows, ten per project. The
+  dispatcher now awaits its verb, and `status` still returns a plain number — awaiting one is a
+  no-op, which `db:status` returning 0 through the new path confirms.
 - **P5.0** — (Phase 5) smoke against the deployed URL: code and exit.
 - **P5.1** — (Phase 5) negative control: credentials withheld, code and exit.
 - **P5.2** — (Phase 5) `Origin` control: header dropped, code and exit.
@@ -695,29 +708,29 @@ this plan's § Measurement record carries the exact statements.
 
 #### Automated
 
-- [x] 3.1 `npm run db:parity` exits 0 with the auth-config aspect included and passing
-- [x] 3.2 `gymlog-test` config reads back as `http://localhost:4321` with a non-empty allow list
-- [x] 3.3 Wrong `mailer_autoconfirm` direction makes the check exit 1 naming the project; reverted
-- [x] 3.4 `npm run test:integration` still passes
-- [x] 3.5 `npm run lint` and `npx prettier --check` pass
+- [x] 3.1 `npm run db:parity` exits 0 with the auth-config aspect included and passing — 10bf779
+- [x] 3.2 `gymlog-test` config reads back as `http://localhost:4321` with a non-empty allow list — 10bf779
+- [x] 3.3 Wrong `mailer_autoconfirm` direction makes the check exit 1 naming the project; reverted — 10bf779
+- [x] 3.4 `npm run test:integration` still passes — 10bf779
+- [x] 3.5 `npm run lint` and `npx prettier --check` pass — 10bf779
 
 #### Manual
 
-- [x] 3.6 The deployed origin has one definition, shared with Phase 5's smoke
+- [x] 3.6 The deployed origin has one definition, shared with Phase 5's smoke — 10bf779
 
 ### Phase 4: Wire parity into `db:push`
 
 #### Automated
 
-- [ ] 4.1 `npm run db:push` with nothing pending runs the after-check and exits 0
-- [ ] 4.2 With drift planted, `db:push` warns before and fails after, with different wording
-- [ ] 4.3 With `SUPABASE_ACCESS_TOKEN` withheld, `db:push` fails on the after-check
-- [ ] 4.4 `npm run db:status` output is unchanged
-- [ ] 4.5 `npm run lint` and `npx prettier --check scripts/supabase-db.mjs` pass
+- [x] 4.1 `npm run db:push` with nothing pending runs the after-check and exits 0
+- [x] 4.2 With drift planted, `db:push` warns before and fails after, with different wording
+- [x] 4.3 With `SUPABASE_ACCESS_TOKEN` withheld, `db:push` fails on the after-check
+- [x] 4.4 `npm run db:status` output is unchanged
+- [x] 4.5 `npm run lint` and `npx prettier --check scripts/supabase-db.mjs` pass
 
 #### Manual
 
-- [ ] 4.6 The two messages are distinguishable at a glance in a real terminal
+- [x] 4.6 The two messages are distinguishable at a glance in a real terminal
 
 ### Phase 5: The post-deploy smoke
 
