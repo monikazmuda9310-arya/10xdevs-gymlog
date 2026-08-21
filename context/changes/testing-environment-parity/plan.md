@@ -635,7 +635,21 @@ this plan's § Measurement record carries the exact statements.
   The mutation tool refuses any target but the literal `gymlog-test` and refuses when
   SUPABASE_TEST_URL resolves to production — both refusals fired before first use. It lives in the
   scratchpad and is deliberately not committed: env-parity.mjs must stay incapable of writing.
-- **P3.0** — (Phase 3) `gymlog-test` auth config before and after the correction, read back.
+- **P3.0** — (Phase 3, 2026-08-21) `gymlog-test` auth config corrected and read back:
+  BEFORE `site_url: "http://localhost:3000"`, `uri_allow_list: ""`;
+  AFTER `site_url: "http://localhost:4321"`,
+  `uri_allow_list: "http://localhost:4321/**,http://localhost:8788/**"`.
+  `mailer_autoconfirm` untouched — Confirm email is still **off** on gymlog-test, which is what
+  `npm run test:integration` depends on. 17 files / 142 tests passed afterwards.
+- **P3.1** — (Phase 3, 2026-08-21) the CONTRACT proven able to fail, by mutating the ASSERTIONS
+  rather than the live configuration.
+  (a) Both `mailer_autoconfirm` directions asserted backwards → exit 1, two violations, each
+  naming WHICH project is wrong — which matters because the two consequences are opposite.
+  (b) `DEPLOYED_ORIGIN` pointed at a renamed host → exit 1, reporting that gymlog's `site_url`
+  is not the expected one AND that `uri_allow_list` does not cover the new host. That is exactly
+  the "the deployed URL moved and the project config did not" scenario AGENTS.md § Environment
+  names as invisible to every test in the repository.
+  Both mutations reverted; `db:parity` green afterwards.
 - **P4.0** — (Phase 4) `db:push` with drift planted: before-warning text, after-failure text.
 - **P5.0** — (Phase 5) smoke against the deployed URL: code and exit.
 - **P5.1** — (Phase 5) negative control: credentials withheld, code and exit.
@@ -666,30 +680,30 @@ this plan's § Measurement record carries the exact statements.
 
 #### Automated
 
-- [x] 2.1 Before mutating, `npm run db:parity` exits 0
-- [x] 2.2 Column added to `gymlog-test`: exits 1, `columns` aspect names that column
-- [x] 2.3 RLS policy altered on `gymlog-test`: exits 1, `policies` aspect names it
-- [x] 2.4 After reverting both: exits 0, every aspect back at its Phase 1 row count
+- [x] 2.1 Before mutating, `npm run db:parity` exits 0 — 0aa6ebd
+- [x] 2.2 Column added to `gymlog-test`: exits 1, `columns` aspect names that column — 0aa6ebd
+- [x] 2.3 RLS policy altered on `gymlog-test`: exits 1, `policies` aspect names it — 0aa6ebd
+- [x] 2.4 After reverting both: exits 0, every aspect back at its Phase 1 row count — 0aa6ebd
 
 #### Manual
 
-- [x] 2.5 No CI run was in flight against `gymlog-test`, checked before and after
-- [x] 2.6 Revert confirmed by re-reading the catalogue, not only by the check going green
-- [x] 2.7 `npm run db:status` reports identical histories — no history row was written
+- [x] 2.5 No CI run was in flight against `gymlog-test`, checked before and after — 0aa6ebd
+- [x] 2.6 Revert confirmed by re-reading the catalogue, not only by the check going green — 0aa6ebd
+- [x] 2.7 `npm run db:status` reports identical histories — no history row was written — 0aa6ebd
 
 ### Phase 3: The auth-config contract
 
 #### Automated
 
-- [ ] 3.1 `npm run db:parity` exits 0 with the auth-config aspect included and passing
-- [ ] 3.2 `gymlog-test` config reads back as `http://localhost:4321` with a non-empty allow list
-- [ ] 3.3 Wrong `mailer_autoconfirm` direction makes the check exit 1 naming the project; reverted
-- [ ] 3.4 `npm run test:integration` still passes
-- [ ] 3.5 `npm run lint` and `npx prettier --check` pass
+- [x] 3.1 `npm run db:parity` exits 0 with the auth-config aspect included and passing
+- [x] 3.2 `gymlog-test` config reads back as `http://localhost:4321` with a non-empty allow list
+- [x] 3.3 Wrong `mailer_autoconfirm` direction makes the check exit 1 naming the project; reverted
+- [x] 3.4 `npm run test:integration` still passes
+- [x] 3.5 `npm run lint` and `npx prettier --check` pass
 
 #### Manual
 
-- [ ] 3.6 The deployed origin has one definition, shared with Phase 5's smoke
+- [x] 3.6 The deployed origin has one definition, shared with Phase 5's smoke
 
 ### Phase 4: Wire parity into `db:push`
 

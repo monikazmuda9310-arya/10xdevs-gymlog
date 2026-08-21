@@ -24,6 +24,7 @@
 
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
+import { DEPLOYED_ORIGIN, EXPECTED_SITE_URL } from "./deployed-origin.mjs";
 
 const API = "https://api.supabase.com/v1/projects";
 
@@ -186,6 +187,67 @@ const ASPECTS = [
   },
 ];
 
+/**
+ * The auth-configuration CONTRACT — and it is a contract rather than a comparison, deliberately.
+ *
+ * Every aspect above asserts the two projects are EQUAL. This one cannot: the projects are supposed
+ * to differ on email confirmation, and making them uniform breaks something in either direction —
+ * off for `gymlog` lets anybody create an account on an address they do not own, on for
+ * `gymlog-test` stops `signUp` returning a session and breaks `npm run test:integration` on its
+ * first assertion (README.md § Email confirmation). So the claim here is "they differ in the
+ * documented direction", and the message has to name WHICH project is wrong, because the two
+ * consequences are opposite.
+ *
+ * `mailer_autoconfirm` names the BYPASS, not the feature: `false` means confirmation is ON.
+ */
+function authConfigProblems(production, test) {
+  const problems = [];
+
+  if (production.mailer_autoconfirm !== false) {
+    problems.push(
+      "gymlog has Confirm email OFF. Real accounts can be created on addresses nobody owns — " +
+        "the thing FR-001 and US-04 exist to prevent. Nothing automated will notice this but this line.",
+    );
+  }
+  if (test.mailer_autoconfirm !== true) {
+    problems.push(
+      "gymlog-test has Confirm email ON. `signUp` stops returning a session, so " +
+        "`npm run test:integration` cannot bootstrap accounts — auth-flows.test.ts's first assertion " +
+        "is the other half of this guard.",
+    );
+  }
+
+  // Production's site_url is where a confirmation link lands. Compared against the ONE definition
+  // in deployed-origin.mjs, which the post-deploy smoke also reads.
+  if (production.site_url !== EXPECTED_SITE_URL) {
+    problems.push(`gymlog site_url is ${JSON.stringify(production.site_url)}, expected ${EXPECTED_SITE_URL}.`);
+  }
+  if (!String(production.uri_allow_list).includes(new URL(DEPLOYED_ORIGIN).hostname)) {
+    problems.push(
+      `gymlog uri_allow_list does not cover ${new URL(DEPLOYED_ORIGIN).hostname} — ` +
+        "a confirmation link to the deployed host would be refused as a redirect target.",
+    );
+  }
+
+  // **Loosely pinned on purpose: `localhost`, not a specific port.** Pinning 4321 would turn an
+  // `astro.config` port change into a false alarm. What matters is that the test project never
+  // sends anybody to a public host.
+  let testHost = null;
+  try {
+    testHost = new URL(test.site_url).hostname;
+  } catch {
+    /* unparseable is caught by the null check below */
+  }
+  if (testHost !== "localhost" && testHost !== "127.0.0.1") {
+    problems.push(
+      `gymlog-test site_url is ${JSON.stringify(test.site_url)} — expected a localhost URL. ` +
+        "It was `http://localhost:3000` until 2026-08-21, a port nothing in this project serves.",
+    );
+  }
+
+  return problems;
+}
+
 const MAX_PRINTED_ROWS = 12;
 
 function fail(message) {
@@ -268,6 +330,17 @@ async function query(ref, token, sql) {
   return JSON.parse(text).map((row) => row.x);
 }
 
+async function authConfig(ref, token) {
+  const response = await fetch(`${API}/${ref}/config/auth`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${text.slice(0, 300)}`);
+  }
+  return JSON.parse(text);
+}
+
 /**
  * Compare both projects across every aspect.
  *
@@ -319,6 +392,20 @@ export async function compareEnvironments() {
             `  Nothing was compared. An unreadable project is not an agreeing one.`,
         );
       }
+    }
+  }
+
+  // Collected in the same phase as the aspects, for the same reason: a config the script could not
+  // read must not leave the schema half of the report looking like a clean bill of health.
+  const configs = {};
+  for (const target of resolved) {
+    try {
+      configs[target.key] = await authConfig(target.ref, token);
+    } catch (error) {
+      return fail(
+        `could not read the auth configuration of ${target.label} — ${mask(error.message)}\n` +
+          `  Nothing was compared.`,
+      );
     }
   }
 
@@ -386,6 +473,18 @@ export async function compareEnvironments() {
     }
   }
 
+  const problems = authConfigProblems(configs.production, configs.test);
+  if (problems.length === 0) {
+    const confirm = `gymlog=ON gymlog-test=off`;
+    console.log(`OK          ${"auth_config".padEnd(17)} confirm-email ${confirm}, site_url as contracted`);
+  } else {
+    differing += 1;
+    console.log(`DIFF        ${"auth_config".padEnd(17)} ${problems.length} contract violation(s)`);
+    for (const problem of problems) {
+      console.log(`            ${mask(problem)}`);
+    }
+  }
+
   console.log("");
   if (unverifiable > 0) {
     console.error(
@@ -401,7 +500,8 @@ export async function compareEnvironments() {
     );
     return DIFFERS;
   }
-  console.log(`env-parity: gymlog and gymlog-test agree across all ${ASPECTS.length} aspects.`);
+  console.log(`env-parity: gymlog and gymlog-test agree across all ${ASPECTS.length} aspects, and the`);
+  console.log(`  auth configuration differs in exactly the documented direction.`);
   return AGREE;
 }
 
