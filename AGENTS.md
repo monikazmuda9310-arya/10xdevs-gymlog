@@ -284,6 +284,20 @@ non-interactive Vitest run.
   - **The required context string must equal the job name exactly.** A typo looks identical to
     working protection and leaves `main` permanently unmergeable, because GitHub waits for a status
     nothing emits.
+  - **Protecting `main` also made every plan's Progress SHAs unreachable from `main`, and nobody
+    wrote that down.** A plan's Progress rows carry the commit each step landed in, so a reader can
+    `git show` it. Work now reaches `main` by **squash**, which replaces those commits with one new
+    SHA — so the recorded ones survive **only while their branch does**. Measured 2026-08-21 across
+    every archived plan: the ten from 2026-08-09…08-14 have **51 of 51** SHAs on `main`, because
+    that work was pushed straight there; the four from 2026-08-16 onward have **0 of 22**, because
+    that work went through squash-merged PRs. The split is the PR flow arriving, not a regression.
+    - **So do not delete a change's feature branch after merging.** `delete_branch_on_merge` is
+      `false` for exactly this reason. Deleting one turns its plan's Progress column into dead
+      pointers, silently — `git show` simply stops resolving.
+    - **An `archive-*` branch IS safe to delete**: it carries one folder-rename commit whose
+      content is wholly on `main`, and no Progress row ever cites it. Check before assuming, the
+      way `chore(archive): close testing-environment-parity` was checked: compare the SHAs the
+      archived `plan.md` names against `origin/main` and against the branch you are about to drop.
 
 **There are FOUR Vitest projects and they cannot see each other's files** — deliberately, by include
 glob: `src/**` for `npm test`, `tests/integration/**`, `tests/render/**`, `tests/middleware/**`.
