@@ -1,0 +1,68 @@
+---
+change_id: testing-week-boundary-seam
+title: Week-boundary seam — prove a screen's week is bounded by the profile's stored zone
+status: implementing
+created: 2026-08-20
+updated: 2026-08-21
+archived_at: null
+---
+
+## Notes
+
+Rollout Phase 4 of `context/foundation/test-plan.md`: "Week-boundary seam".
+Goal: the week the screen shows is bounded by the zone the profile holds.
+
+Risks covered: Risk #1 — "The week's figures are computed from the wrong days after a timezone
+change; the number looks correct and is believed" (High impact x High likelihood — the only
+High x High row on the map; evidence: interview Q3; hot-spot src/lib/services/ — 53 changes/30d).
+
+Test types planned: integration + render.
+
+Risk response intent (from test-plan.md section 2, Risk Response Guidance):
+
+- Risk #1: prove that a SCREEN shows a week bounded by the days of the profile's stored zone, not by
+  UTC — including for a zone the form accepts. Must challenge the assumption that "the unit tests pin
+  both DST transitions": they pin a pure function, not what a screen does with a settable zone.
+  Context to ground: where the stored zone is read, what happens to an unknown one, and whether the
+  form and the validator share one list. Anti-patterns to avoid: a guard left inert by the runner's
+  ambient zone; asserting a figure without asserting WHICH DAYS made it.
+
+Inherited from Phase 3 (named in test-plan.md section 6.6 with this phase as owner):
+
+- Two class-E fallbacks that degrade silently and are compensated on /settings only:
+  `todayIn` answering in UTC for an unknown zone (`calendar.ts:26-35`), and
+  `Intl.supportedValuesOf("timeZone")` degrading from 418 entries to a 12-entry hardcoded list
+  (`timezones.ts:50-63`). Both are week-boundary-shaped, which is why they were assigned here.
+- Note the CATEGORY rather than a count: test-plan.md said "three swallows are deliberate" and there
+  are five (lessons.md section "The conversion constant has been miscounted twice").
+
+## Decisions taken outside the artifacts
+
+- **2026-08-20 — the §2 backport is DEFERRED to `/10x-test-plan --refresh`, deliberately.** Research
+  surfaced four corrections to `test-plan.md` §2 (the hot-spot citation is adjacent rather than the
+  anchor; "assert which days made the figure" is structurally impossible from `/dashboard`'s HTML;
+  the inertness mechanism is circularity, not the ambient zone the anti-pattern column names; and
+  the fallback list has seven entries, not twelve). The owner chose to leave §2 frozen: `research.md`
+  already carries all four, `/10x-plan` read it in full, and Phase 4 is not blocked by any of them.
+  **Do not backport them into §2 as a side effect of implementing this change** — §6 and §6.6 are
+  this phase's to edit, §1–§2 are not. The 12 → 7 correction is the one exception and is Phase 4
+  step 3, because a wrong number is a fact rather than a framing.
+
+## Mutation record — Phase 1 (2026-08-21)
+
+All three run against `tests/render/week-boundary.test.ts` and reverted with `git checkout`. Each was
+read for the reason it failed, not merely for the suite turning red (`lessons.md` § "A mutation that
+fails for the WRONG REASON has not confirmed the guard").
+
+- **Mutation 1 — `dashboard.astro:43` → `weeklyTonnage(supabase, user.id, "Europe/Warsaw")`.** Red on
+  the **negative-offset** test and on the cross-check, both on the `daily_tonnage` window:
+  `expected 2026-07-27..2026-08-09, received 2026-08-03..2026-08-16`. The positive-offset test stayed
+  **green**, which is the point of keeping two instants — a suite holding only I1 passes against this
+  defect.
+- **Mutation 2 — the same line → `"UTC"`.** Red on **both** instant rows, in opposite directions:
+  I1/`Europe/Warsaw` received `2026-07-27..2026-08-09` where it wanted `2026-08-03..2026-08-16`, and
+  I2/`America/New_York` received the reverse. That opposition is the pair's whole claim.
+- **Mutation 3 — `tonnage.ts:99-100` → `.gte()` / `.lte()` with no arguments.** Red on all three
+  tests with `{ gte: undefined, lte: undefined }`. `dashboard-tonnage.test.ts` stayed green at its
+  full 14 tests, which is the sharpest available statement of what this file adds: the bounds S-07's
+  implementation review found were guarded by nothing now have a reader.
