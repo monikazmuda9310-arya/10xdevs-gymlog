@@ -590,12 +590,12 @@ Frankfurt, in line with the existing tonnage suites.
 
 #### Automated
 
-- [x] 4.1 `npm run lint` passes
-- [x] 4.2 The full eight-step gate passes in order
+- [x] 4.1 `npm run lint` passes — 3297e8b
+- [x] 4.2 The full eight-step gate passes in order — 3297e8b
 
 #### Manual
 
-- [x] 4.3 No `12-entry` occurrence survives in `context/`
-- [x] 4.4 §6.8 is sufficient to write a correct week assertion without reading `research.md`
-- [x] 4.5 §6.6's Phase 4 entry states what was wrong in the document before it was measured
-- [x] 4.6 `test-plan.md` §3 Phase 4 Status set to `complete`
+- [x] 4.3 No `12-entry` occurrence survives in `context/` — 3297e8b
+- [x] 4.4 §6.8 is sufficient to write a correct week assertion without reading `research.md` — 3297e8b
+- [x] 4.5 §6.6's Phase 4 entry states what was wrong in the document before it was measured — 3297e8b
+- [x] 4.6 `test-plan.md` §3 Phase 4 Status set to `complete` — 3297e8b
