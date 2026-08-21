@@ -766,28 +766,28 @@ this plan's § Measurement record carries the exact statements.
 
 #### Automated
 
-- [x] 5.1 Against the deployed URL, the smoke exits 0 reporting `sign_in_failed`
-- [x] 5.2 Negative control: built worker served with credentials withheld reports `not_configured`, exit 1
-- [x] 5.3 `Origin` control: header dropped reports the 403 branch and exits 2, not 1
-- [x] 5.4 `wrangler secret list --name gymlog` lists both names
-- [x] 5.5 `npm run lint` and `npx prettier --check` pass
+- [x] 5.1 Against the deployed URL, the smoke exits 0 reporting `sign_in_failed` — 9553469
+- [x] 5.2 Negative control: built worker served with credentials withheld reports `not_configured`, exit 1 — 9553469
+- [x] 5.3 `Origin` control: header dropped reports the 403 branch and exits 2, not 1 — 9553469
+- [x] 5.4 `wrangler secret list --name gymlog` lists both names — 9553469
+- [x] 5.5 `npm run lint` and `npx prettier --check` pass — 9553469
 
 #### Manual
 
-- [x] 5.6 `npm run deploy` end to end, and the deployed URL still signs a real account in
-- [x] 5.7 Passing output states its two limits
-- [x] 5.8 `not_configured` failure names `wrangler secret put` and does not suggest rollback
+- [x] 5.6 `npm run deploy` end to end, and the deployed URL still signs a real account in — 9553469
+- [x] 5.7 Passing output states its two limits — 9553469
+- [x] 5.8 `not_configured` failure names `wrangler secret put` and does not suggest rollback — 9553469
 
 ### Phase 6: Close the gates in the documents
 
 #### Automated
 
-- [ ] 6.1 `npx prettier --check` passes on all five documents
-- [ ] 6.2 No file in `context/foundation/` still describes either gate as pending
-- [ ] 6.3 The full eight-step gate passes
-- [ ] 6.4 `npm run db:parity` exits 0 and `npm run db:push` completes with both checks green
+- [x] 6.1 `npx prettier --check` passes on all five documents
+- [x] 6.2 No file in `context/foundation/` still describes either gate as pending
+- [x] 6.3 The full eight-step gate passes
+- [x] 6.4 `npm run db:parity` exits 0 and `npm run db:push` completes with both checks green
 
 #### Manual
 
-- [ ] 6.5 §6.9 is sufficient to add an aspect without opening this plan, checked by writing one
-- [ ] 6.6 The `lessons.md` entries name the measurement, not just the rule
+- [x] 6.5 §6.9 is sufficient to add an aspect without opening this plan, checked by writing one
+- [x] 6.6 The `lessons.md` entries name the measurement, not just the rule

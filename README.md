@@ -62,9 +62,11 @@ npm run dev
 - `npm run test:render` - Render pages through Astro's container and assert on the resulting HTML (hermetic)
 - `npm run test:middleware` - Drive `onRequest` with real `gymlog-test` session cookies (needs network)
 - `npm run test:e2e` - Build the worker, strip its credentials, serve it, and drive Chromium against it (needs network)
-- `npm run db:status` - Print both projects' migration histories — the drift check
+- `npm run db:status` - Print both projects' migration histories (histories only — see `db:parity`)
+- `npm run db:parity` - Compare the two projects' **schemas**, seeded catalogue and auth config (needs network)
 - `npm run db:push` - Apply pending migrations to both projects, `gymlog-test` first
 - `npm run db:types` - Regenerate `src/db/database.types.ts` from the production schema
+- `npm run deploy` - Build, verify the Worker's secret names, deploy, then smoke-test the deployed URL
 
 ## Project Structure
 
@@ -162,24 +164,24 @@ and `http://localhost:4321/**` for local work.
 
 ### Routes
 
-| Route                   | Description                                                                                                              |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `/auth/signin`          | Email/password sign-in form. On success → `/dashboard`                                                                   |
-| `/auth/signup`          | Email/password sign-up form. On success → `/dashboard`, or `/auth/confirm-email` when a confirmation email is on its way |
-| `/auth/confirm-email`   | "Check your inbox" page — reached only when an email is genuinely coming                                                 |
-| `/dashboard`            | Protected. This training week's tonnage next to last week's, **broken down per muscle group and per exercise**           |
-| `/exercises`            | Protected. The catalogue: 38 seeded exercises plus the account's own, with search and a muscle-group filter              |
-| `/workouts`             | Protected. The account's own workouts, most recent first, and the form that starts one dated today in their timezone     |
-| `/workouts/[id]`        | Protected. One workout: add exercises, log sets, see each set's estimated 1RM. **404 for a workout that is not yours**   |
-| `/records`              | Protected. Current records per exercise — best estimated 1RM and heaviest weight, each with the set and date behind it   |
-| `/settings`             | Protected. Weight unit, estimation formula, and the timezone the training week runs in. One form, one Save               |
+| Route                   | Description                                                                                                                                                                                                                                                                 |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/auth/signin`          | Email/password sign-in form. On success → `/dashboard`                                                                                                                                                                                                                      |
+| `/auth/signup`          | Email/password sign-up form. On success → `/dashboard`, or `/auth/confirm-email` when a confirmation email is on its way                                                                                                                                                    |
+| `/auth/confirm-email`   | "Check your inbox" page — reached only when an email is genuinely coming                                                                                                                                                                                                    |
+| `/dashboard`            | Protected. This training week's tonnage next to last week's, **broken down per muscle group and per exercise**                                                                                                                                                              |
+| `/exercises`            | Protected. The catalogue: 38 seeded exercises plus the account's own, with search and a muscle-group filter                                                                                                                                                                 |
+| `/workouts`             | Protected. The account's own workouts, most recent first, and the form that starts one dated today in their timezone                                                                                                                                                        |
+| `/workouts/[id]`        | Protected. One workout: add exercises, log sets, see each set's estimated 1RM. **404 for a workout that is not yours**                                                                                                                                                      |
+| `/records`              | Protected. Current records per exercise — best estimated 1RM and heaviest weight, each with the set and date behind it                                                                                                                                                      |
+| `/settings`             | Protected. Weight unit, estimation formula, and the timezone the training week runs in. One form, one Save                                                                                                                                                                  |
 | `/api/auth/signout`     | POST. Always → `/auth/signin`, so returning requires authenticating again. **If the provider refuses, the session is ended on this device anyway and the destination carries `?error=sign_out_failed`** — the status is `302` either way, so it cannot carry the difference |
-| `/api/exercises`        | POST, **JSON** (not a form post — the caller is a hydrated island). Creates a custom exercise for the signed-in account  |
-| `/api/workouts`         | POST, JSON. Creates a workout from `{ performedOn, note? }`                                                              |
-| `/api/exercise-entries` | POST, JSON. Adds an exercise to a workout; choosing one already there returns the existing entry rather than an error. **An exercise the caller cannot see is refused exactly like one that does not exist** — same 404, same message code |
-| `/api/sets`             | POST, JSON. Logs a set. **The weight unit is not in the body** — it is read from the account's profile on the server     |
-| `/api/profile`          | PATCH, JSON. Replaces all three preferences at once. Writes only the row named by `locals.user.id`; no route parameter   |
-| `/api/account`          | DELETE. Removes the signed-in account and everything stored with it, then **signs the caller out in the same request**. No route parameter and no body — the account is named by `auth.uid()` inside the database |
+| `/api/exercises`        | POST, **JSON** (not a form post — the caller is a hydrated island). Creates a custom exercise for the signed-in account                                                                                                                                                     |
+| `/api/workouts`         | POST, JSON. Creates a workout from `{ performedOn, note? }`                                                                                                                                                                                                                 |
+| `/api/exercise-entries` | POST, JSON. Adds an exercise to a workout; choosing one already there returns the existing entry rather than an error. **An exercise the caller cannot see is refused exactly like one that does not exist** — same 404, same message code                                  |
+| `/api/sets`             | POST, JSON. Logs a set. **The weight unit is not in the body** — it is read from the account's profile on the server                                                                                                                                                        |
+| `/api/profile`          | PATCH, JSON. Replaces all three preferences at once. Writes only the row named by `locals.user.id`; no route parameter                                                                                                                                                      |
+| `/api/account`          | DELETE. Removes the signed-in account and everything stored with it, then **signs the caller out in the same request**. No route parameter and no body — the account is named by `auth.uid()` inside the database                                                           |
 
 Correcting what was logged, added by S-05. Each resource carries its mutations and a preflight that
 answers what the change would cost:
@@ -289,19 +291,41 @@ writing per-page checks.
 
 This project deploys to [Cloudflare Workers](https://workers.cloudflare.com/).
 
-1. Build the project:
-
 ```bash
-npm run build
+npm run deploy
 ```
 
-2. Deploy with Wrangler:
+That is one command on purpose. It builds, checks that the Worker actually has runtime secrets
+**by name**, deploys, and then asks the deployed URL a question whose answer depends on those
+secrets. Deploying without checking is not an available mistake, the same way `db:push` has no
+single-target variant.
 
-```bash
-npx wrangler deploy
-```
+**Why the check exists.** `SUPABASE_URL` and `SUPABASE_KEY` are Worker runtime secrets, set with
+`npx wrangler secret put`. GitHub repository secrets are build-time only and do not become them.
+A Worker without them **builds, deploys green and serves 200s**, and nobody can sign in — it has
+happened here once already, with CI green throughout.
 
-Set `SUPABASE_URL` and `SUPABASE_KEY` as secrets in your Cloudflare dashboard or via `npx wrangler secret put`.
+**An unauthenticated GET cannot see that.** A healthy deployment and a secret-less one both answer
+`200` on `/auth/signin` and both redirect `/dashboard`. The smoke posts deliberately-invalid
+credentials instead and reads the outcome code:
+
+| Result           | What it means                                                            |
+| ---------------- | ------------------------------------------------------------------------ |
+| `sign_in_failed` | **Healthy.** The Worker reached Supabase and got a genuine refusal       |
+| `not_configured` | Runtime secrets are absent — `npx wrangler secret put` for both          |
+| `unexpected`     | Secrets present, provider refused them — wrong key or wrong project      |
+| `rate_limited`   | **Inconclusive, not a failure.** Supabase throttles per IP; re-run later |
+
+**What a pass does not prove**, and it says so every time: which Supabase project the Worker is
+pointed at, and that a real account can complete a session. Only signing in shows that.
+
+**Nothing is rolled back automatically.** The commonest cause of a red smoke is absent secrets,
+which the previous version does not have either — an automatic rollback would report a recovery
+while leaving the application just as dead. To roll back deliberately: `npx wrangler rollback`.
+
+**Deploying is manual and stays out of CI.** A deploy workflow needs `CLOUDFLARE_API_TOKEN` as a
+repository secret, which would let any merge overwrite production — the same power CI is
+deliberately denied over the database.
 
 ## CI
 
@@ -315,10 +339,10 @@ GitHub Actions runs **eight** steps in order on every push and PR to `main`: lin
 
 Five repository secrets:
 
-| Secret                                   | Project       | Used by                                            |
-| ---------------------------------------- | ------------- | -------------------------------------------------- |
-| `SUPABASE_URL`, `SUPABASE_KEY`           | `gymlog`      | the typecheck and build steps                      |
-| `SUPABASE_TEST_URL`, `SUPABASE_TEST_KEY` | `gymlog-test` | `test:integration`, `test:middleware`, `test:e2e`  |
+| Secret                                   | Project       | Used by                                             |
+| ---------------------------------------- | ------------- | --------------------------------------------------- |
+| `SUPABASE_URL`, `SUPABASE_KEY`           | `gymlog`      | the typecheck and build steps                       |
+| `SUPABASE_TEST_URL`, `SUPABASE_TEST_KEY` | `gymlog-test` | `test:integration`, `test:middleware`, `test:e2e`   |
 | `GYMLOG_TEST_PASSWORD`                   | `gymlog-test` | its two fixture accounts, and every per-run account |
 
 **CI holds no production database credential and never will.** Migrations are applied by hand from a developer machine, deliberately: putting a database-owner connection string in repository secrets would let any merge rewrite the schema.
