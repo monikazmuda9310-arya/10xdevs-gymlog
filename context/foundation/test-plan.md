@@ -528,10 +528,17 @@ denied for table workouts`). Both outcomes are "no data" and they are different 
   against production through the same endpoint the parity check uses read-only — strictly more
   powerful than the database password AGENTS.md § Environment already refuses CI. Same for
   `CLOUDFLARE_API_TOKEN`: deploy stays manual so no merge can overwrite production.
-- **Prove any new aspect by breaking something.** Apply DDL to `gymlog-test`, confirm the check
-  goes red **naming that change** and that only that aspect went red, then revert. Check
-  `gh run list` for an in-flight CI run first — the `gymlog-test-fixtures` group does not cover a
-  human at a terminal.
+- **Prove any new aspect by breaking something, and there is a committed tool for it**:
+  `node scripts/parity-selftest.mjs gymlog-test`. It applies one structural and one
+  access-control mutation, asserts that the **named aspect** reports the **named object** and
+  that **nothing else moved**, and reverts in a `finally` so a failed assertion still cleans up.
+  It refuses any target but the literal `gymlog-test`, refuses when the two URLs resolve to one
+  project, and refuses when `gh` reports an in-flight CI run — the `gymlog-test-fixtures` group
+  serialises CI against itself and knows nothing about a human at a terminal. **Absent `gh` is a
+  refusal**, overridable with `--no-ci-check`.
+  - Adding an aspect means adding a mutation there, or the aspect has never been shown to fire.
+  - **It is not in any gate and must not be**: the eight steps must stay incapable of mutating a
+    database. There is deliberately no npm script — typing the target is part of the guard.
 - **Reference**: `scripts/env-parity.mjs`, `scripts/deploy-smoke.mjs`; the measurement record in
   the **`testing-environment-parity`** change folder's `plan.md`.
 - **Run locally**: `npm run db:parity`; `node scripts/deploy-smoke.mjs [url]`.
@@ -704,6 +711,14 @@ neighbours before they were measured.
   aimed at `gymlog-test` answers `sign_in_failed` just as happily. Only a successful sign-in names
   the project, through its `sb-<ref>-auth-token` cookie, and that needs a production account. The
   limitation is **printed with every passing result** rather than left in a document.
+- **The mutation proofs were originally throwaway, and that was caught by this change's own
+  implementation review.** The evidence for the two claims the parity check rests on lived in a
+  session scratchpad, so within a week it would have been prose in a plan and nothing else —
+  against this repository's own precedent, where `e2e-build.mjs` and `e2e-serve.mjs` are
+  committed specifically so a refusal stays provable. `scripts/parity-selftest.mjs` replaced it,
+  and was itself mutated to confirm it fails for its own reason: pointing an expected fragment at
+  a string that never appears reddened that one mutation, left the other passing, and still
+  reverted.
 - **The one-sided floor branch has never executed.** Both projects run the identical query and
   answer identical counts, so it cannot be constructed while they agree; the both-sides branch was
   proven by mutation. Stated in the source, with the edit that would make it bite.

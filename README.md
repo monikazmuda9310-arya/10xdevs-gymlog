@@ -300,6 +300,13 @@ That is one command on purpose. It builds, checks that the Worker actually has r
 secrets. Deploying without checking is not an available mistake, the same way `db:push` has no
 single-target variant.
 
+**It refuses to ship what it cannot identify.** Before building, `npm run deploy` checks git:
+an uncommitted working tree means the thing being deployed is not any commit, and a branch other
+than `main` has no guarantee of having passed `ci` — `main` is protected and requires that check
+for admins too. The smoke would still pass in both cases, because a broken feature does not stop the
+Worker reaching its auth provider, so the command would report `done` over a deployment that never
+passed a test. Override each separately with `--allow-dirty` / `--allow-branch` when you mean it.
+
 **Why the check exists.** `SUPABASE_URL` and `SUPABASE_KEY` are Worker runtime secrets, set with
 `npx wrangler secret put`. GitHub repository secrets are build-time only and do not become them.
 A Worker without them **builds, deploys green and serves 200s**, and nobody can sign in — it has

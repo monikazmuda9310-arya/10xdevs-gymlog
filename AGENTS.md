@@ -319,6 +319,10 @@ is what the deployed Worker serves; `gymlog-test` is what CI and the integration
     sourced grants from `information_schema.role_table_grants`, which hides every grant from
     that role: it answered **zero rows on both projects and was reported as parity**. Floors come
     from documented invariants, never from today's counts. Full rules: `test-plan.md` § 6.9.
+  - **The check is proven able to fail, and the proof is committed**:
+    `node scripts/parity-selftest.mjs gymlog-test` mutates the test schema, asserts the named
+    aspect reports the named object and nothing else moved, and reverts in a `finally`. Not in any
+    gate, and must not be — the eight steps stay incapable of mutating a database.
   - **Three exit codes, and the third is the point**: agree, differ, and **could not be**
     **compared**. An unreadable project is not an agreeing one.
   - **`SUPABASE_ACCESS_TOKEN` must never reach CI.** It is account-wide and can run arbitrary SQL

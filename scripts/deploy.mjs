@@ -49,6 +49,56 @@ function wrangler(args, { capture = false } = {}) {
   });
 }
 
+// ------------------------------------------------------- 0. what is about to be shipped, exactly
+// **This command reads git state, and the first version did not.** Without it `npm run deploy` will
+// happily publish a dirty feature branch: the build succeeds, the secret names are present, and the
+// smoke passes — because a broken feature does not stop the Worker reaching its auth provider. The
+// command would report `done` over a deployment that had never passed a single test.
+//
+// It leans on branch protection rather than re-running the gate. `main` requires the `ci` check with
+// `enforce_admins: true`, so anything on `main` has been through all eight steps; running them again
+// here would add ten minutes to every deploy and duplicate what CI already did — and a slow deploy
+// command invites people back to bare `wrangler deploy`, the habit this script exists to remove.
+//
+// **What it does NOT cover**: `strict` is false on branch protection (`test-plan.md` § 5), so a
+// merged commit was not necessarily green against its final base.
+function git(args) {
+  const result = spawnSync("git", args, { cwd: ROOT, encoding: "utf8", stdio: ["inherit", "pipe", "pipe"] });
+  if (result.error || result.status !== 0) {
+    refuse(`\`git ${args.join(" ")}\` failed. This command refuses to deploy what it cannot identify.`);
+  }
+  return result.stdout.trim();
+}
+
+// Two flags, not one: the two conditions are different risks and each has to be waivable — and
+// testable — on its own. A single flag that waives both cannot be proven a guard twice.
+const ALLOW_DIRTY = process.argv.includes("--allow-dirty");
+const ALLOW_BRANCH = process.argv.includes("--allow-branch");
+const branch = git(["rev-parse", "--abbrev-ref", "HEAD"]);
+const dirty = git(["status", "--porcelain"]);
+
+if (!ALLOW_DIRTY && dirty) {
+  refuse(
+    `the working tree has uncommitted changes, so what would be deployed is not any commit:\n` +
+      dirty
+        .split("\n")
+        .slice(0, 10)
+        .map((line) => `    ${line}`)
+        .join("\n") +
+      `\n  Commit or stash first. To deploy anyway: npm run deploy -- --allow-dirty`,
+  );
+}
+if (!ALLOW_BRANCH && branch !== "main") {
+  refuse(
+    `HEAD is on "${branch}", not main.\n` +
+      `  main is branch-protected and requires the \`ci\` check for admins too, so a commit there has\n` +
+      `  been through all eight gate steps. Nothing guarantees that about "${branch}", and the smoke\n` +
+      `  below would still pass over a deployment that fails every test.\n` +
+      `  To deploy this branch anyway: npm run deploy -- --allow-branch`,
+  );
+}
+console.log(`deploy: shipping ${branch} @ ${git(["rev-parse", "--short", "HEAD"])}${dirty ? " (UNCLEAN)" : ""}`);
+
 // ---------------------------------------------------------------- 1. build
 // Resolved from astro's own `bin` field rather than hardcoded, the same way supabase-db.mjs finds
 // the Supabase CLI — a guessed path fails the build step and the refusal then blames the build for

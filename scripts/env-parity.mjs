@@ -353,8 +353,15 @@ async function authConfig(ref, token) {
  * Exported so `db:push` can call it in-process: spawning this as a child would put a shell between
  * the exit code and its caller, and a swallowed non-zero exit is the failure the wrapper exists to
  * prevent.
+ *
+ * **`report`, when passed, is filled with one entry per aspect** — `{ name, verdict, testOnly,
+ * productionOnly }`. It exists for `scripts/parity-selftest.mjs`, which has to assert not merely
+ * that a mutation turned the check red but that the RIGHT aspect named the RIGHT object. The exit
+ * code alone cannot carry that, and a self-test that accepts any red is the same shape as the
+ * failures this script exists to catch. Optional and additive: the return value is unchanged, so
+ * `db:push`'s two calls are untouched.
  */
-export async function compareEnvironments() {
+export async function compareEnvironments({ report } = {}) {
   loadEnv();
 
   const token = process.env.SUPABASE_ACCESS_TOKEN;
@@ -437,6 +444,7 @@ export async function compareEnvironments() {
     // view, a table or an enum on one project alone.
     if (belowFloor[0] && belowFloor[1]) {
       unverifiable += 1;
+      report?.push({ name: aspect.name, verdict: "UNVERIFIED", testOnly: [], productionOnly: [] });
       console.log(`UNVERIFIED  ${aspect.name.padEnd(17)} ${counts} — below the floor of ${aspect.minRows} on BOTH`);
       console.log(`            the query returned almost nothing on both projects, so it proved nothing.`);
       console.log(`            Fix the query or the invariant behind minRows — do not lower the floor to match.`);
@@ -444,6 +452,7 @@ export async function compareEnvironments() {
     }
 
     if (digest(production) === digest(test)) {
+      report?.push({ name: aspect.name, verdict: "OK", testOnly: [], productionOnly: [] });
       console.log(`OK          ${aspect.name.padEnd(17)} ${counts}`);
       continue;
     }
@@ -459,9 +468,12 @@ export async function compareEnvironments() {
     // to a psql prompt they do not have.
     const inTest = new Set(test);
     const inProduction = new Set(production);
+    const productionOnly = production.filter((row) => !inTest.has(row));
+    const testOnly = test.filter((row) => !inProduction.has(row));
+    report?.push({ name: aspect.name, verdict: "DIFF", testOnly, productionOnly });
     const only = [
-      ["gymlog only     ", production.filter((row) => !inTest.has(row))],
-      ["gymlog-test only", test.filter((row) => !inProduction.has(row))],
+      ["gymlog only     ", productionOnly],
+      ["gymlog-test only", testOnly],
     ];
     for (const [side, rows] of only) {
       for (const row of rows.slice(0, MAX_PRINTED_ROWS)) {

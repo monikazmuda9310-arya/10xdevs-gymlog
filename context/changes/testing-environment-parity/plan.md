@@ -134,9 +134,13 @@ exit with a code that distinguishes agreement from difference from inability to 
   from its URL hostname exactly as `productionProjectRef()` does (`supabase-db.mjs:186-204`), so the
   targets cannot be configured to anything else. Fails with a named variable when one is absent.
 - Every query is sent with `read_only: true`. Nothing in this script may write.
-- **Aspect shape**: `{ name, sql, minRows }`. An aspect returning fewer than `minRows` on either
-  project is a **failure of the check**, reported distinctly from a difference — the message must say
-  the aspect could not be verified, not that the projects disagree.
+- **Aspect shape**: `{ name, sql, minRows }`. An aspect below `minRows` is reported distinctly from
+  a difference — the message must say the aspect could not be verified, not that the projects
+  disagree.
+  - **DEVIATION, implemented 2026-08-21.** This line originally said "on either project". Shipped
+    behaviour: below the floor on **both** sides is `UNVERIFIED`; on **one** side it is real drift
+    and reported as a difference. The literal version would report a project that genuinely lost
+    four views as "could not verify" — hiding the exact drift the script exists to find.
 - **Aspects** — the eleven from `research.md` § Detailed Findings 4, with `grants` re-sourced from
   `pg_class.relacl` rather than `information_schema.role_table_grants` (which returns nothing to
   `supabase_read_only_user`), plus one new aspect:
@@ -325,7 +329,11 @@ is why this does not stay a command to remember.
   fails and is repaired by hand.
 - Exit `2` from either call (could not compare) **fails the after-check and warns on the before-check**.
   An unverifiable after-state must not read as success.
-- The before-check is skipped when `push` has nothing to apply, so an idempotent re-run stays cheap.
+- **DEVIATION, implemented 2026-08-21.** This line originally said the before-check is skipped when
+  `push` has nothing to apply. It always runs. Detecting "nothing pending" means parsing the CLI's
+  migration table or reconciling local filenames against remote history, and a mis-detection
+  **silently skips a guard** — the exact class of failure this change exists to close. The two
+  network pushes cost more than both checks together.
 - Import the comparison as a function rather than spawning the script, so a non-zero exit cannot be
   swallowed by a shell layer.
 
