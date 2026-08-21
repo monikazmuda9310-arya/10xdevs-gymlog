@@ -275,6 +275,40 @@ named against it.
 - **The estimate is a number only for 1–12 reps at positive load**, so a flow must land inside that
   range for the assertion to mean anything: 5 reps at 100 kg is `100 × 36 / (37 − 5)` = **112.5**
   under the default Brzycki. Outside it the slot holds a sentence instead.
+- **A known failure mode that is NEITHER the product nor the spec: `wrangler dev` can die mid-run.**
+  Seen once, on the push run for `7fbfb0d` (2026-08-20, GitHub Actions run `32411019182`). Read the
+  log before diagnosing anything else, because the symptom points at the wrong place:
+
+  ```
+  19:58:01.466  GET /auth/signin 200 OK           ← critical-flow's last step
+  19:58:01.605  ✘ [ERROR]                         ← wrangler's crash handler, EMPTY message
+  19:58:01.605  If you think this is a bug then please create an issue at workers-sdk
+  19:58:01.616  GET /workouts/61a3ac5d… 302 Found ← still serving, 11 ms AFTER the error
+  19:58:01.660  🪵 Logs were written to …         ← wrangler exits
+  19:58:01.709  ✓ critical-flow (9.3s)
+  19:58:01.926  ✘ smoke — ERR_CONNECTION_REFUSED
+  ```
+
+  **The spec that fails is not the spec that provoked it.** `critical-flow` — signup, a logged set,
+  an estimate, sign-out — passed in full; `smoke`, a single `page.goto`, met a dead port 260 ms
+  later. So the red test is the trivial one and the accusation lands on the harness's own smoke
+  check, which is the last thing at fault. **`ERR_CONNECTION_REFUSED` from any spec means the server
+  is gone: grep the `[WebServer]` lines for `✘ [ERROR]` before reading a single line of product
+  code.**
+  - **The trigger is unknown and is not recorded as known.** Wrangler's message was **empty**; a
+    telemetry notice printed 80 ms earlier is suggestive and unproven, and writing it down as the
+    cause would be inventing one. What IS established: the process crashed, it was not the specs, and
+    it has not recurred — the same two specs went green twice the following day.
+  - **`wrangler` is `^4.90.0` in `package.json` while `npm ci` installs whatever the lockfile pins**,
+    and wrangler's own crash output suggested 4.125.0. A lead for whoever meets this next, not a fix:
+    nobody has checked whether the newer version changes anything.
+  - **`retries: 0` is deliberate and it settles two different questions with one rule.**
+    `playwright.config.ts:70` argues it for the FLOW — "a flow that only passes on the second attempt
+    is a finding, not a flake to absorb" — which is right. A crashed harness server is not the flow
+    behaving inconsistently, and the gate cannot currently tell the two apart. Do not "fix" this by
+    turning retries on: that would absorb the product flakiness the rule exists to surface. If it
+    recurs, the shape worth building is one that distinguishes a dead port from a failed assertion.
+
 - **Reference test**: `tests/e2e/critical-flow.spec.ts`; `tests/e2e/smoke.spec.ts` for the harness.
 - **Run locally**: `npm run test:e2e`. To watch it: `E2E_SLOWMO=500 npm run test:e2e -- --headed`.
 
