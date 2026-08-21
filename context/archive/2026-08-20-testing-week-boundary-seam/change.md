@@ -1,10 +1,10 @@
 ---
 change_id: testing-week-boundary-seam
 title: Week-boundary seam — prove a screen's week is bounded by the profile's stored zone
-status: impl_reviewed
+status: archived
 created: 2026-08-20
 updated: 2026-08-21
-archived_at: null
+archived_at: 2026-08-21T08:21:00Z
 ---
 
 ## Notes
