@@ -18,6 +18,7 @@
     "test:middleware": "vitest run --config vitest.middleware.config.ts",
     "test:e2e": "node scripts/e2e-build.mjs && playwright test",
     "db:status": "node scripts/supabase-db.mjs status",
+    "db:parity": "node scripts/env-parity.mjs",
     "db:push": "node scripts/supabase-db.mjs push",
     "db:types": "node scripts/supabase-db.mjs types && prettier --write src/db/database.types.ts"
   },
