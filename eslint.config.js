@@ -91,6 +91,9 @@ export default tseslint.config(
         console: "readonly",
         process: "readonly",
         URL: "readonly",
+        // The post-deploy smoke posts a form body: the sign-in endpoint reads `formData()`, not
+        // JSON, so the probe has to encode the same way a browser does (`deploy-smoke.mjs`).
+        URLSearchParams: "readonly",
         fetch: "readonly",
         setTimeout: "readonly",
       },

@@ -45,7 +45,7 @@ _evidence that surfaced this risk_ — never a specific file as "where the failu
 | 4   | A screen renders correctly and does nothing — the island never hydrates, or the control is unusable at a phone width  | High   | Medium     | interview Q4; `roadmap.md` § Done — four of five shipped defects were browser-visible and pipeline-invisible                                                                                        |
 | 5   | An operation fails, the failure is logged, and the caller is told it succeeded                                        | High   | Medium     | module 3 M3L5 (OWASP A10); `prd.md` § Deleting your account — a refusal must be distinguishable from a success. **Not hot-spot-led (corrected 2026-08-20)** — see the note under the guidance table |
 | 6   | A migration proven against the empty test project meets real rows for the first time on production                    | High   | Medium     | interview Q2; `AGENTS.md` § Commands — migration histories are compared, schemas are not                                                                                                            |
-| 7   | The Worker deploys green, serves 200s, and nobody can sign in because runtime secrets are absent                      | High   | Medium     | `infrastructure.md` § Risk register (H×H row; mitigation proposed 2026-08-08, never built)                                                                                                          |
+| 7   | The Worker deploys green, serves 200s, and nobody can sign in because runtime secrets are absent                      | High   | Medium     | `infrastructure.md` § Risk register (H×H row; mitigation proposed 2026-08-08, unbuilt until Phase 5 — and wrong, see § 6.6)                                                                         |
 
 Risk #2 is the mandatory abuse row. The other three abuse classes were checked and are not top-N:
 untrusted input is validated by a shared zod schema at every endpoint and covered by seven suites;
@@ -86,13 +86,13 @@ Each row is a discrete rollout phase that will open its own change folder via `/
 moves left-to-right through the values below; the orchestrator updates Status as artifacts appear on
 disk.
 
-| #   | Phase name           | Goal (one line)                                                                  | Risks covered | Test types               | Status      | Change folder                   |
-| --- | -------------------- | -------------------------------------------------------------------------------- | ------------- | ------------------------ | ----------- | ------------------------------- |
-| 1   | Edit-time gates      | Lock the floor: lint and typecheck fire at edit time, not at commit time         | cross-cutting | gates                    | complete    | — (no change folder — see §6.6) |
-| 2   | Browser layer        | Prove the boundary and the flow through a real session, against the test project | #2, #3, #4    | integration + e2e        | complete    | `testing-browser-layer`         |
-| 3   | Silent-failure audit | A failure that is caught must still be told to the caller                        | #5            | integration + regression | complete    | `testing-silent-failure-audit`  |
-| 4   | Week-boundary seam   | The week the screen shows is bounded by the zone the profile holds               | #1            | integration + render     | complete    | `testing-week-boundary-seam`    |
-| 5   | Environment parity   | Prove the two projects agree, and that a deploy can still sign somebody in       | #6, #7        | script + CI + smoke      | not started | —                               |
+| #   | Phase name           | Goal (one line)                                                                  | Risks covered | Test types               | Status   | Change folder                   |
+| --- | -------------------- | -------------------------------------------------------------------------------- | ------------- | ------------------------ | -------- | ------------------------------- |
+| 1   | Edit-time gates      | Lock the floor: lint and typecheck fire at edit time, not at commit time         | cross-cutting | gates                    | complete | — (no change folder — see §6.6) |
+| 2   | Browser layer        | Prove the boundary and the flow through a real session, against the test project | #2, #3, #4    | integration + e2e        | complete | `testing-browser-layer`         |
+| 3   | Silent-failure audit | A failure that is caught must still be told to the caller                        | #5            | integration + regression | complete | `testing-silent-failure-audit`  |
+| 4   | Week-boundary seam   | The week the screen shows is bounded by the zone the profile holds               | #1            | integration + render     | complete | `testing-week-boundary-seam`    |
+| 5   | Environment parity   | Prove the two projects agree, and that a deploy can still sign somebody in       | #6, #7        | script + gate + smoke    | complete | `testing-environment-parity`    |
 
 Phases 1–3 are course deliverables (module 3, items 3, 4 and 5) and come first for that reason.
 Phase 4 covers the highest-scoring risk on the map and is deliberately **not** first: it is cheap,
@@ -147,19 +147,19 @@ Two consequences reshaped this phase:
 
 ## 5. Quality Gates
 
-| Gate                           | Where                  | Required?                 | Catches                                                        |
-| ------------------------------ | ---------------------- | ------------------------- | -------------------------------------------------------------- |
-| lint + typecheck               | local + CI             | required                  | syntactic and type drift                                       |
-| unit                           | local + CI             | required                  | domain-calculation regressions                                 |
-| render check                   | local + CI             | required                  | what a page's HTML actually contains                           |
-| integration                    | local + CI             | required                  | access-control and persisted-state regressions                 |
-| build                          | local + CI             | required                  | adapter and bundling failures                                  |
-| pre-commit (staged files)      | local                  | required                  | lint and format drift before a commit lands                    |
-| edit-time lint + typecheck     | local (agent loop)     | required after §3 Phase 1 | regressions at the moment they are written                     |
-| middleware / cookie check      | local + CI             | required                  | a request bound to the wrong identity; the three cookie states |
-| e2e on the critical flow       | local + CI on PR       | required                  | broken sign-in, routing, hydration, cross-account boundary     |
-| schema parity between projects | CI or manual, pre-push | required after §3 Phase 5 | two databases believed identical that are not                  |
-| post-deploy smoke              | after deploy           | required after §3 Phase 5 | a green deploy that cannot authenticate anybody                |
+| Gate                           | Where                   | Required?                 | Catches                                                        |
+| ------------------------------ | ----------------------- | ------------------------- | -------------------------------------------------------------- |
+| lint + typecheck               | local + CI              | required                  | syntactic and type drift                                       |
+| unit                           | local + CI              | required                  | domain-calculation regressions                                 |
+| render check                   | local + CI              | required                  | what a page's HTML actually contains                           |
+| integration                    | local + CI              | required                  | access-control and persisted-state regressions                 |
+| build                          | local + CI              | required                  | adapter and bundling failures                                  |
+| pre-commit (staged files)      | local                   | required                  | lint and format drift before a commit lands                    |
+| edit-time lint + typecheck     | local (agent loop)      | required after §3 Phase 1 | regressions at the moment they are written                     |
+| middleware / cookie check      | local + CI              | required                  | a request bound to the wrong identity; the three cookie states |
+| e2e on the critical flow       | local + CI on PR        | required                  | broken sign-in, routing, hydration, cross-account boundary     |
+| schema parity between projects | local, inside `db:push` | required                  | two databases believed identical that are not                  |
+| post-deploy smoke              | local, inside `deploy`  | required                  | a green deploy that cannot authenticate anybody                |
 
 Any new job that writes to `gymlog-test` joins the existing CI concurrency group, or it reintroduces
 the race that group exists to prevent. **The middleware and e2e steps join it by living in the
@@ -181,6 +181,12 @@ push to `main` is refused with `GH006 … Required status check "ci" is expected
   success — protection on, pushes refused — and a permanently unmergeable `main`, because GitHub
   waits for a status nothing emits. The next PR that merges green is what proves the name.
 - Emergency path: `gh api --method DELETE …/branches/main/protection`, merge, then re-apply.
+- **`strict` is FALSE, and that is a named limit rather than an oversight.** Read back 2026-08-21:
+  `required_status_checks: { contexts: ["ci"], strict: false }`. "Require branches to be up to
+  date before merging" is off, so a PR whose `ci` passed against an older `main` can still merge —
+  green against a base that no longer exists. Left off deliberately: in a single-maintainer
+  repository the failure it prevents is rare and the friction it adds (a rebase per intervening
+  merge) is constant. Surfaced by Phase 5's research; it is not one of that phase's two risks.
 
 ## 6. Cookbook Patterns
 
@@ -474,6 +480,69 @@ denied for table workouts`). Both outcomes are "no data" and they are different 
   `tests/integration/week-boundary-seam.test.ts`.
 - **Run locally**: `npm run test:render`, then `npm run test:integration`.
 
+### 6.9 Adding a parity aspect or a deploy check
+
+- **Location**: `scripts/env-parity.mjs` (`npm run db:parity`, also run on both sides of
+  `db:push`) and `scripts/deploy-smoke.mjs` (`npm run deploy`). Neither is in CI and neither
+  should be — see the credential note below.
+- **An aspect is a name, a read-only SQL query, and a `minRows` FLOOR.** The floor is the
+  load-bearing part. The first draft sourced grants from `information_schema.role_table_grants`,
+  which filters to grants the CURRENT USER is grantor, grantee or a member of — and the Management
+  API runs as `supabase_read_only_user`, which is none of those for `anon`/`authenticated`. It
+  answered **zero rows on both projects and was reported as parity**. Same failure shape as
+  `{ impact: [] }` read as reassurance. Source grants from `pg_class.relacl` instead.
+- **Floors come from documented invariants, never from today's row counts.** `views: 4` because
+  AGENTS.md says four views; `columns: 9` because every relation has at least one column. A floor
+  fitted to the current schema turns the next legitimate migration into a false alarm
+  (`lessons.md` § "Write the threshold into the plan BEFORE taking the measurement"). Lowering one
+  should mean changing the invariant in AGENTS.md first.
+- **When no invariant exists yet, say which kind of floor you wrote.** A new aspect often has
+  nothing in AGENTS.md to derive a minimum from — found on 2026-08-21 by writing an `extensions`
+  aspect from this section alone and having to guess. Two honest answers: establish the invariant
+  (write it in AGENTS.md, then cite it), or use `minRows: 1` with a comment saying plainly that it
+  is a **tripwire against an empty result** rather than a real minimum. What must not happen is a
+  number that looks derived and is not.
+- **Below the floor on BOTH sides means the QUERY is suspect; on ONE side it is real drift.** Easy
+  to get backwards, and getting it backwards hides the drift the script exists to find.
+- **Three exit codes, and the third is why this is worth building**: `0` agree, `1` differ,
+  `2` **could not be compared**. An unreadable project is not an agreeing one, so everything is
+  collected before anything is compared — a mid-run HTTP failure must not leave earlier aspects
+  reported as green.
+- **Scope catalogue data to `user_id is null`.** Measured 2026-08-21: production holds 0 custom
+  exercises and `gymlog-test` holds 75, so an unscoped comparison of `exercises` reports a 75-row
+  difference every run and trains its reader to ignore the aspect.
+- **The auth-config aspect is a CONTRACT, not an equality check.** The projects are supposed to
+  differ on `mailer_autoconfirm`, and the message must name WHICH project is wrong because the two
+  consequences are opposite. Pin `gymlog-test`'s `site_url` loosely — `localhost`, not a port — or
+  an `astro.config` change becomes a false alarm.
+- **The smoke's signal is the `?error=` CODE after a POST, never a GET.** A bare GET of
+  `/auth/signin` renders no banner whether or not the Worker has credentials, because
+  `messageForCode(null)` is `null` — which is why the mitigation `infrastructure.md` proposed in
+  2026-08-08 passes in exactly the broken case.
+- **A `fetch` POST MUST send `Origin`.** `security.checkOrigin` answers `403` before any handler
+  runs, and a 403 reads exactly like an absent credential. Report it as `could not probe`, never
+  as a broken deployment.
+- **`rate_limited` is inconclusive, not a failure.** Supabase throttles per IP, so a smoke run
+  twice can cause it itself.
+- **Never put `SUPABASE_ACCESS_TOKEN` in CI.** It is account-wide and can run arbitrary SQL
+  against production through the same endpoint the parity check uses read-only — strictly more
+  powerful than the database password AGENTS.md § Environment already refuses CI. Same for
+  `CLOUDFLARE_API_TOKEN`: deploy stays manual so no merge can overwrite production.
+- **Prove any new aspect by breaking something, and there is a committed tool for it**:
+  `node scripts/parity-selftest.mjs gymlog-test`. It applies one structural and one
+  access-control mutation, asserts that the **named aspect** reports the **named object** and
+  that **nothing else moved**, and reverts in a `finally` so a failed assertion still cleans up.
+  It refuses any target but the literal `gymlog-test`, refuses when the two URLs resolve to one
+  project, and refuses when `gh` reports an in-flight CI run — the `gymlog-test-fixtures` group
+  serialises CI against itself and knows nothing about a human at a terminal. **Absent `gh` is a
+  refusal**, overridable with `--no-ci-check`.
+  - Adding an aspect means adding a mutation there, or the aspect has never been shown to fire.
+  - **It is not in any gate and must not be**: the eight steps must stay incapable of mutating a
+    database. There is deliberately no npm script — typing the target is part of the guard.
+- **Reference**: `scripts/env-parity.mjs`, `scripts/deploy-smoke.mjs`; the measurement record in
+  the **`testing-environment-parity`** change folder's `plan.md`.
+- **Run locally**: `npm run db:parity`; `node scripts/deploy-smoke.mjs [url]`.
+
 ### 6.6 Per-rollout-phase notes
 
 **Phase 1 — Edit-time gates (complete, 2026-08-16).** Shipped directly rather than through a change
@@ -617,6 +686,54 @@ missing. Found by this change's own implementation review, 2026-08-21.
   tonnage. Two assertions pin today's behaviour and say it is not an endorsement. **The edit that
   makes it a product decision** is Open Question 2 in the `testing-week-boundary-seam` change
   folder's `research.md` — an owner call, not a test's.
+
+**Phase 5 — Environment parity (complete, 2026-08-21).** Risks #6 and #7, both of which are
+invisible to the eight-step gate by construction: one needs both databases, the other needs a
+deployment. **No production code changed.** Three things were wrong in this document or its
+neighbours before they were measured.
+
+- **Every Supabase-CLI route to a schema comparison needs Docker**, which this machine does not
+  have — `supabase db dump --db-url` answers `failed to run docker`. The plan assumed the CLI
+  could do it. The aimable path is the Management API's query endpoint with `read_only: true`,
+  on the token `db:types` already uses, and the refusal was proven (`25006`) with a positive
+  control beside it rather than trusted.
+- **The first draft of the check reported parity it had never performed.** One aspect answered
+  zero rows on both projects and matched trivially. That is the `{ impact: [] }` shape again, in
+  a new costume, and it is why every aspect now carries a row-count floor (§6.9).
+- **The post-deploy mitigation `infrastructure.md` proposed since 2026-08-08 does not work.**
+  "Fetch `/auth/signin` and assert the banner is absent" passes in exactly the broken case,
+  because with no `?error=` there is no banner in either case. It was never implemented, which is
+  the only reason it never gave false assurance. Corrected in place rather than deleted.
+
+**What Phase 5 deliberately did NOT close**, stated so a green gate is not read as covering it:
+
+- **The smoke cannot tell WHICH Supabase project the deployed Worker points at.** `SUPABASE_URL`
+  aimed at `gymlog-test` answers `sign_in_failed` just as happily. Only a successful sign-in names
+  the project, through its `sb-<ref>-auth-token` cookie, and that needs a production account. The
+  limitation is **printed with every passing result** rather than left in a document.
+- **The mutation proofs were originally throwaway, and that was caught by this change's own
+  implementation review.** The evidence for the two claims the parity check rests on lived in a
+  session scratchpad, so within a week it would have been prose in a plan and nothing else —
+  against this repository's own precedent, where `e2e-build.mjs` and `e2e-serve.mjs` are
+  committed specifically so a refusal stays provable. `scripts/parity-selftest.mjs` replaced it,
+  and was itself mutated to confirm it fails for its own reason: pointing an expected fragment at
+  a string that never appears reddened that one mutation, left the other passing, and still
+  reverted.
+- **The one-sided floor branch has never executed.** Both projects run the identical query and
+  answer identical counts, so it cannot be constructed while they agree; the both-sides branch was
+  proven by mutation. Stated in the source, with the edit that would make it bite.
+- **`strict: false` on branch protection** — surfaced by this phase's research, out of scope for
+  its two risks, recorded as a named limit in §5.
+- **§6.9 was checked by the person who wrote it, which is the weakest form of that evidence** — the
+  same shape as §6.8`s open claim and as `lessons.md`§ "Verify with a script that attacks". The
+check was real (an`extensions` aspect written from §6.9 alone, run green, discarded) and it did
+  find a gap: the section demanded floors from documented invariants and said nothing about the
+  case where none exists. That is now written down. **The next author who adds an aspect settles
+  whether the rest of §6.9 is sufficient**: record here whether they needed this plan.
+- **Nothing here is in CI, and that is the design.** Both gates need a credential CI must never
+  hold. A gate outside the eight-step pipeline rots unless something else makes it unskippable,
+  which is why the parity check lives inside `db:push` and the smoke inside `deploy` rather than
+  beside them.
 
 ## 7. What We Deliberately Don't Test
 

@@ -17,6 +17,10 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Imported as a FUNCTION rather than spawned: a child process puts a shell between the exit code and
+// this caller, and a swallowed non-zero exit is exactly the failure the after-check exists to catch.
+import { compareEnvironments, DIFFERS, UNVERIFIABLE } from "./env-parity.mjs";
+
 const require = createRequire(import.meta.url);
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -141,9 +145,46 @@ function status(cli) {
   return worst;
 }
 
-function push(cli) {
+/**
+ * Push, with a parity comparison on BOTH sides of it — and the two sides make different claims.
+ *
+ * **Before**: "did the two projects agree when we started?" A difference here PREDATES this push,
+ * so it warns and does not block. Refusing would make the only tool that can reveal pre-existing
+ * drift the tool that blocks its repair — and repairing drift usually means pushing a migration.
+ *
+ * **After**: "did this push leave them agreeing?" That one fails the command. It is the failure the
+ * wrapper is blind to today: the production push failing, somebody repairing it by hand, and both
+ * migration histories reading identical afterwards while the schemas do not
+ * (context/changes/testing-environment-parity/research.md § Detailed Findings 1).
+ *
+ * **UNVERIFIABLE is fatal after and merely a warning before.** An after-state nobody could read
+ * must not be reported as a successful push; a before-state nobody could read is not a reason to
+ * refuse to migrate.
+ *
+ * **The before-check always runs, and the plan said to skip it when nothing is pending.** Detecting
+ * "nothing pending" means either parsing the CLI's migration table or reconciling local filenames
+ * against remote history, and a mis-detection SILENTLY SKIPS A GUARD. That is precisely the class
+ * of failure this whole change exists to close, so the few seconds are the better trade — the two
+ * network pushes below cost more than both checks together.
+ */
+async function push(cli) {
   const urls = TARGETS.map((target) => ({ target, url: urlFor(target) }));
   const [test, production] = urls;
+
+  banner("parity BEFORE the push");
+  const before = await compareEnvironments();
+  if (before === DIFFERS) {
+    console.error(
+      `\nsupabase-db: WARNING — the two projects ALREADY differ, before this push touched anything.` +
+        `\nThis is not a reason to refuse the migration, and it is not caused by it. Read the aspects` +
+        `\nabove: if the migration you are about to apply is the repair, carry on.`,
+    );
+  } else if (before === UNVERIFIABLE) {
+    console.error(
+      `\nsupabase-db: WARNING — parity could not be checked before the push. Continuing anyway;` +
+        `\nthe check after the push is the one that blocks.`,
+    );
+  }
 
   banner(test.target.label);
   const testCode = run(cli, ["db", "push", "--db-url", test.url, "--yes"]);
@@ -166,6 +207,27 @@ function push(cli) {
         `\nDo NOT apply the SQL by hand in the dashboard: that desynchronises the remote migration history.`,
     );
     return productionCode;
+  }
+
+  banner("parity AFTER the push");
+  const after = await compareEnvironments();
+  if (after === DIFFERS) {
+    console.error(
+      `\nsupabase-db: BOTH PUSHES SUCCEEDED AND THE SCHEMAS DO NOT AGREE.` +
+        `\nThe migration histories now match — that is what \`npm run db:status\` compares — and the` +
+        `\nschemas they produced do not. The aspects above name what differs.` +
+        `\nThe usual cause is DDL applied outside the migration system on one project: the dashboard` +
+        `\nSQL editor writes no history row, so nothing else in this repository can see it.`,
+    );
+    return after;
+  }
+  if (after === UNVERIFIABLE) {
+    console.error(
+      `\nsupabase-db: the push succeeded but parity COULD NOT BE CHECKED afterwards.` +
+        `\nThat is not the same as "the projects agree", so this command is not reporting success.` +
+        `\nRe-run \`npm run db:parity\` once the cause above is fixed — \`db:push\` is idempotent.`,
+    );
+    return after;
   }
 
   return 0;
@@ -238,4 +300,6 @@ if (!verb || !(verb in VERBS)) {
 }
 
 loadEnv();
-process.exit(VERBS[verb](resolveCli()));
+// `push` is async now — it awaits two parity comparisons. `status` and `types` still return a
+// number, and awaiting a number is a no-op, so the dispatcher stays one line.
+process.exit(await VERBS[verb](resolveCli()));

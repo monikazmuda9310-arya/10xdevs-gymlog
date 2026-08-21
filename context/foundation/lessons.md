@@ -578,6 +578,51 @@ restrict` above then **blocks that cascade**. One account could permanently prev
   answer is to ask the code. It is the peer of "A guard you have not mutated may not guard": there
   the assertion was empty, here it is fully written and mathematically incapable of failing.
 
+## A comparison that returns nothing on both sides reports agreement it never checked
+
+- **Context**: the first draft of `scripts/env-parity.mjs`, 2026-08-21, in the
+  **`testing-environment-parity`** change folder.
+- **Problem**: the schema comparison had eleven aspects and all eleven reported `OK`. One of them
+  compared **zero rows against zero rows**. It sourced grants from
+  `information_schema.role_table_grants`, a view that only shows grants where the current user is
+  grantor, grantee or a member of the grantee role — and the Management API runs as
+  `supabase_read_only_user`, which is none of those for `anon` or `authenticated`. Two empty lists
+  are equal, so the aspect passed, and grants are load-bearing for this project's access control.
+  Sourced from `pg_class.relacl` instead it sees nine relations per project. The bug was invisible
+  in the report: `OK grants prod=0 test=0` sat in a column of genuine passes, and only reading the
+  counts rather than the verdicts caught it.
+- **Rule**: **a differential check needs a floor — the minimum number of things it expects to
+  find — and the floor comes from a documented invariant, not from what it found today.** Equality
+  between two empty sets is not evidence of anything, and any query can silently stop matching:
+  a renamed view, a narrowed permission, a changed catalogue. Ask of every comparison: _what would
+  make this report green while blind?_ Same shape as `{ impact: [] }` rendered as reassurance, and
+  as "a route that ALWAYS fails satisfies a failure assertion perfectly".
+- **Applies to**: any check whose verdict is a comparison rather than a value — schema diffs,
+  snapshot tests, set-equality assertions, reconciliation totals. Print the cardinality beside the
+  verdict so a reader can see the check had a subject.
+
+## A probe whose own omission looks exactly like the failure it tests for
+
+- **Context**: `scripts/deploy-smoke.mjs` and the risk-register mitigation it replaced
+  (`context/foundation/infrastructure.md`, proposed 2026-08-08, never built). Both found
+  2026-08-21.
+- **Problem**: two instances in one phase. **The proposed mitigation** was "fetch `/auth/signin`
+  and assert the 'Supabase not configured' banner is absent" — but that banner only renders from
+  `?error=not_configured`, and a bare GET carries no `?error=` at all, so
+  `messageForCode(null)` returns `null` and there is no banner **in either case**. The assertion
+  passes exactly as well when the thing it guards is broken. **The replacement had the mirror
+  problem**: a `fetch` POST with no `Origin` header is answered `403` by Astro's
+  `security.checkOrigin` before any handler runs — and a `403` from a probe that forgot a header
+  is indistinguishable, to the probe, from a deployment that cannot authenticate anybody.
+- **Rule**: **a probe must be able to tell _the thing is broken_ from _I could not ask_, and it
+  must be proven able to say the first.** Give the two outcomes different exit codes, and prove
+  the failing one by breaking the subject — ideally on the same target, so the two answers differ
+  only in the probe. Here: one credential-less worker, asked twice, answering `not_configured`
+  with the header and `403 could not probe` without it.
+- **Applies to**: smoke tests, health checks, post-deploy verification, any assertion phrased as
+  an absence. An absence-assertion with no positive control is the most confident-looking way to
+  test nothing.
+
 ## Measurement record — the evidence behind the rules in `AGENTS.md`
 
 > **These entries are not rules and must not be read as ones.** They are the measurements and

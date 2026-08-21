@@ -293,16 +293,41 @@ Playwright is a fifth runner over `tests/e2e/**`, outside Vitest entirely. See �
 check runs against a hosted project through `--db-url`. There are **two**: `gymlog` is production and
 is what the deployed Worker serves; `gymlog-test` is what CI and the integration check write to.
 
-| Command                    | What it does                                                            |
-| -------------------------- | ----------------------------------------------------------------------- |
-| `npm run db:status`        | prints **both** migration histories, labelled — this is the drift check |
-| `npm run db:push`          | applies every pending migration to **both**, `gymlog-test` first        |
-| `npm run db:types`         | regenerates `src/db/database.types.ts` from the **production** schema   |
-| `npm run test:integration` | the RLS check against `gymlog-test`; never runs inside `npm test`       |
-| `npm run test:render`      | renders pages through Astro's container and asserts on the HTML         |
-| `npm run test:middleware`  | drives `onRequest` with real `gymlog-test` session cookies              |
-| `npm run test:e2e`         | builds the worker, strips its credentials, serves it, drives Chromium   |
+| Command                    | What it does                                                              |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `npm run db:status`        | prints **both** migration histories, labelled — histories only, see below |
+| `npm run db:parity`        | compares the two **schemas**, the seeded catalogue and the auth contract  |
+| `npm run db:push`          | applies every pending migration to **both**, `gymlog-test` first          |
+| `npm run db:types`         | regenerates `src/db/database.types.ts` from the **production** schema     |
+| `npm run test:integration` | the RLS check against `gymlog-test`; never runs inside `npm test`         |
+| `npm run test:render`      | renders pages through Astro's container and asserts on the HTML           |
+| `npm run test:middleware`  | drives `onRequest` with real `gymlog-test` session cookies                |
+| `npm run test:e2e`         | builds the worker, strips its credentials, serves it, drives Chromium     |
+| `npm run deploy`           | build → check the Worker's secret NAMES → `wrangler deploy` → smoke       |
 
+- **`db:status` compares HISTORIES; `db:parity` compares what they PRODUCED.** Two documented
+  paths let the histories agree while the schemas do not: the dashboard SQL editor writes no
+  history row, and a production push that fails after the test push succeeded gets repaired by
+  hand. `db:push` now runs the comparison on **both sides** — it **warns** before (a difference
+  there predates the push, and refusing would block its own repair) and **fails** after.
+  - **Every Supabase-CLI route to a schema comparison needs Docker**, which this machine does not
+    have: `supabase db dump --db-url` answers `failed to run docker`, the same wall `db:types`
+    met. The comparison goes through the Management API's query endpoint with `read_only: true`
+    — a genuine refusal (`25006`), proven with a positive control, running as
+    `supabase_read_only_user` rather than `postgres`.
+  - **Every aspect carries a row-count FLOOR, and that is not defensiveness.** The first draft
+    sourced grants from `information_schema.role_table_grants`, which hides every grant from
+    that role: it answered **zero rows on both projects and was reported as parity**. Floors come
+    from documented invariants, never from today's counts. Full rules: `test-plan.md` § 6.9.
+  - **The check is proven able to fail, and the proof is committed**:
+    `node scripts/parity-selftest.mjs gymlog-test` mutates the test schema, asserts the named
+    aspect reports the named object and nothing else moved, and reverts in a `finally`. Not in any
+    gate, and must not be — the eight steps stay incapable of mutating a database.
+  - **Three exit codes, and the third is the point**: agree, differ, and **could not be**
+    **compared**. An unreadable project is not an agreeing one.
+  - **`SUPABASE_ACCESS_TOKEN` must never reach CI.** It is account-wide and can run arbitrary SQL
+    against production through the same endpoint — strictly more powerful than the database
+    password CI is already refused. This is why the check is local rather than a CI job.
 - **There is deliberately no single-target push.** Advancing one schema and forgetting the other is
   the only way the two drift, so forgetting is not an available mistake. If the production push fails
   after the test push succeeded, the wrapper says so by name; fix the cause and re-run `db:push`,
@@ -579,8 +604,23 @@ support, and `wrangler.jsonc` declares a Workers Static Assets project. The depl
 - **Missing secrets fail silently, not loudly.** `src/lib/supabase.ts` returns `null` when
   `SUPABASE_URL` / `SUPABASE_KEY` are absent, and `src/middleware.ts` then sets `locals.user = null`.
   The app builds, deploys, serves 200s, and nobody can sign in. GitHub repository secrets are
-  **build-time only** — the Worker needs its own `wrangler secret put`. No pipeline can catch this;
-  check it by signing in against the deployed URL.
+  **build-time only** — the Worker needs its own `wrangler secret put`. No pipeline can catch this.
+  - **`npm run deploy` now catches it, and a GET never could.** The smoke
+    (`scripts/deploy-smoke.mjs`) POSTs deliberately-invalid credentials and reads the `?error=`
+    code on the redirect: `sign_in_failed` means the Worker reached Supabase and was accepted,
+    `not_configured` means the secrets are absent, `unexpected` means they are present and wrong,
+    and `rate_limited` is **inconclusive rather than a failure**. An unauthenticated GET answers
+    identically in every one of those cases — measured 2026-08-21, which is also why the
+    banner-absence check `infrastructure.md` proposed passes in exactly the broken case.
+  - **A `fetch` POST must send `Origin`** or `security.checkOrigin` answers `403` before any
+    handler runs, which reads exactly like an absent credential.
+  - **What the smoke does NOT prove**, and it prints this on every pass: which Supabase project
+    the Worker points at, and that a real account can complete a session. Only signing in does —
+    the `sb-<ref>-auth-token` cookie is what names the project.
+  - **No automatic rollback.** Absent secrets are Worker state, not deployment state, so the
+    previous version lacks them too; rolling back would turn a loud failure into a quiet one.
+  - **Deploy stays manual and out of CI**, so no merge can overwrite production — the same
+    property CI is already denied for the database.
 - **`astro dev` already runs the real workerd runtime** (adapter v13 bundles
   `@cloudflare/vite-plugin`). Do not add a `wrangler dev` step **to the development loop** — it is
   legacy there, and `platformProxy` was removed. **That sentence is about the dev loop only and does
