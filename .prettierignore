@@ -1,0 +1,5 @@
+# Third-party content kept byte-for-byte. Prettier's markdown reflow is not
+# lossless here: it read the glob patterns `*.test.*` / `*.spec.*` in the
+# instructors' text as emphasis and rewrote them to `_.test._` / `_.spec._`,
+# which no longer names any file pattern. Measured 2026-08-22.
+.claude/skills/mvp-check/SKILL.md
