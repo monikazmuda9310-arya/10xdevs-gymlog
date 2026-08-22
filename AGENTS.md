@@ -718,6 +718,14 @@ reader could not infer from there.
   which is what puts them inside that group — a separate workflow would **not** join it and would
   reintroduce the race the group exists to prevent. **No new repository secret was needed**: the five
   existing ones cover both, and neither step carries a production credential.
+  - **The group orders CI against CI and nothing else, so a LOCAL run races it.** It is keyed on the
+    workflow, which cannot see a developer running `test:integration`, `test:middleware` or
+    `test:e2e` from their machine — and all three write the same `gymlog-test` fixture rows. Measured
+    2026-08-22: a local integration run overlapped a PR's own run by **53 seconds** and went red on
+    one assertion, against a change no suite under `tests/` even imports. **Check `gh run list
+--limit 1` before running one locally**, and when a shared-state suite fails once and passes on
+    re-run, settle the cause from timing and coupling before debugging the diff. Full record:
+    `lessons.md` § "The CI concurrency group serialises CI against CI".
 - **Five tables.** `public.profiles` (one row per account, created by a trigger on `auth.users` and
   backfilled); `public.exercises` (the catalogue — **38 seeded rows** with `user_id is null` plus
   custom rows private to their owner, § shared-catalogue variant in `context/foundation/access-control.md`); and `public.workouts` →

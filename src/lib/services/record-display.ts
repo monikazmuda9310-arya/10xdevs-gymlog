@@ -209,6 +209,13 @@ export function impactSentence(
  * alone, so the pair that produced the duplicate collapses to one.
  *
  * Order is the caller's, first occurrence wins: the rows read in the order the records were affected.
+ *
+ * **One exercise never yields both a record-scoped and an exercise-scoped row**, which is what keeps
+ * the two identities from describing the same lift at once. It holds by construction rather than by
+ * assertion: `fallingRecords` reads a single `SurvivingFor` per exercise, and `anySetSurvives: false`
+ * means neither candidate exists — so all of that exercise's records take the `no_sets_left` branch
+ * together, or none of them does. If that ever stopped being true the dialog would print "falls to
+ * X" and "will no longer appear at all" for one lift, side by side.
  */
 export function impactSentences(
   records: readonly FallingRecord[],

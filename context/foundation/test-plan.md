@@ -797,6 +797,15 @@ check was real (an`extensions` aspect written from §6.9 alone, run green, disca
   named properties instead.
 - **That the provider's client library works** — the boundary under test is our policy, not their
   SDK.
+- **The confirmation dialog as a rendered component** — `RecordImpactDialog.tsx` is mounted by no
+  suite, and this is a **named gap rather than a judgement that it does not matter**. The unit suite
+  covers `impactSentence` and `impactSentences` since 2026-08-22; nothing renders the component that
+  calls them. The render project cannot mount React islands (it renders Astro pages through the
+  container), and the browser project could but the harness crashed three times in the week of
+  2026-08-16 for reasons unrelated to the product (§ 6.3). **The duplicate-sentence defect of
+  2026-08-22 lived exactly in that gap** — found by the owner clicking through the deployed app, with
+  every one of the eight gate steps green. Re-evaluate when the e2e harness is trusted enough to carry
+  a spec that constructs "an exercise whose single set holds both records".
 
 ## 8. Freshness Ledger
 
