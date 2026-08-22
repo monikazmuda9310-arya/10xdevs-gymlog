@@ -646,6 +646,30 @@ restrict` above then **blocks that cascade**. One account could permanently prev
   change is archived" — same failure, different address space: that one dies to a **move**, this
   one to a **squash**.
 
+## The CI concurrency group serialises CI against CI — a local run races it anyway
+
+- **Context**: `.github/workflows/ci.yml` § `concurrency`, and `npm run test:integration` against
+  `gymlog-test`. Measured on 2026-08-22 during `/10x-impl-review` of the
+  **`duplicate-record-impact-sentence`** change.
+- **Problem**: the integration suite reported `1 failed | 141 passed`, and passed on the two runs
+  before and the two after. The change under review touches only display-layer TypeScript and **no
+  suite under `tests/` imports it at all**, so the code could not be the cause. The clock settled it:
+  CI run `32582561154` ran its own `test:integration` step against `gymlog-test` from `15:44:57Z` to
+  `15:48:01Z`, while the local run started `15:47:08Z` and ran 71.9 s — **53 seconds of overlap, both
+  writing the same fixture rows.** `AGENTS.md` presents the workflow's `concurrency` group as the
+  thing that stops two runs racing those rows, and it does; but it is keyed on the workflow, so it
+  orders **CI against CI and nothing else**. A developer's local run is invisible to it. The failure
+  then looks exactly like a product defect in whatever was just written, which is the expensive part:
+  the natural next move is to debug the diff.
+- **Rule**: **before running a suite that writes to a shared hosted project, check whether CI is
+  already running one.** `gh run list --limit 1` answers it. And when a suite that touches shared
+  state fails once and passes on re-run, **establish the cause from timing and coupling before
+  touching the code** — "did anything else hold this resource" and "does the changed code even reach
+  this suite" are both cheap and both answerable. Capture the failing output at the moment it
+  happens; a flake whose output was not kept cannot be told apart from one that was never diagnosed.
+- **Applies to**: `test:integration`, `test:middleware` and `test:e2e` — all three write to
+  `gymlog-test`. Not the hermetic projects (`npm test`, `test:render`), which share nothing.
+
 ## Measurement record — the evidence behind the rules in `AGENTS.md`
 
 > **These entries are not rules and must not be read as ones.** They are the measurements and

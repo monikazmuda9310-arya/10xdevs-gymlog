@@ -176,6 +176,24 @@ carrying the claim goes FIRST" is about exactly this.
 
 **Implementation Note**: pause for manual confirmation before Phase 2.
 
+### Addendum — where the implementation departed from the contracts above (2026-08-22)
+
+Recorded during `/10x-impl-review` so a later reader comparing plan against code does not read these
+as drift. All three are the plan text being wrong rather than the code.
+
+- **The collapse key is not `(scope, exerciseId)`.** Contract #2 says that literally, and taken
+  literally it collapses two **different** records of one exercise into one line — contradicting this
+  plan's own Testing Strategy control ("two kinds, same exercise, different successors → two rows").
+  What shipped keys a row on its **subject**: `exercise-<id>` for `scope: "exercise"`,
+  `record-<kind>-<id>` for `scope: "record"`.
+- **The collapse lives in the service, not the dialog.** Contract #2 assigns it to
+  `RecordImpactDialog.tsx`; it is `impactSentences` in `record-display.ts`. Forced by contract #4,
+  which demands an assertion that two entries "collapse to **one** row" — unreachable from the unit
+  suite while the collapse sits in a `client:load` island. `lessons.md` § "A criterion that demands a
+  unit test must name the module that will hold it", recurring inside the change that cites it.
+- **`ImpactRow` is exported and contract #1 does not list it.** It is `ImpactSentence` plus the `key`
+  the React list needs, and it exists so the dialog does not rebuild row identity itself.
+
 ---
 
 ## Phase 2: On the public URL, seen
