@@ -623,6 +623,29 @@ restrict` above then **blocks that cascade**. One account could permanently prev
   an absence. An absence-assertion with no positive control is the most confident-looking way to
   test nothing.
 
+## A recorded commit SHA outlives its branch only if the repo does not squash
+
+- **Context**: the Progress sections of every `plan.md`, which record the commit each step landed
+  in. Found on 2026-08-21 while deciding whether an archived change's branches could be deleted.
+- **Problem**: the convention assumes a SHA is a durable address. Under squash merging it is not —
+  the merge replaces the branch's commits with one new commit, so the recorded SHAs exist only on
+  the branch, and deleting it makes `git show` stop resolving with no error and nothing to notice.
+  Measured across all fourteen archived plans: the ten from 2026-08-09…08-14 have **51 of 51** SHAs
+  reachable from `main`, because that work was pushed straight to `main`; the four from 2026-08-16
+  onward have **0 of 22**, because that work went through squash-merged PRs. **The change that made
+  `main` safe is the change that made the SHAs perishable** — the same PR flow, arriving. Nobody
+  connected the two, and the tidying instinct that deletes merged branches is exactly what would
+  collect the debt.
+- **Rule**: **before recording a pointer, ask what deletes it.** A SHA under squash is scoped to a
+  branch, not to the repository — so either keep the branch (this repo's answer:
+  `delete_branch_on_merge: false`, now stated as a reason rather than a default), or record
+  something the merge preserves, such as the PR number the squash subject already carries. Verify
+  before deleting anything that a plan cites: `git merge-base --is-ancestor <sha> origin/main`.
+- **Applies to**: `/10x-implement`'s SHA write-back, `/10x-archive`'s branch cleanup, and any
+  document citing a commit. Sibling of § "A pointer INTO `context/changes/` dies the day that
+  change is archived" — same failure, different address space: that one dies to a **move**, this
+  one to a **squash**.
+
 ## Measurement record — the evidence behind the rules in `AGENTS.md`
 
 > **These entries are not rules and must not be read as ones.** They are the measurements and
