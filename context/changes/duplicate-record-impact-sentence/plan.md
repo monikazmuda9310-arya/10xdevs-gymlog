@@ -244,18 +244,18 @@ reasons unrelated to the product. **Stated so a green suite is not read as cover
 
 #### Automated
 
-- [x] 1.1 `npm test` passes with the new `record-display.test.ts` cases
-- [x] 1.2 `npm run lint` passes
-- [x] 1.3 `npm run typecheck` passes
-- [x] 1.4 `npx prettier --check` passes on all four touched files
-- [x] 1.5 `npm run test:render` and `npm run test:integration` still pass
-- [x] 1.6 Mutation: reverting the collapse reddens the duplicate assertion, and that one specifically
-- [x] 1.7 No definition of `impactSentence` or `RECORD_LABEL` remains under `src/components/`
+- [x] 1.1 `npm test` passes with the new `record-display.test.ts` cases — debc113
+- [x] 1.2 `npm run lint` passes — debc113
+- [x] 1.3 `npm run typecheck` passes — debc113
+- [x] 1.4 `npx prettier --check` passes on all four touched files — debc113
+- [x] 1.5 `npm run test:render` and `npm run test:integration` still pass — debc113
+- [x] 1.6 Mutation: reverting the collapse reddens the duplicate assertion, and that one specifically — debc113
+- [x] 1.7 No definition of `impactSentence` or `RECORD_LABEL` remains under `src/components/` — debc113
 
 #### Manual
 
-- [x] 1.8 The header comment explains why the collapse exists
-- [x] 1.9 No sentence text changed — only how many times each is printed
+- [x] 1.8 The header comment explains why the collapse exists — debc113
+- [x] 1.9 No sentence text changed — only how many times each is printed — debc113
 
 ### Phase 2: On the public URL, seen
 
