@@ -15,7 +15,7 @@
  */
 
 import type { EstimationFormula, PersonalRecordRow, WeightUnit } from "@/types";
-import type { FallingRecord } from "./record-impact";
+import type { FallingRecord, RecordKind } from "./record-impact";
 import { estimateForLoggedSet, roundForDisplay, weightInUnit } from "./set-display";
 
 /** One record, ready to print: the figure, and the set that still backs it (US-02). */
@@ -103,6 +103,134 @@ export function fallToFigure(record: FallingRecord, unit: WeightUnit, formula: E
     return { kind: "no_qualifying_set" };
   }
   return { kind: "figure", figure: { value: roundForDisplay(estimate.oneRepMax), ...shared } };
+}
+
+/**
+ * The two record kinds as a reader sees them named, and the sentence each one's future is written
+ * into. Both lived in `RecordImpactDialog.tsx` until 2026-08-22; they moved here because a rule
+ * living inside a `client:load` island is a rule the unit suite cannot reach, and this one shipped
+ * a visible defect to the deployed app with every gate green.
+ */
+const RECORD_LABEL: Record<RecordKind, string> = {
+  estimate: "best estimated 1RM",
+  heaviest: "heaviest weight",
+};
+
+/**
+ * One sentence, and **what that sentence is about** — which is the whole point of the type.
+ *
+ * `fallingRecords` emits one entry per record KIND, and it is right to: a set holding both records
+ * really does take both of them down. But one of the three futures is not about a record at all.
+ * "Back Squat will no longer appear in your records at all" is a fact about the **exercise**, so a
+ * set that holds both records and is the last one logged for its lift produced that sentence twice,
+ * word for word, on the deployed app.
+ *
+ * So a sentence declares its own scope and the caller collapses on it. The alternative — comparing
+ * the rendered strings — works today only because the other branches happen to interpolate
+ * `RECORD_LABEL`; the day one of them stops, two genuinely different records would collapse into one
+ * row and nothing would say so.
+ */
+export interface ImpactSentence {
+  /** `"record"`: true of one of the two records. `"exercise"`: true of the lift as a whole. */
+  scope: "record" | "exercise";
+  text: string;
+}
+
+/** A sentence with the identity of its subject attached — the collapse, and the React key. */
+export interface ImpactRow extends ImpactSentence {
+  key: string;
+}
+
+/**
+ * One record's future, in one sentence.
+ *
+ * **An edit is stated conditionally and a deletion absolutely**, and the difference is not politeness.
+ * The exact record after an edit is `max(the set's new estimate, the successor)`, and computing the
+ * first in float64 to compare against the second — which Postgres produced in exact `numeric` — is
+ * the one comparison this project forbids. So the dialog quotes the successor, which is exact, and
+ * says "if this change takes the record off this set".
+ *
+ * **`no_sets_left` is a deletion's answer only.** The impact query excludes the set being edited, so
+ * "nothing else survives" comes back for an exercise whose only set is the one being corrected — but
+ * that set is not going anywhere, and the exercise will still be on `/records` afterwards. Telling
+ * somebody their lift is about to vanish because they fixed its RPE would be exactly the invented
+ * screen state the three-outcome successor type exists to prevent, so an edit reads both empty
+ * outcomes as "nothing else could hold it". **That is also why only the delete path can return
+ * `scope: "exercise"`**: every other branch interpolates `RECORD_LABEL` and therefore says something
+ * true of one record only.
+ */
+export function impactSentence(
+  record: FallingRecord,
+  action: "delete" | "edit",
+  unit: WeightUnit,
+  formula: EstimationFormula,
+): ImpactSentence {
+  const label = RECORD_LABEL[record.kind];
+  const fall = fallToFigure(record, unit, formula);
+
+  if (action === "edit") {
+    if (fall.kind !== "figure") {
+      return {
+        scope: "record",
+        text: `If this change takes the ${label} for ${record.exerciseName} off this set, no other set can hold it — the exercise would show none.`,
+      };
+    }
+    return {
+      scope: "record",
+      text: `If this change takes the ${label} for ${record.exerciseName} off this set, it falls to ${fall.figure.value} ${unit}, from ${fall.figure.reps} × ${fall.figure.weight} ${fall.figure.weightUnit} on ${fall.figure.performedOn}.`,
+    };
+  }
+
+  switch (fall.kind) {
+    case "figure":
+      return {
+        scope: "record",
+        text: `Your ${label} for ${record.exerciseName} falls to ${fall.figure.value} ${unit}, from ${fall.figure.reps} × ${fall.figure.weight} ${fall.figure.weightUnit} on ${fall.figure.performedOn}.`,
+      };
+    case "no_qualifying_set":
+      return {
+        scope: "record",
+        text: `${record.exerciseName} will have no ${label}: no other set you have logged for it qualifies.`,
+      };
+    case "no_sets_left":
+      return {
+        scope: "exercise",
+        text: `${record.exerciseName} will no longer appear in your records at all — this removes the last set you have logged for it.`,
+      };
+  }
+}
+
+/**
+ * The list the dialog prints: **one row per distinct future**, not one per affected record.
+ *
+ * A record-scoped sentence is identified by its exercise AND its kind, so two records falling for the
+ * same lift stay two rows — they are different futures and the product's whole S-05 premise is that
+ * different futures never share a sentence. An exercise-scoped sentence is identified by the exercise
+ * alone, so the pair that produced the duplicate collapses to one.
+ *
+ * Order is the caller's, first occurrence wins: the rows read in the order the records were affected.
+ */
+export function impactSentences(
+  records: readonly FallingRecord[],
+  action: "delete" | "edit",
+  unit: WeightUnit,
+  formula: EstimationFormula,
+): ImpactRow[] {
+  const rows: ImpactRow[] = [];
+  const seen = new Set<string>();
+
+  for (const record of records) {
+    const sentence = impactSentence(record, action, unit, formula);
+    const key =
+      sentence.scope === "exercise" ? `exercise-${record.exerciseId}` : `record-${record.kind}-${record.exerciseId}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    rows.push({ key, ...sentence });
+  }
+
+  return rows;
 }
 
 /**
