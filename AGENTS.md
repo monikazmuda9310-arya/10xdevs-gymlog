@@ -298,6 +298,30 @@ non-interactive Vitest run.
       content is wholly on `main`, and no Progress row ever cites it. Check before assuming, the
       way `chore(archive): close testing-environment-parity` was checked: compare the SHAs the
       archived `plan.md` names against `origin/main` and against the branch you are about to drop.
+    - **FOUR branches must not be deleted, and they are named here because the general rule is not
+      enough.** Every unreachable SHA was traced on 2026-08-22 and all 22 are accounted for:
+
+      | Archived plan                  | SHAs | Held only by                           |
+      | ------------------------------ | ---- | -------------------------------------- |
+      | `testing-browser-layer`        | 7    | `phase-2-browser-layer-plan`           |
+      | `testing-silent-failure-audit` | 5    | `feature/testing-silent-failure-audit` |
+      | `testing-week-boundary-seam`   | 4    | `testing-week-boundary-seam`           |
+      | `testing-environment-parity`   | 6    | `testing-environment-parity`           |
+
+      **`phase-2-browser-layer-plan` is the trap in that list.** Its name says _plan_, so it reads
+      like a drafting branch to throw away; it actually holds the whole of Phase 2's implementation.
+      Its PR is merged, so the cheap check — _is the content on `main`?_ — answers **yes** and would
+      clear it for deletion. Only the second check catches it. A guess about which branch held those
+      SHAs was made before the measurement and was **wrong**.
+
+    - **The two checks, in the order that matters.** _Is the PR merged?_ answers whether the CONTENT
+      survived. _Does any `plan.md` cite a SHA reachable only from this branch?_ answers whether the
+      POINTERS do. They are different questions and the first one passing is not the second one
+      passing.
+      - Do **not** use `git diff main <branch>` for the first check: it reports differences in both
+        directions, so an old merged branch looks full of unmerged content when what it is really
+        showing is everything `main` gained afterwards. Measured 2026-08-22 — it flagged four of five
+        already-merged branches.
 
 **There are FOUR Vitest projects and they cannot see each other's files** — deliberately, by include
 glob: `src/**` for `npm test`, `tests/integration/**`, `tests/render/**`, `tests/middleware/**`.
