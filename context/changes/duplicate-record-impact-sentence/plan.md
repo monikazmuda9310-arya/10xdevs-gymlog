@@ -261,11 +261,11 @@ reasons unrelated to the product. **Stated so a green suite is not read as cover
 
 #### Automated
 
-- [ ] 2.1 `npm run deploy` exits 0 with `deploy-smoke: PASS`
-- [ ] 2.2 `npm run db:parity` still exits 0
+- [x] 2.1 `npm run deploy` exits 0 with `deploy-smoke: PASS` — abb13e2
+- [x] 2.2 `npm run db:parity` still exits 0 — abb13e2
 
 #### Manual
 
-- [ ] 2.3 Deployed: deleting the last set of a both-records exercise shows the sentence once
-- [ ] 2.4 Deployed: a set holding both records with other sets left still shows two lines
-- [ ] 2.5 The `edit` dialog is unchanged
+- [x] 2.3 Deployed: deleting the last set of a both-records exercise shows the sentence once — abb13e2
+- [x] 2.4 Deployed: a set holding both records with other sets left still shows two lines — abb13e2
+- [x] 2.5 The `edit` dialog is unchanged — abb13e2
