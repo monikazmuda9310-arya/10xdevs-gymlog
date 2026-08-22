@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { bestEstimateFigure, fallToFigure, heaviestFigure } from "@/lib/services/record-display";
+import {
+  bestEstimateFigure,
+  fallToFigure,
+  heaviestFigure,
+  impactSentence,
+  impactSentences,
+} from "@/lib/services/record-display";
 import type { FallingRecord, RecordCandidate } from "@/lib/services/record-impact";
 import type { PersonalRecordRow } from "@/types";
 
@@ -165,5 +171,162 @@ describe("fallToFigure", () => {
     expect(fallToFigure(falling("estimate", { kind: "no_sets_left" }), "kg", "brzycki")).toEqual({
       kind: "no_sets_left",
     });
+  });
+});
+
+describe("impactSentences", () => {
+  function falling(
+    kind: "estimate" | "heaviest",
+    successor: FallingRecord["successor"],
+    exerciseId = "exercise",
+  ): FallingRecord {
+    return { kind, exerciseId, exerciseName: "Bench Press", holderSetId: `holder-${kind}`, successor };
+  }
+
+  const successorSet: RecordCandidate = {
+    set_id: "successor",
+    reps: 5,
+    weight: 90,
+    weight_unit: "kg",
+    weight_kg: 90,
+    performed_on: "2026-08-01",
+  };
+
+  // The defect this change exists to fix, and the claim of this whole block — so it goes first, or a
+  // mutation reverting the collapse would land on one of the wording assertions below instead.
+  it("prints the exercise leaving /records ONCE when a set holds both records and is its last", () => {
+    const rows = impactSentences(
+      [falling("estimate", { kind: "no_sets_left" }), falling("heaviest", { kind: "no_sets_left" })],
+      "delete",
+      "kg",
+      "brzycki",
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].text).toBe(
+      "Bench Press will no longer appear in your records at all — this removes the last set you have logged for it.",
+    );
+    expect(rows[0].scope).toBe("exercise");
+  });
+
+  // The control the collapse must not swallow: same lift, same future KIND, two different records.
+  it("keeps two rows when both records fall for one exercise but each is about a record", () => {
+    const rows = impactSentences(
+      [falling("estimate", { kind: "no_qualifying_set" }), falling("heaviest", { kind: "no_qualifying_set" })],
+      "delete",
+      "kg",
+      "brzycki",
+    );
+
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.text)).toEqual([
+      "Bench Press will have no best estimated 1RM: no other set you have logged for it qualifies.",
+      "Bench Press will have no heaviest weight: no other set you have logged for it qualifies.",
+    ]);
+  });
+
+  it("keeps two rows for the same lift when the records fall to different successors", () => {
+    const rows = impactSentences(
+      [
+        falling("estimate", { kind: "candidate", candidate: successorSet }),
+        falling("heaviest", { kind: "no_qualifying_set" }),
+      ],
+      "delete",
+      "kg",
+      "brzycki",
+    );
+
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.scope === "record")).toBe(true);
+  });
+
+  it("does not collapse `no_sets_left` on an EDIT, because an edit never says the lift is leaving", () => {
+    // The impact query excludes the set being edited, so `no_sets_left` comes back for an exercise
+    // whose only set is the one being corrected — and that set is not going anywhere. Both entries
+    // read as record-scoped there, so both keep their line.
+    const rows = impactSentences(
+      [falling("estimate", { kind: "no_sets_left" }), falling("heaviest", { kind: "no_sets_left" })],
+      "edit",
+      "kg",
+      "brzycki",
+    );
+
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.scope === "record")).toBe(true);
+  });
+
+  it("gives each row a key that is stable and distinct", () => {
+    const rows = impactSentences(
+      [
+        falling("estimate", { kind: "no_qualifying_set" }),
+        falling("heaviest", { kind: "no_qualifying_set" }),
+        falling("estimate", { kind: "no_qualifying_set" }, "other-exercise"),
+      ],
+      "delete",
+      "kg",
+      "brzycki",
+    );
+
+    expect(new Set(rows.map((row) => row.key)).size).toBe(3);
+  });
+});
+
+describe("impactSentence", () => {
+  function falling(kind: "estimate" | "heaviest", successor: FallingRecord["successor"]): FallingRecord {
+    return { kind, exerciseId: "exercise", exerciseName: "Bench Press", holderSetId: "holder", successor };
+  }
+
+  const candidate: FallingRecord["successor"] = {
+    kind: "candidate",
+    candidate: {
+      set_id: "successor",
+      reps: 5,
+      weight: 90,
+      weight_unit: "kg",
+      weight_kg: 90,
+      performed_on: "2026-08-01",
+    },
+  };
+
+  // The six combinations: three futures x two actions. Every text is typed out rather than built
+  // from the subject, so a template change has to be re-read by a human to go green again.
+  it("states a deletion absolutely and quotes the successor", () => {
+    expect(impactSentence(falling("estimate", candidate), "delete", "kg", "brzycki")).toEqual({
+      scope: "record",
+      text: "Your best estimated 1RM for Bench Press falls to 101.3 kg, from 5 × 90 kg on 2026-08-01.",
+    });
+  });
+
+  it("states an edit conditionally, because the record afterwards is a comparison this project forbids", () => {
+    expect(impactSentence(falling("heaviest", candidate), "edit", "kg", "brzycki")).toEqual({
+      scope: "record",
+      text: "If this change takes the heaviest weight for Bench Press off this set, it falls to 90 kg, from 5 × 90 kg on 2026-08-01.",
+    });
+  });
+
+  it("names the record when the lift stays on /records with nothing to show for it", () => {
+    expect(impactSentence(falling("estimate", { kind: "no_qualifying_set" }), "delete", "kg", "brzycki")).toEqual({
+      scope: "record",
+      text: "Bench Press will have no best estimated 1RM: no other set you have logged for it qualifies.",
+    });
+  });
+
+  it("is exercise-scoped only where the lift really leaves /records", () => {
+    expect(impactSentence(falling("heaviest", { kind: "no_sets_left" }), "delete", "kg", "brzycki")).toEqual({
+      scope: "exercise",
+      text: "Bench Press will no longer appear in your records at all — this removes the last set you have logged for it.",
+    });
+  });
+
+  it("reads both empty outcomes as one sentence on an edit, and neither is exercise-scoped", () => {
+    const expected = {
+      scope: "record",
+      text: "If this change takes the best estimated 1RM for Bench Press off this set, no other set can hold it — the exercise would show none.",
+    };
+
+    expect(impactSentence(falling("estimate", { kind: "no_qualifying_set" }), "edit", "kg", "brzycki")).toEqual(
+      expected,
+    );
+    expect(impactSentence(falling("estimate", { kind: "no_sets_left" }), "edit", "kg", "brzycki")).toEqual(expected);
   });
 });
