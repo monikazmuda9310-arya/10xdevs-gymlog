@@ -1,10 +1,10 @@
 ---
 change_id: account-deletion
 title: Let an account delete itself, and fail honestly when the database refuses
-status: impl_reviewed
+status: archived
 created: 2026-08-14
-updated: 2026-08-15
-archived_at: null
+updated: 2026-08-22
+archived_at: 2026-08-22T16:59:43Z
 ---
 
 ## Notes
