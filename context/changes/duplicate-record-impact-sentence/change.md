@@ -1,7 +1,7 @@
 ---
 change_id: duplicate-record-impact-sentence
 title: The delete dialog says an exercise leaves your records twice
-status: implementing
+status: implemented
 created: 2026-08-22
 updated: 2026-08-22
 archived_at: null
