@@ -298,15 +298,22 @@ non-interactive Vitest run.
       content is wholly on `main`, and no Progress row ever cites it. Check before assuming, the
       way `chore(archive): close testing-environment-parity` was checked: compare the SHAs the
       archived `plan.md` names against `origin/main` and against the branch you are about to drop.
-    - **FOUR branches must not be deleted, and they are named here because the general rule is not
-      enough.** Every unreachable SHA was traced on 2026-08-22 and all 22 are accounted for:
+    - **FIVE branches must not be deleted, and they are named here because the general rule is not
+      enough.** The first four were traced on 2026-08-22, all 22 SHAs accounted for; the fifth was
+      created the same day and is listed the moment its plan was archived rather than at the next
+      audit:
 
-      | Archived plan                  | SHAs | Held only by                           |
-      | ------------------------------ | ---- | -------------------------------------- |
-      | `testing-browser-layer`        | 7    | `phase-2-browser-layer-plan`           |
-      | `testing-silent-failure-audit` | 5    | `feature/testing-silent-failure-audit` |
-      | `testing-week-boundary-seam`   | 4    | `testing-week-boundary-seam`           |
-      | `testing-environment-parity`   | 6    | `testing-environment-parity`           |
+      | Archived plan                      | SHAs | Held only by                               |
+      | ---------------------------------- | ---- | ------------------------------------------ |
+      | `testing-browser-layer`            | 7    | `phase-2-browser-layer-plan`               |
+      | `testing-silent-failure-audit`     | 5    | `feature/testing-silent-failure-audit`     |
+      | `testing-week-boundary-seam`       | 4    | `testing-week-boundary-seam`               |
+      | `testing-environment-parity`       | 6    | `testing-environment-parity`               |
+      | `duplicate-record-impact-sentence` | 2    | `feature/duplicate-record-impact-sentence` |
+
+      **The list grows whenever a plan is archived, and the moment to extend it is the archive
+      itself.** Waiting for an audit is how a branch spends weeks looking deletable: its PR is
+      merged, its content is on `main`, and only this table says otherwise.
 
       **`phase-2-browser-layer-plan` is the trap in that list.** Its name says _plan_, so it reads
       like a drafting branch to throw away; it actually holds the whole of Phase 2's implementation.
